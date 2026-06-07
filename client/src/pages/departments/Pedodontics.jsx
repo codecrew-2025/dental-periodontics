@@ -8,13 +8,13 @@ const CASE_CONSENT_NAV_STATE_KEY = 'caseSheetConsentApproved';
 import { getCurrentPatientId, getSharedXrayImage } from '../../utils/sharedXray';
 import { clearCaseDraft, loadCaseDraft, saveCaseDraft } from '../../utils/caseDraft';
 
-const Pedodontics = () => {
+const Pedodontics = ({ initialCaseData, readOnly = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const DRAFT_ROUTE_KEY = '/pedodontics';
   const [currentPage, setCurrentPage] = useState(0);
   const { user } = useAuth();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState(initialCaseData || {
     medicalHistory: '',
     dentalHistory: '',
     currentMedications: '',
@@ -88,6 +88,14 @@ const Pedodontics = () => {
   const buildApiUrl = (path) => `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 
   useEffect(() => {
+    if (initialCaseData) {
+      if (initialCaseData.digitalSignature) {
+        setSignaturePreview(initialCaseData.digitalSignature);
+      }
+      setIsDraftHydrated(true);
+      return;
+    }
+
     const prefill = location.state?.redoEdit ? location.state?.prefillCaseData : null;
     const editCaseId = String(location.state?.editCaseId || localStorage.getItem('redoEditCaseId') || '').trim();
     if (prefill && editCaseId) {
@@ -1333,11 +1341,13 @@ const Pedodontics = () => {
         </div>
 
         <form>
-          {renderPage1()}
-          {renderPage2()}
-          {renderPage3()}
-          {renderPage4()}
-          {renderPage5()}
+          <fieldset disabled={readOnly} style={{ border: 'none', margin: 0, padding: 0 }}>
+            {renderPage1()}
+            {renderPage2()}
+            {renderPage3()}
+            {renderPage4()}
+            {renderPage5()}
+          </fieldset>
 
           <div className="navigation">
             <button
@@ -1350,7 +1360,8 @@ const Pedodontics = () => {
             <button
               type="button"
               onClick={handleNext}
-              disabled={isSubmitting}
+              disabled={isSubmitting || (readOnly && currentPage === totalPages - 1)}
+              style={readOnly && currentPage === totalPages - 1 ? { display: 'none' } : {}}
             >
               {isSubmitting ? 'Submitting...' : (currentPage === totalPages - 1 ? 'Submit' : 'Next')}
             </button>

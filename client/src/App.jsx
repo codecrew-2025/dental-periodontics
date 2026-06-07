@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Home from './pages/AppHome';
 import Login from './pages/Login';
@@ -16,8 +16,10 @@ import MyAppointment from './pages/MyAppointment';
 import DoctorSchedule from './pages/DoctorSchedules';
 import CasePortal from './pages/casePortal';
 import Pedodontics from './pages/departments/Pedodontics';
+import PeriodonticsLongCaseSheet from './pages/departments/Doctor_Long_Case_Sheet_Periodontics';
+import PeriodonticsShortCaseSheet from './pages/departments/Small_Casesheet_Periodontics';
 import OralMedicine from './pages/departments/OralMedicine';
-import ImplantPatient from './pages/departments/prosthodontics/ImplantPatient';
+
 import { AuthProvider, useAuth } from './pages/context/AuthContext';
 import ProtectedRoute from './pages/context/ProtectedRoute';
 import Prescription from './pages/prescription';
@@ -28,10 +30,7 @@ import CaseHistory from './pages/caseHistory';
 import Unauthorized from './pages/Unauthorized'; // Import the new component
 import ForgetPassword from './pages/forgetpassword';
 import MyPrescriptions from './pages/MyPrescriptions';
-import Complete_denture from './pages/departments/prosthodontics/Complete_denture';
-import Partial from './pages/departments/prosthodontics/partial';
-import Fpd from './pages/departments/prosthodontics/Fpd';
-import Implant from './pages/departments/prosthodontics/Implant';
+
 import DentalBillingApp from './pages/DentalBillingApp';
 import BillX from './pages/casesheetBilling';
 import XRayBilling from './pages/x_ray';
@@ -45,7 +44,7 @@ import PGDashboard from './pages/PGDashboard';
 import UGDashboard from './pages/UGDashboard';
 import ConsentForm from './pages/consentform';
 import CampDashboard from './pages/CampDashboard';
-import ConservativeDentistry from './pages/departments/ConservativeDentistry';
+
 
 const getDashboardRouteByRole = (role) => {
   const normalizedRole = String(role || '').trim().toLowerCase();
@@ -200,10 +199,7 @@ const AppRoutes = () => {
         <Route
           path="/pg-dashboard"
           element={
-            <ProtectedRoute
-              allowedRoles={['pg']}
-              allowedDepartments={['public health dentistry', 'publichealthdentistry', 'publichealth', 'communitydentistry']}
-            >
+            <ProtectedRoute allowedRoles={['pg']}>
               <PGDashboard />
             </ProtectedRoute>
           }
@@ -212,10 +208,7 @@ const AppRoutes = () => {
         <Route
           path="/ug-dashboard"
           element={
-            <ProtectedRoute
-              allowedRoles={['ug']}
-              allowedDepartments={['public health dentistry', 'publichealthdentistry', 'publichealth', 'communitydentistry']}
-            >
+            <ProtectedRoute allowedRoles={['ug']}>
               <UgDashboardRoute />
             </ProtectedRoute>
           }
@@ -291,19 +284,8 @@ const AppRoutes = () => {
             <ProtectedRoute
               allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
               allowedDepartments={[
-                'pedodontics',
-                'prosthodontics',
-                'prothodontics',
-                'prosthondontics',
-                'completedenture',
-                'fpd',
-                'fixedpartialdenture',
-                'implantology',
-                'implant',
-                'implantpatient',
-                'partialdenture',
-                'partial',
                 'periodontics',
+                'periodontology',
                 'general',
                 'generaldentistry',
                 'oral',
@@ -311,11 +293,76 @@ const AppRoutes = () => {
                 'oralandmaxillofacialsurgery',
                 'oralmedicine',
                 'oralmedicineandradiology',
-                'oralmedicineradiology',
-                'conservativedentistryandendodontics'
+                'oralmedicineradiology'
               ]}
             >
               <CasePortal />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/periodontics"
+          element={
+            <ProtectedRoute
+              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
+              allowedDepartments={[
+                'periodontics',
+                'periodontology',
+                'general',
+                'generaldentistry',
+                'oral',
+                'oralandmaxillofacial',
+                'oralandmaxillofacialsurgery',
+                'oralmedicine',
+                'oralmedicineandradiology',
+                'oralmedicineradiology'
+              ]}
+            >
+              <CasePortal />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/periodontics/long"
+          element={
+            <ProtectedRoute
+              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
+              allowedDepartments={[
+                'periodontics',
+                'periodontology',
+                'general',
+                'generaldentistry',
+                'oral',
+                'oralandmaxillofacial',
+                'oralandmaxillofacialsurgery',
+                'oralmedicine',
+                'oralmedicineandradiology',
+                'oralmedicineradiology'
+              ]}
+            >
+              <PeriodonticsLongCaseSheet />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/periodontics/short"
+          element={
+            <ProtectedRoute
+              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
+              allowedDepartments={[
+                'periodontics',
+                'periodontology',
+                'general',
+                'generaldentistry',
+                'oral',
+                'oralandmaxillofacial',
+                'oralandmaxillofacialsurgery',
+                'oralmedicine',
+                'oralmedicineandradiology',
+                'oralmedicineradiology'
+              ]}
+            >
+              <PeriodonticsShortCaseSheet />
             </ProtectedRoute>
           }
         />
@@ -324,7 +371,7 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute
               allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
-              allowedDepartments={['pedodontics']}
+              allowedDepartments={['disabled']}
             >
               <Pedodontics />
             </ProtectedRoute>
@@ -341,84 +388,7 @@ const AppRoutes = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/complete_denture"
-          element={
-            <ProtectedRoute
-              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
-              allowedDepartments={['prosthodontics', 'prothodontics', 'prosthondontics', 'completedenture']}
-            >
-              <Complete_denture />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/ImplantPatient"
-          element={
-            <ProtectedRoute
-              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
-              allowedDepartments={['prosthodontics', 'prothodontics', 'prosthondontics', 'implantology', 'implant', 'implantpatient']}
-            >
-              <ImplantPatient />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/Implant"
-          element={
-            <ProtectedRoute
-              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
-              allowedDepartments={['prosthodontics', 'prothodontics', 'prosthondontics', 'implantology', 'implant']}
-            >
-              <Implant />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/Fpd"
-          element={
-            <ProtectedRoute
-              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
-              allowedDepartments={['prosthodontics', 'prothodontics', 'prosthondontics', 'fpd', 'fixedpartialdenture']}
-            >
-              <Fpd />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/partial"
-          element={
-            <ProtectedRoute
-              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
-              allowedDepartments={['prosthodontics', 'prothodontics', 'prosthondontics', 'partialdenture', 'partial']}
-            >
-              <Partial />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/partial_denture"
-          element={
-            <ProtectedRoute
-              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
-              allowedDepartments={['prosthodontics', 'prothodontics', 'prosthondontics', 'partialdenture', 'partial']}
-            >
-              <Partial />
-            </ProtectedRoute>
-          }
-        />
 
-        <Route
-          path="/conservative-dentistry"
-          element={
-            <ProtectedRoute
-              allowedRoles={['doctor', 'chief', 'chief-doctor', 'pg', 'ug']}
-              allowedDepartments={['conservative', 'conservativedentistry', 'endodontics', 'conservativedentistryandendodontics']}
-            >
-              <ConservativeDentistry />
-            </ProtectedRoute>
-          }
-        />
 
         <Route path="/prescriptions" element={<Prescription />} />
         <Route path="/prescription-view" element={<PrescriptionView />} />

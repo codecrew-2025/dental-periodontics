@@ -32,7 +32,9 @@ const normalizeRoleName = (role) => {
 
 const normalizeDepartmentName = (department) => {
   if (!department) return '';
-  return String(department).trim().toLowerCase().replace(/[_\s]+/g, '');
+  return String(department).trim().toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '');
 };
 
 const normalizePhoneNumber = (value) => {
@@ -1114,20 +1116,12 @@ router.get('/doctor/assigned-pgs/overview', auth, requireRole(['doctor']), async
     const generalCaseModule = await import('../models/GeneralCase.js');
     const prescriptionModule = await import('../models/Prescription.js');
     const pedodonticsModule = await import('../models/PedodonticsCase.js');
-    const completeDentureModule = await import('../models/CompleteDentureCase.js');
-    const fpdModule = await import('../models/Fpd-model.js');
-    const implantModule = await import('../models/Implant-model.js');
-    const implantPatientModule = await import('../models/ImplantPatient-model.js');
-    const partialModule = await import('../models/partial-model.js');
+    const oralModule = await import('../models/Oral-model.js');
 
     const GeneralCase = generalCaseModule.default;
     const Prescription = prescriptionModule.default;
     const PedodonticsCase = pedodonticsModule.default;
-    const CompleteDentureCase = completeDentureModule.default;
-    const FPD = fpdModule.default;
-    const Implant = implantModule.default;
-    const ImplantPatient = implantPatientModule.default;
-    const PartialDenture = partialModule.default;
+    const OralCase = oralModule.default;
 
     const normalizeDepartment = (value) => String(value || '').trim().toLowerCase().replace(/[\s_]+/g, '');
     const getDepartmentBucket = (departmentLabel) => {
@@ -1135,18 +1129,7 @@ router.get('/doctor/assigned-pgs/overview', auth, requireRole(['doctor']), async
 
       if (!normalized) return 'all';
       if (normalized.includes('pedodont')) return 'pedodontics';
-      if (
-        normalized.includes('prostho') ||
-        normalized.includes('protho') ||
-        normalized.includes('prosth') ||
-        normalized === 'fpd' ||
-        normalized === 'fixedpartialdenture' ||
-        normalized.includes('implant') ||
-        normalized.includes('partial')
-      ) {
-        return 'prosthodontics';
-      }
-
+      if (normalized.includes('oral')) return 'oral';
       return 'all';
     };
 
@@ -1199,11 +1182,7 @@ router.get('/doctor/assigned-pgs/overview', auth, requireRole(['doctor']), async
 
     const caseSources = [
       { model: PedodonticsCase, department: 'Pedodontics', bucket: 'pedodontics' },
-      { model: CompleteDentureCase, department: 'Complete Denture', bucket: 'prosthodontics' },
-      { model: FPD, department: 'FPD', bucket: 'prosthodontics' },
-      { model: Implant, department: 'Implant', bucket: 'prosthodontics' },
-      { model: ImplantPatient, department: 'Implant Patient Surgery', bucket: 'prosthodontics' },
-      { model: PartialDenture, department: 'Partial Denture', bucket: 'prosthodontics' },
+      { model: OralCase, department: 'Oral', bucket: 'oral' },
     ];
 
     const allCases = referralPatientIds.length
@@ -1666,54 +1645,45 @@ router.patch('/chief/assigned-doctors/:doctorId/update', auth, requireRole(['chi
 // Get all cases from assigned PGs across all departments
 router.get('/doctor/assigned-pgs/cases', auth, requireRole(['doctor']), async (req, res) => {
   try {
-    // Get all PGs assigned by this doctor
-    const assignedPGs = await User.find(
-      { role: 'pg', createdBy: req.user._id },
+    // Get all PGs and UGs assigned by this doctor
+    const assignedStudents = await User.find(
+      { role: { $in: ['pg', 'ug'] }, createdBy: req.user._id },
       { Identity: 1, name: 1 }
     ).lean();
 
-    if (!assignedPGs.length) {
+    if (!assignedStudents.length) {
       return res.json({ success: true, cases: [] });
     }
 
-    // Get all PG identities
-    const pgIdentities = assignedPGs.map(pg => pg.Identity).filter(Boolean);
-    const pgNames = new Map(assignedPGs.map(pg => [pg.Identity, pg.name]));
+    // Get all student identities
+    const studentIdentities = assignedStudents.map(s => s.Identity).filter(Boolean);
+    const studentNames = new Map(assignedStudents.map(s => [s.Identity, s.name]));
 
     // Import all case models
     const pedodonticsModule = await import('../models/PedodonticsCase.js');
-    const completeDentureModule = await import('../models/CompleteDentureCase.js');
-    const fpdModule = await import('../models/Fpd-model.js');
-    const implantModule = await import('../models/Implant-model.js');
-    const implantPatientModule = await import('../models/ImplantPatient-model.js');
-    const partialModule = await import('../models/partial-model.js');
+    const oralModule = await import('../models/Oral-model.js');
+    const periodonticsModule = await import('../models/PeriodonticsCaseModel.js');
 
     const PedodonticsCase = pedodonticsModule.default;
-    const CompleteDentureCase = completeDentureModule.default;
-    const FPD = fpdModule.default;
-    const Implant = implantModule.default;
-    const ImplantPatient = implantPatientModule.default;
-    const PartialDenture = partialModule.default;
+    const OralCase = oralModule.default;
+    const PeriodonticsCase = periodonticsModule.default;
 
     const endpoints = [
       { model: PedodonticsCase, department: 'Pedodontics' },
-      { model: CompleteDentureCase, department: 'Complete Denture' },
-      { model: FPD, department: 'FPD' },
-      { model: Implant, department: 'Implant' },
-      { model: ImplantPatient, department: 'Implant Patient Surgery' },
-      { model: PartialDenture, department: 'Partial Denture' },
+      { model: OralCase, department: 'Oral' },
+      { model: PeriodonticsCase, department: 'Periodontics' },
     ];
 
     const casePromises = endpoints.map(async ({ model, department }) => {
       try {
-        const cases = await model.find({ doctorId: { $in: pgIdentities } })
+        const cases = await model.find({ doctorId: { $in: studentIdentities } })
           .sort({ createdAt: -1 })
           .lean();
 
         return cases.map(c => ({
           ...c,
           department,
-          pgName: pgNames.get(c.doctorId) || c.doctorName,
+          pgName: studentNames.get(c.doctorId) || c.doctorName,
         }));
       } catch (err) {
         console.error(`Error fetching ${department} cases:`, err);
@@ -1741,7 +1711,7 @@ router.patch('/doctor/assigned-pgs/cases/:caseId/approve', auth, requireRole(['d
     const { department, chiefApproval, approvedBy } = req.body;
     const normalizedDepartment = normalizeDepartmentName(req.user?.department);
 
-    if (normalizedDepartment === 'general' || normalizedDepartment === 'generaldentistry' || normalizedDepartment.includes('oral')) {
+    if (normalizedDepartment === 'general' || normalizedDepartment === 'generaldentistry') {
       return res.status(403).json({
         success: false,
         message: 'General doctors cannot use case-sheet approval controls.',
@@ -1754,12 +1724,9 @@ router.patch('/doctor/assigned-pgs/cases/:caseId/approve', auth, requireRole(['d
 
     // Map department to model
     const modelMap = {
-      'Pedodontics': '../models/PedodonticsCase.js',
-      'Complete Denture': '../models/CompleteDentureCase.js',
-      'FPD': '../models/Fpd-model.js',
-      'Implant': '../models/Implant-model.js',
-      'Implant Patient Surgery': '../models/ImplantPatient-model.js',
-      'Partial Denture': '../models/partial-model.js',
+      Pedodontics: '../models/PedodonticsCase.js',
+      Oral: '../models/Oral-model.js',
+      Periodontics: '../models/PeriodonticsCaseModel.js',
     };
 
     const modelPath = modelMap[department];
@@ -1777,15 +1744,15 @@ router.patch('/doctor/assigned-pgs/cases/:caseId/approve', auth, requireRole(['d
       return res.status(404).json({ success: false, message: 'Case not found' });
     }
 
-    // Verify the case belongs to an assigned PG
-    const pg = await User.findOne({
+    // Verify the case belongs to an assigned PG or UG
+    const student = await User.findOne({
       Identity: caseItem.doctorId,
-      role: 'pg',
+      role: { $in: ['pg', 'ug'] },
       createdBy: req.user._id,
     });
 
-    if (!pg) {
-      return res.status(403).json({ success: false, message: 'You can only approve cases from your assigned PGs' });
+    if (!student) {
+      return res.status(403).json({ success: false, message: 'You can only approve cases from your assigned students' });
     }
 
     // Update the case

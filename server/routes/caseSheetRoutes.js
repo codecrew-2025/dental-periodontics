@@ -64,8 +64,8 @@ const parseArrayField = (field) => {
   }
   return field;
 };
-// Save pedodontics case sheet - Only doctors can access
-router.post('/save', auth, requireRole(['doctor','chief','pg']), upload.single('digitalSignature'), async (req, res) => {
+// Save pedodontics case sheet - Doctors, PG and UG can access
+router.post('/save', auth, requireRole(['doctor','chief','pg','ug']), upload.single('digitalSignature'), async (req, res) => {
   try {
     const arrayFields = ['bodyType', 'dietInference', 'profile', 'face', 'spacing', 'primary', 'permanent'];
     

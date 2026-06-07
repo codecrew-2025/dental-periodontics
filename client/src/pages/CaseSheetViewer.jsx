@@ -25,26 +25,16 @@ const CaseSheetViewer = () => {
       // Try unified endpoint first
       const unifiedEndpoint = `/api/casesheets/${caseId}`;
 
+      // Note: fallback endpoints that map by patient ID (not case ID) are intentionally removed.
+      // All department case sheets are served by the unified /api/casesheets/:caseId endpoint.
       const fallbackEndpoints = [
-        `/api/pedodontics/${caseId}`,
-        `/api/complete-denture/${caseId}`,
-        `/api/fpd/${caseId}`,
-        `/api/implant/${caseId}`,
-        `/api/ImplantPatient/${caseId}`,
-        `/api/partial/${caseId}`,
         `/api/oral/${caseId}`,
         `/api/general/${caseId}`
       ];
 
       const mapping = {
-        "/api/pedodontics/": "pedodontics",
-        "/api/complete-denture/": "complete_denture",
-        "/api/fpd/": "fpd",
-        "/api/implant/": "implant",
-        "/api/ImplantPatient/": "implant_patient",
-        "/api/partial/": "partial_denture",
         "/api/oral/": "oral",
-        "/api/general/": "general"
+        "/api/general/": "oral"
       };
 
       let data = null;
@@ -146,6 +136,12 @@ const CaseSheetViewer = () => {
       if (data) {
         if (!data.department && dept) {
           data.department = dept;
+        }
+        if (data.patientId) {
+          localStorage.setItem('CurrentpatientId', String(data.patientId).trim());
+        }
+        if (data.patientName) {
+          localStorage.setItem('CurrentpatientName', String(data.patientName).trim());
         }
         setCaseMeta(data);
 

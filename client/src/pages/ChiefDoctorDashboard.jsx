@@ -393,51 +393,25 @@ const ChiefDoctorDashboard = () => {
           url: `${API_BASE_URL}/api/pedodontics/chief/all-cases`,
         },
         {
-          departmentKey: "completeDenture",
-          department: "Complete Denture",
-          url: `${API_BASE_URL}/api/complete-denture/chief/all-cases`,
-        },
-        {
-          departmentKey: "fpd",
-          department: "FPD",
-          url: `${API_BASE_URL}/api/fpd/chief/all-cases`,
-        },
-        {
-          departmentKey: "implant",
-          department: "Implant",
-          url: `${API_BASE_URL}/api/implant/chief/all-cases`,
-        },
-        {
-          departmentKey: "implantPatient",
-          department: "Implant Patient Surgery",
-          url: `${API_BASE_URL}/api/ImplantPatient/chief/all-cases`,
-        },
-        {
-          departmentKey: "partial",
-          department: "Partial Denture",
-          url: `${API_BASE_URL}/api/partial/chief/all-cases`,
-        },
-        {
           departmentKey: "oral",
           department: "Oral",
           url: `${API_BASE_URL}/api/oral/chief/all-cases`,
+        },
+        {
+          departmentKey: "periodontics",
+          department: "Periodontics",
+          url: `${API_BASE_URL}/api/casesheets/periodontics/chief/all-cases`,
         },
       ];
 
       const allowedCaseDepartmentsByChiefDepartment = {
         pedodontics: ["pedodontics"],
-        prosthodontics: ["completeDenture", "fpd", "implant", "implantPatient", "partial"],
-        prothodontics: ["completeDenture", "fpd", "implant", "implantPatient", "partial"],
-        prosthondontics: ["completeDenture", "fpd", "implant", "implantPatient", "partial"],
-        completedenture: ["completeDenture"],
-        fpd: ["fpd"],
-        fixedpartialdenture: ["fpd"],
-        implantology: ["implant", "implantPatient"],
-        implant: ["implant"],
-        implantpatient: ["implantPatient"],
-        partialdenture: ["partial"],
-        partial: ["partial"],
         oral: ["oral"],
+        periodontics: ["periodontics"],
+        periodontology: ["periodontics"],
+        // Support alternate naming for oral departments
+        oralmedicine: ["oral"],
+        oralmedicineandradiology: ["oral"],
         oralandmaxillofacial: ["oral"],
         oralandmaxillofacialsurgery: ["oral"],
       };
@@ -637,6 +611,7 @@ const ChiefDoctorDashboard = () => {
         "Implant Patient Surgery": "ImplantPatient",
         "Partial Denture": "partial",
         Oral: "oral",
+        Periodontics: "periodontics",
       };
 
       const base = apiMap[caseItem.department];
@@ -714,6 +689,7 @@ const ChiefDoctorDashboard = () => {
         "Implant Patient Surgery": "ImplantPatient",
         "Partial Denture": "partial",
         Oral: "oral",
+        Periodontics: "periodontics",
       };
 
       const base = apiMap[selectedCase.department];
@@ -912,10 +888,10 @@ const ChiefDoctorDashboard = () => {
 
   const getApprovalStatus = (caseItem) => {
     if (!caseItem.chiefApproval) return "Pending";
-    if (caseItem.chiefApproval.toLowerCase().includes("approved"))
-      return "Approved";
-    if (caseItem.chiefApproval.toLowerCase().includes("redo"))
-      return "Redo";
+    const lower = caseItem.chiefApproval.toLowerCase();
+    if (lower.includes("approved")) return "Approved";
+    if (lower.includes("redo") || lower.includes("resend") || lower.includes("rejected")) return "Redo";
+    if (lower.includes("pending")) return "Pending";
     return caseItem.chiefApproval;
   };
 
@@ -1675,7 +1651,7 @@ const ChiefDoctorDashboard = () => {
                       <tr key={c._id}>
                         <td>{i + 1}</td>
                         <td>{c.department}</td>
-                        <td>{c.doctorName}</td>
+                        <td>{c.doctorName || '—'}</td>
                         <td>{c.patientName || '—'}</td>
                         <td>{c.patientId || '—'}</td>
                         <td>{c.createdAt ? formatDate(c.createdAt) : "—"}</td>
@@ -1771,9 +1747,7 @@ const ChiefDoctorDashboard = () => {
                 onClick={closeCaseSheetPreview}
                 aria-label="Close"
                 title="Close"
-              >
-                ✕
-              </button>
+              >\n                      &times;\n                    </button>
 
               <h2>General Case Sheet Preview</h2>
 
@@ -1855,9 +1829,7 @@ const ChiefDoctorDashboard = () => {
                     onClick={closeMessageBox}
                     aria-label="Close"
                     title="Close"
-                  >
-                    ✕
-                  </button>
+                  >\n                      &times;\n                    </button>
                   <p>{message}</p>
                 </>
               ) : (
@@ -1868,9 +1840,7 @@ const ChiefDoctorDashboard = () => {
                     onClick={closeMessageBox}
                     aria-label="Close"
                     title="Close"
-                  >
-                    ✕
-                  </button>
+                  >\n                      &times;\n                    </button>
                   <h2>{messageTitle}</h2>
                   <p>{message}</p>
                   <button onClick={closeMessageBox}>OK</button>

@@ -11,7 +11,7 @@ import {
 } from '../utils/generalCaseXray';
 import { getPatientResumeTarget } from '../utils/caseDraft';
 import { setStoredPatientId } from '../utils/patientIdentity';
-
+import { isDepartmentAllowed } from '../config/allowedDepartments';
 const UGDashboard = () => {
   // State for form data
   const navigate = useNavigate();
@@ -19,25 +19,17 @@ const UGDashboard = () => {
 
   const departmentKeyToRoute = {
     pedodontics: '/pedodontics',
-    complete_denture: '/complete_denture',
-    fpd: '/Fpd',
-    implant: '/Implant',
-    implant_patient: '/ImplantPatient',
-    partial_denture: '/partial_denture',
+    periodontics: '/periodontics',
     oral: '/oral-medicine',
-    conservative: '/conservative-dentistry',
-    endodontics: '/conservative-dentistry',
-    conservativedentistry: '/conservative-dentistry',
   };
 
   const getCaseRouteForDepartment = (departmentValue) => {
     const key = String(departmentValue || '').trim().toLowerCase().replace(/[\s_]+/g, '');
     if (key === 'pedodontics') return '/pedodontics';
-    if (key === 'periodontics') return '/casePortal?dept=periodontics';
+    if (key === 'periodontics') return '/periodontics';
     if (key.includes('oral') || key.includes('maxillofacial')) return '/oral-medicine';
-    if (key.includes('conservative') || key.includes('endodontic')) return '/conservative-dentistry';
     if (key === 'general' || key === 'generaldentistry') return '/oral-medicine';
-    return '/casePortal?dept=prosthodontics';
+    return '/casePortal';
   };
 
   const formatDateInput = (date) => {
@@ -61,13 +53,7 @@ const UGDashboard = () => {
     oralandmaxillofacial: 'Oral and Maxillofacial Surgery',
     oralandmaxillofacialsurgery: 'Oral and Maxillofacial Surgery',
     pedodontics: 'Pedodontics',
-    prosthodontics: 'Prosthodontics',
-    periodontics: 'Periodontics',
-    conservative: 'Conservative Dentistry and Endodontics',
-    conservativedentistry: 'Conservative Dentistry and Endodontics',
-    endodontics: 'Conservative Dentistry and Endodontics',
-    implant: 'Implantology',
-    implantology: 'Implantology',
+
   };
 
   const formatDepartmentLabel = (value) => {
@@ -213,7 +199,7 @@ const UGDashboard = () => {
 
   const safeReadJson = async (res) => {
     try {
-      const contentType = res?.headers?.get?.('content-type') || '';
+      const contentType = res?.headers?.get?.('content-type') || 'Unknown';
       if (!String(contentType).toLowerCase().includes('application/json')) return null;
       return await res.json();
     } catch {
@@ -911,18 +897,6 @@ const UGDashboard = () => {
       (left, right) => getAssignedCaseTimestamp(right) - getAssignedCaseTimestamp(left)
     );
   };
-
-  const getCaseRouteForDepartment = (departmentValue) => {
-    const departmentKey = normalizeDepartment(departmentValue);
-
-    if (departmentKey.includes('publichealthdentistry') || departmentKey.includes('publichealth') || departmentKey.includes('communitydentistry')) return '/general-case-sheet';
-    if (departmentKey === 'pedodontics') return '/pedodontics';
-    if (departmentKey === 'periodontics') return '/casePortal?dept=periodontics';
-    if (departmentKey.includes('oral') || departmentKey.includes('maxillofacial')) return '/casePortal?dept=oral';
-    if (departmentKey.includes('conservative') || departmentKey.includes('endodontic')) return '/casePortal';
-    if (departmentKey === 'general' || departmentKey === 'generaldentistry') return '/general-case-sheet';
-    return '/casePortal?dept=prosthodontics';
-  };
   const handleLogout = () => {
     logout(); 
   };
@@ -980,15 +954,25 @@ const UGDashboard = () => {
       setCaseStatusError('');
 
       const token = localStorage.getItem('token');
-      const endpoints = [
-        { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' },
-        { url: buildApiUrl(`/api/complete-denture/patient/${encodeURIComponent(patientId)}`), department: 'Complete Denture' },
-        { url: buildApiUrl(`/api/fpd/patient/${encodeURIComponent(patientId)}`), department: 'FPD' },
-        { url: buildApiUrl(`/api/implant/patient/${encodeURIComponent(patientId)}`), department: 'Implant' },
-        { url: buildApiUrl(`/api/ImplantPatient/patient/${encodeURIComponent(patientId)}`), department: 'Implant Patient Surgery' },
-        { url: buildApiUrl(`/api/partial/patient/${encodeURIComponent(patientId)}`), department: 'Partial Denture' },
-        { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: 'Oral Medicine and Radiology' },
-      ];
+      const normalizedDepartment = String(user?.department || '').trim().toLowerCase();
+      const normalizedRole = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
+      const isDoctorOrPG = normalizedRole === 'doctor' || normalizedRole === 'pg';
+      const endpoints = [];
+
+      if (normalizedDepartment.includes('oral') || normalizedDepartment.includes('general') || normalizedDepartment.includes('dentistry')) {
+        endpoints.push({ url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: 'Oral Medicine and Radiology' });
+      }
+
+      if (normalizedDepartment.includes('pedodont')) {
+        endpoints.push({ url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' });
+      }
+
+      if (!endpoints.length && !isDoctorOrPG) {
+        endpoints.push(
+          { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: 'Oral Medicine and Radiology' },
+          { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' }
+        );
+      }
 
       const results = await Promise.all(
         endpoints.map(async ({ url, department }) => {
@@ -1068,7 +1052,7 @@ const UGDashboard = () => {
       setAssignedCasesError('');
 
       const token = localStorage.getItem('token');
-      const res = await fetch(buildApiUrl('/api/general/assigned-ug-cases'), {
+      const res = await fetch(buildApiUrl('/api/general/assigned-pg-cases'), {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -1226,9 +1210,86 @@ const UGDashboard = () => {
         return rows;
       }
 
-      // UG non-PHD doctors: no case sheet history endpoint — show empty
-      setPgCaseSheetHistory([]);
-      return [];
+      const res = await fetch(buildApiUrl('/api/casesheets/pg/history'), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (res.status === 401) {
+        await ensureActiveSession(res, 'Token expired');
+        return [];
+      }
+
+      const json = await res.json();
+      console.debug('[UGDashboard] /api/casesheets/pg/history response:', { status: res.status, ok: res.ok, json });
+      // Debug: log raw rows for troubleshooting department filtering
+      try {
+        console.debug('[UGDashboard:DEBUG] raw rows sample:', Array.isArray(json?.data) ? json.data.slice(0,5) : json?.data);
+      } catch (e) {
+        console.debug('[UGDashboard:DEBUG] failed to log rows', e);
+      }
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.message || 'Failed to load case sheet history');
+      }
+
+      const rows = Array.isArray(json.data) ? json.data : [];
+      // Filter rows to the current UG department (show only e.g. Periodontics)
+      const targetDeptKey = String(ugDepartmentKey || user?.department || '').trim().toLowerCase();
+      let visibleRows = rows;
+      if (targetDeptKey && targetDeptKey.includes('periodont')) {
+        visibleRows = rows.filter((r) => {
+          const deptCandidates = [r.departmentKey, r.department, Array.isArray(r.selectedDepartments) ? r.selectedDepartments[0] : '']
+            .filter(Boolean)
+            .join('||')
+            .toLowerCase();
+          return deptCandidates.includes('periodont');
+        });
+      }
+
+      setPgCaseSheetHistory(visibleRows);
+      console.debug('[UGDashboard:DEBUG] visibleRows count:', visibleRows.length);
+      // Fallback: if no rows but a patient is selected, try loading general cases for that patient
+      if ((!Array.isArray(rows) || rows.length === 0)) {
+        const currentPatientId = localStorage.getItem('CurrentpatientId') || '';
+        if (currentPatientId) {
+          try {
+            const genRes = await fetch(buildApiUrl(`/api/general/patient/${encodeURIComponent(currentPatientId)}`), { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+            if (genRes.ok) {
+              const genJson = await genRes.json().catch(() => null);
+              const genRows = Array.isArray(genJson?.data) ? genJson.data : [];
+              const mapped = genRows.map(item => ({
+                caseId: String(item._id || ''),
+                department: 'General Case',
+                departmentKey: 'general',
+                patientId: String(item.patientId || '').trim(),
+                patientName: String(item.patientName || '').trim(),
+                doctorId: String(item.doctorId || '').trim(),
+                doctorName: String(item.doctorName || '').trim(),
+                chiefApproval: String(item.chiefApproval || ''),
+                createdAt: item.createdAt || null,
+              }));
+              if (mapped.length) {
+                let visibleMapped = mapped;
+                if (targetDeptKey && targetDeptKey.includes('periodont')) {
+                  visibleMapped = mapped.filter((r) => {
+                    const deptCandidates = [r.departmentKey, r.department, Array.isArray(r.selectedDepartments) ? r.selectedDepartments[0] : '']
+                      .filter(Boolean)
+                      .join('||')
+                      .toLowerCase();
+                    return deptCandidates.includes('periodont');
+                  });
+                }
+                if (visibleMapped.length) setPgCaseSheetHistory(visibleMapped);
+              }
+            }
+          } catch (err) {
+            console.error('[UGDashboard] fallback general/patient fetch failed', err);
+          }
+        }
+      }
+      return rows;
     } catch (error) {
       console.error('Failed to fetch PG case sheet history', error);
       setPgCaseSheetHistoryError(error.message || 'Failed to load case sheet history');
@@ -1242,7 +1303,8 @@ const UGDashboard = () => {
   const startRedoEditFlow = async (row) => {
     const token = localStorage.getItem('token');
     const caseId = String(row?.caseId || '').trim();
-    const departmentKey = String(row?.departmentKey || '').trim();
+    const rawDepartmentKey = String(row?.departmentKey || '').trim();
+    const departmentKey = normalizeDepartment(rawDepartmentKey);
     const routePath = departmentKeyToRoute[departmentKey];
 
     if (!token) {
@@ -1320,7 +1382,7 @@ const UGDashboard = () => {
     if (!normalized) return 'pending';
     if (normalized.includes('approved')) return 'approved';
     if (normalized.startsWith('redo') || normalized.startsWith('resend') || normalized.startsWith('rejected')) return 'redo';
-    return 'redo';
+    return 'pending';
   };
 
   const assignedCasesAlertStatus = useMemo(() => {
@@ -1390,7 +1452,7 @@ const UGDashboard = () => {
   useEffect(() => {
     const storedUgId = localStorage.getItem('ugId');
     const storedUgName = localStorage.getItem('ugName');
-    const storedUgEmail = localStorage.getItem('ugEmail') || user?.email || '';
+    const storedUgEmail = localStorage.getItem('ugEmail') || user?.email || 'Unknown';
 
     if (storedUgId) setUgId(storedUgId);
     else if (user?.Identity) setUgId(user.Identity);
@@ -1409,6 +1471,12 @@ const UGDashboard = () => {
 
     if (!currentPatientId) {
       showMessage('Patient ID not found for opening the case sheet.', 'error');
+      return;
+    }
+
+    const deptKey = String(ugDepartmentLabel || user?.department || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+    if (!isDepartmentAllowed(deptKey)) {
+      window.alert("Your department is currently disabled in this application.");
       return;
     }
 
@@ -1455,7 +1523,12 @@ const UGDashboard = () => {
     const separator = departmentRoute.includes('?') ? '&' : '?';
     const caseIdParam = ensuredCaseId ? `&caseId=${encodeURIComponent(ensuredCaseId)}` : '';
     const patientRouteUrl = `${departmentRoute}${separator}patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName || currentPatientId)}&department=${encodeURIComponent(resolvedDepartmentLabel)}${caseIdParam}`;
-    window.open(patientRouteUrl, '_blank');
+    console.debug('[UGDashboard] openAssignedCaseRoute ->', { currentPatientId, currentPatientName, resolvedDepartmentLabel, departmentRoute, patientRouteUrl });
+    const newWin = window.open(patientRouteUrl, '_blank', 'noopener,noreferrer');
+    if (!newWin) {
+      console.debug('[UGDashboard] window.open blocked, navigating in same tab');
+      window.location.href = patientRouteUrl;
+    }
   };
 
   const getResolvedPractitionerId = () => {
@@ -1469,7 +1542,7 @@ const UGDashboard = () => {
     const byRole = String(localStorage.getItem('ugName') || '').trim();
     const fallbackDoctor = String(localStorage.getItem('doctorName') || '').trim();
     const fallbackUser = String(user?.name || '').trim();
-    return byRole || fallbackDoctor || fallbackUser || 'UG';
+    return byRole || fallbackDoctor || fallbackUser || 'Unknown';
   };
 
   const ensurePublicHealthCaseSheetGenerated = async ({ patientId, patientName }) => {
@@ -1593,7 +1666,7 @@ const UGDashboard = () => {
   }, []);
 
   const populateFormWithPatientData = (patientData) => {
-    const preferredLanguage = patientData.personalInfo?.preferredLanguage || '';
+    const preferredLanguage = patientData.personalInfo?.preferredLanguage || 'Unknown';
     const isOtherLanguage = !['English', 'Hindi', 'Tamil'].includes(preferredLanguage);
     
     const dob = patientData.personalInfo?.dateOfBirth ? new Date(patientData.personalInfo.dateOfBirth).toISOString().split('T')[0] : '';
@@ -2034,7 +2107,7 @@ const UGDashboard = () => {
   };
 
   const getInitials = () => {
-    const name = ugName || user?.name || 'UG';
+    const name = ugName || user?.name || 'Unknown';
     return name
       .split(' ')
       .filter(Boolean)
@@ -2061,9 +2134,9 @@ const UGDashboard = () => {
             aria-label={isSideNavOpen ? 'Collapse navigation' : 'Expand navigation'}
             title="Menu"
             onClick={() => setIsSideNavOpen((v) => !v)}
-          >
-            ☰
-          </button>
+            >
+              <i className="fas fa-bars"></i>
+            </button>
 
           <div className="chief-brand">
             <img
@@ -2078,7 +2151,7 @@ const UGDashboard = () => {
             <div className="chief-brand-title">
               UG Dashboard
               {ugDepartmentLabel ? (
-                <span className="chief-brand-title-dept">— {formatDepartmentLabel(ugDepartmentLabel)}</span>
+                <span className="chief-brand-title-dept">| {formatDepartmentLabel(ugDepartmentLabel)}</span>
               ) : null}
             </div>
           </div>
@@ -2099,7 +2172,7 @@ const UGDashboard = () => {
                 <span className="profile-name">{ugName || user?.name || 'UG'}</span>
                 <span className="profile-email">{ugEmail || user?.email || ''}</span>
               </div>
-              <div className="profile-arrow">{showLogoutDropdown ? '▲' : '▼'}</div>
+              <div className="profile-arrow">{showLogoutDropdown ? <i className="fas fa-chevron-up"></i> : <i className="fas fa-chevron-down"></i>}</div>
             </div>
 
             {showLogoutDropdown && (
@@ -2120,12 +2193,12 @@ const UGDashboard = () => {
 
                 <div className="dropdown-options">
                   <button className="dropdown-item" onClick={handleViewProfile} type="button">
-                    <span className="dropdown-icon">👤</span>
+                    <span className="dropdown-icon"><i className="fas fa-user"></i></span>
                     <span>My Profile</span>
                   </button>
 
                   <button className="dropdown-item" onClick={handleChangePassword} type="button">
-                    <span className="dropdown-icon">🔒</span>
+                    <span className="dropdown-icon"><i className="fas fa-key"></i></span>
                     <span>Change Password</span>
                   </button>
 
@@ -2139,7 +2212,7 @@ const UGDashboard = () => {
                     }}
                     type="button"
                   >
-                    <span className="dropdown-icon">🚪</span>
+                    <span className="dropdown-icon"><i className="fas fa-sign-out-alt"></i></span>
                     <span>Logout</span>
                   </button>
                 </div>
@@ -2163,8 +2236,8 @@ const UGDashboard = () => {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               >
-                <span className="chief-nav-icon">🧾</span>
-                <span>Patient Management</span>
+                <span className="chief-nav-icon"><i className="fas fa-user-injured"></i></span>
+                  <span>Patient Management</span>
               </button>
 
               <button
@@ -2176,9 +2249,9 @@ const UGDashboard = () => {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               >
-                <span className="chief-nav-icon">📌</span>
-                <span className="pg-nav-label">
-                  Case Sheet
+                <span className="chief-nav-icon"><i className="fas fa-file-medical"></i></span>
+                  <span className="pg-nav-label">
+                    Case Sheet
                   <span className="pg-nav-alert-dot" data-status={assignedCasesAlertStatus} />
                 </span>
               </button>
@@ -2192,8 +2265,8 @@ const UGDashboard = () => {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               >
-                <span className="chief-nav-icon">📅</span>
-                <span>My Appointments</span>
+                <span className="chief-nav-icon"><i className="fas fa-calendar-check"></i></span>
+                  <span>My Appointments</span>
               </button>
 
               <button
@@ -2205,8 +2278,8 @@ const UGDashboard = () => {
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               >
-                <span className="chief-nav-icon">📊</span>
-                <span>Analytics</span>
+                <span className="chief-nav-icon"><i className="fas fa-chart-line"></i></span>
+                  <span>Analytics</span>
               </button>
             </div>
           </aside>
@@ -2236,7 +2309,7 @@ const UGDashboard = () => {
                       color: 'inherit',
                     }}
                   >
-                    ✕
+                      &times;
                   </button>
                   {successMessage}
                 </div>
@@ -2272,8 +2345,8 @@ const UGDashboard = () => {
                       borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', maxHeight: 260, overflowY: 'auto',
                     }}>
                       {searchResults.map((p, i) => {
-                        const fullName = [p.personalInfo?.firstName, p.personalInfo?.lastName].filter(Boolean).join(' ') || p.patientName || '—';
-                        const phone = p.personalInfo?.phone || '—';
+                        const fullName = [p.personalInfo?.firstName, p.personalInfo?.lastName].filter(Boolean).join(' ') || p.patientName || 'Unknown';
+                        const phone = p.personalInfo?.phone || 'Unknown';
                         return (
                           <div key={p.patientId || i}
                             onClick={() => handleSelectSearchResult(p)}
@@ -2314,7 +2387,6 @@ const UGDashboard = () => {
                   </div>
                 )}
 
-<<<<<<< HEAD
                 {/* General Case Sheet Preview — not shown for PHD doctors */}
                 {showUserIdDisplay && !isPublicHealthDentistry && (
                   <div className="general-case-preview-section" style={{ margin: '16px 0', padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
@@ -2355,7 +2427,9 @@ const UGDashboard = () => {
                           const pid = String(generatedUserId || '').trim();
                           const pname = String(localStorage.getItem('CurrentpatientName') || '').trim();
                           if (pid) {
-                            window.open(`/general-case-view?patientId=${encodeURIComponent(pid)}&patientName=${encodeURIComponent(pname)}`, '_blank');
+                            const target = `/general-case-view?patientId=${encodeURIComponent(pid)}&patientName=${encodeURIComponent(pname)}`;
+                            const consentUrl = `/consent-form?redirect=${encodeURIComponent(target)}`;
+                            window.open(consentUrl, '_blank', 'noopener,noreferrer');
                           }
                         }}
                         disabled={!generatedUserId}
@@ -2365,9 +2439,6 @@ const UGDashboard = () => {
                     </div>
                   </div>
                 )}
-=======
-
->>>>>>> b9290f39ded440f4a943168e9e7c930ce26f6408
 
                 {/* Form Section */}
                 {showForm && (
@@ -2850,7 +2921,8 @@ const UGDashboard = () => {
                           const patientName = String(row?.patientName || '').trim();
                           const patientId = String(row?.patientId || '').trim();
                           const department = String(row?.department || '').trim();
-                          const departmentKey = String(row?.departmentKey || '').trim();
+                          const rawDepartmentKey = String(row?.departmentKey || '').trim();
+                          const departmentKey = normalizeDepartment(rawDepartmentKey);
                           const referredDepartment = String(row?.referredDepartment || '').trim();
                           const approvalText = String(row?.chiefApproval || '').trim();
                           const status = isPublicHealthDentistry
@@ -2872,9 +2944,10 @@ const UGDashboard = () => {
                               <td>{patientName || '—'}</td>
                               <td>{patientId || '—'}</td>
                               <td>{department || '—'}</td>
-                              <td>
+                              <td style={{ whiteSpace: 'nowrap' }}>
                                 {referredDepartment ? (
                                   <span style={{
+                                    display: 'inline-block',
                                     background: 'rgba(99,102,241,0.15)',
                                     border: '1px solid rgba(165,180,252,0.4)',
                                     borderRadius: 4,
@@ -2905,15 +2978,14 @@ const UGDashboard = () => {
                                     className="view-button"
                                     onClick={() => {
                                       if (canViewCaseSheet && caseId) {
+                                        let target = '';
                                         if (departmentKey === 'general') {
-                                          window.open(
-                                            `/general-case-view?patientId=${encodeURIComponent(patientId)}&patientName=${encodeURIComponent(patientName)}&caseId=${encodeURIComponent(caseId)}&department=${encodeURIComponent(ugDepartmentLabel || user?.department || departmentKey)}`,
-                                            '_blank',
-                                            'noopener,noreferrer'
-                                          );
+                                          target = `/general-case-view?patientId=${encodeURIComponent(patientId)}&patientName=${encodeURIComponent(patientName)}&caseId=${encodeURIComponent(caseId)}&department=${encodeURIComponent(ugDepartmentLabel || user?.department || departmentKey)}`;
                                         } else {
-                                          window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank', 'noopener,noreferrer');
+                                          target = `/case-sheet-view/${encodeURIComponent(caseId)}`;
                                         }
+                                        const consentUrl = `/consent-form?redirect=${encodeURIComponent(target)}`;
+                                        window.open(consentUrl, '_blank', 'noopener,noreferrer');
                                       }
                                     }}
                                     disabled={!canViewCaseSheet || !caseId}
@@ -2979,7 +3051,6 @@ const UGDashboard = () => {
                           <th style={{ padding: '6px 6px', textAlign: 'center' }}>Patient ID</th>
                           <th style={{ padding: '6px 6px', textAlign: 'center' }}>Date & Time</th>
                           <th style={{ padding: '6px 6px', textAlign: 'center' }}>Complaint</th>
-                          <th style={{ padding: '6px 6px', textAlign: 'center' }}>Status</th>
                           <th style={{ padding: '6px 6px', textAlign: 'center' }}>Action</th>
                         </tr>
                       </thead>
@@ -2994,7 +3065,7 @@ const UGDashboard = () => {
                           const isAssignedAppointment = appointmentStatus === 'assigned' || appointmentStatus === 'in_progress';
                           
                           // 🔥 FIX: Appointments are auto-confirmed, so they should show as confirmed
-                          const isConfirmed = appointmentStatus === 'confirmed' || appointmentStatus === 'rescheduled';
+                          const isConfirmed = appointmentStatus === 'confirmed' || appointmentStatus === 'assigned' || appointmentStatus === 'in_progress' || appointmentStatus === 'rescheduled';
                           const canConfirmAppointment = appointmentStatus === 'assigned';
                           const canRescheduleAppointment = isAssignedAppointment && !hasPendingReschedule;
 
@@ -3029,76 +3100,54 @@ const UGDashboard = () => {
                                 {formatAppointmentComplaintDisplay(appointment?.chiefComplaint) || '—'}
                               </td>
                               <td style={{ padding: '6px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                {/* 🔥 FIX: Show confirmation status */}
-                                {isConfirmed ? (
+                                {appointmentStatus === 'rejected' ? (
                                   <span style={{ 
-                                    background: '#48bb78', 
+                                    background: '#f56565', 
                                     color: '#fff', 
                                     borderRadius: '12px', 
-                                    padding: '3px 10px', 
+                                    padding: '4px 10px', 
                                     fontSize: '12px', 
                                     fontWeight: 600,
                                     display: 'inline-block'
                                   }}>
-                                    ✓ Confirmed
+                                    ✕ Rejected
                                   </span>
+                                ) : isConfirmed ? (
+                                  <div style={{ display: 'inline-flex', gap: '6px', flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center' }}>
+                                    <button
+                                      type="button"
+                                      className="view-button"
+                                      onClick={() => beginRescheduleForAppointment(appointment)}
+                                      disabled={isSubmitting || hasPendingReschedule}
+                                      title={hasPendingReschedule ? 'A reschedule request is already pending approval' : ''}
+                                      style={{
+                                        background: '#48bb78',
+                                        color: '#fff',
+                                        padding: '4px 10px',
+                                        fontSize: '0.75em',
+                                        minWidth: '100px',
+                                        whiteSpace: 'nowrap',
+                                        border: 'none',
+                                        borderRadius: '6px',
+                                        cursor: isSubmitting || hasPendingReschedule ? 'not-allowed' : 'pointer',
+                                        opacity: hasPendingReschedule ? 0.6 : 1,
+                                      }}
+                                    >
+                                      {isSubmitting ? 'Saving...' : '✓ Approved'}
+                                    </button>
+                                  </div>
                                 ) : (
                                   <span style={{ 
                                     background: '#ed8936', 
                                     color: '#fff', 
                                     borderRadius: '12px', 
-                                    padding: '3px 10px', 
+                                    padding: '4px 10px', 
                                     fontSize: '12px', 
                                     fontWeight: 600,
                                     display: 'inline-block'
                                   }}>
                                     ⏳ Pending
                                   </span>
-                                )}
-                              </td>
-                              <td style={{ padding: '6px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                {hasPendingReschedule ? (
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                    <span style={{ background: '#ed8936', color: '#fff', borderRadius: '12px', padding: '3px 10px', fontSize: '12px', fontWeight: 600 }}>
-                                      ⏳ Pending Approval
-                                    </span>
-                                    <span style={{ fontSize: '11px', color: '#888' }}>
-                                      {appointment?.rescheduleRequest?.requestedDate} {appointment?.rescheduleRequest?.requestedTime}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'inline-flex', gap: '6px', flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center' }}>
-                                    <button
-                                      type="button"
-                                      className="view-button"
-                                      onClick={() => approveAppointment(appointment)}
-                                      disabled={!canConfirmAppointment || isSubmitting}
-                                      style={{
-                                        padding: '4px 6px',
-                                        fontSize: '0.75em',
-                                        minWidth: '78px',
-                                        whiteSpace: 'nowrap',
-                                      }}
-                                    >
-                                      {isSubmitting ? 'Saving...' : 'Confirm appointment'}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="view-button"
-                                      onClick={() => beginRescheduleForAppointment(appointment)}
-                                      disabled={isSubmitting || !canRescheduleAppointment}
-                                      title={hasPendingReschedule ? 'A reschedule request is already pending approval' : ''}
-                                      style={{
-                                        padding: '4px 6px',
-                                        fontSize: '0.75em',
-                                        minWidth: '78px',
-                                        whiteSpace: 'nowrap',
-                                        opacity: hasPendingReschedule ? 0.5 : 1,
-                                      }}
-                                    >
-                                        {isSubmitting ? 'Saving...' : 'Request reschedule'}
-                                    </button>
-                                  </div>
                                 )}
                               </td>
                             </tr>

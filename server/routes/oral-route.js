@@ -60,7 +60,7 @@ const normalisePayload = (body) => {
 };
 
 // ── CREATE ────────────────────────────────────────────────────────────────
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (req, res) => {
   try {
     const payload = normalisePayload(req.body);
     const oralCase = new OralCase(payload);
@@ -94,7 +94,7 @@ router.get('/doctor/:doctorId', auth, async (req, res) => {
 });
 
 // ── GET ALL FOR CHIEF ─────────────────────────────────────────────────────
-router.get('/chief/all-cases', auth, requireRole('chief_doctor'), async (req, res) => {
+router.get('/chief/all-cases', auth, requireRole(['chief_doctor', 'chief']), async (req, res) => {
   try {
     const cases = await OralCase.find().sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: cases });
@@ -131,7 +131,7 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // ── UPDATE ────────────────────────────────────────────────────────────────
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (req, res) => {
   try {
     const payload = normalisePayload(req.body);
     const updatedCase = await OralCase.findByIdAndUpdate(

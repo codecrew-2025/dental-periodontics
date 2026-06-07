@@ -9,12 +9,24 @@ import AssignmentState from '../models/AssignmentState.js';
 
 const router = express.Router();
 
-const normalizeDepartment = (value) => String(value || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+const normalizeDepartment = (value) => String(value || '').trim().toLowerCase()
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, '');
 const normalizeRole = (value) => String(value || '').trim().toLowerCase().replace(/[\s_]+/g, '-');
 const XRAY_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg);base64,/i;
 const MAX_XRAY_DATA_URL_LENGTH = 8 * 1024 * 1024;
 
-const GENERAL_DEPARTMENT_KEYS = new Set(['general', 'generaldentistry', 'oralmedicine', 'oralmedicineandradiology']);
+const GENERAL_DEPARTMENT_KEYS = new Set([
+  'general',
+  'generaldentistry',
+  'oral',
+  'oralmedicine',
+  'oralmedicineandradiology',
+  'oralandmaxillofacial',
+  'oralmaxillofacial',
+  'oralandmaxillofacialsurgery',
+  'oralmaxillofacialsurgery',
+]);
 const PUBLIC_HEALTH_DEPARTMENT_KEYS = new Set(['publichealthdentistry', 'publichealth', 'communitydentistry']);
 
 const departmentAliasMap = {
@@ -263,7 +275,16 @@ const autoTransferPendingReferralsToPgQueue = async () => {
       continue;
     }
 
-    await caseItem.save();
+    try {
+      await caseItem.save();
+    } catch (error) {
+      if (error.name === 'VersionError') {
+        // Document updated by concurrent request, safely ignore
+        console.warn(`VersionError: Skipping auto-transfer save for case ${caseItem._id}`);
+      } else {
+        throw error;
+      }
+    }
   }
 };
 
@@ -308,6 +329,10 @@ const assignLegacySpecialistReferrals = async (departmentLabel) => {
 // Create / Save a General Case Sheet
 router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (req, res) => {
   try {
+    console.log('[GENERAL CASE] 📨 POST /save request received');
+    console.log('[GENERAL CASE] selectedDepartments:', req.body.selectedDepartments);
+    console.log('[GENERAL CASE] referredDepartment:', req.body.referredDepartment);
+    
     if (req.body.bookingId) {
       const appt = await Appointment.findOne({ bookingId: req.body.bookingId });
       if (appt) {
@@ -467,22 +492,30 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
       chiefApproval: ''
     });
 
+    let assignedPg = null;
     if (!publicHealthCase) {
-      const { assignedPg } = await assignReferralToPg(generalCase, specialistDoctor);
+      const result = await assignReferralToPg(generalCase, specialistDoctor);
+      assignedPg = result.assignedPg;
       if (!assignedPg?._id) {
         return res.status(409).json({
           success: false,
           message: `No PG is assigned under ${specialistDoctor?.name || referredDepartment}. Assign a PG before saving this referral.`,
         });
       }
+    } else {
+      // For public health cases, we still need a PG for the appointment
+      assignedPg = await pickPgForDoctor(specialistDoctor);
     }
 
     await generalCase.save();
 
-    // 🔥 FIX: Mark the appointment as ASSIGNED and update PG/UG assignment fields
+    // 🔥 Create or update appointment for specialist doctor
     try {
       const todayStr = new Date().toISOString().split('T')[0];
-      const recentAppointment = await Appointment.findOne({
+      const specialistDoctorIdStr = specialistDoctor?._id ? String(specialistDoctor._id) : '';
+      console.log(`[APPOINTMENT] Processing referral for patient ${patientId}, specialist: ${specialistDoctor?.name} (id: ${specialistDoctorIdStr})`);
+      
+      let recentAppointment = await Appointment.findOne({
         patientId,
         appointmentDate: { $gte: todayStr },
         status: { $in: ['pending', 'assigned', 'rescheduled'] },
@@ -490,23 +523,58 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
       }).sort({ appointmentDate: 1, createdAt: -1 });
 
       if (recentAppointment) {
-        recentAppointment.status = 'assigned'; // ASSIGNED - case sheet submitted, PG assigned
+        // Update existing appointment
+        recentAppointment.status = 'assigned';
         recentAppointment.isProcessed = true;
-        recentAppointment.doctorId = assignedPg.Identity || assignedPg._id; // Set PG as doctorId
+        recentAppointment.doctorId = specialistDoctorIdStr; // Store as STRING to match query
         recentAppointment.assignedPgUgId = assignedPg.Identity || '';
-        recentAppointment.assigned_pg_ug_id = assignedPg.Identity || ''; // Set PG assignment
-        recentAppointment.pgDoctorId = assignedPg.Identity || ''; // Alternative field
+        recentAppointment.assigned_pg_ug_id = assignedPg.Identity || '';
+        recentAppointment.pgDoctorId = assignedPg.Identity || '';
         recentAppointment.supervisingDeptDoctorId = specialistDoctor?.Identity || '';
-        recentAppointment.supervising_dept_doctor_id = specialistDoctor?.Identity || ''; // Set dept doctor
-        recentAppointment.deptDoctorId = specialistDoctor?.Identity || ''; // Alternative field
-        recentAppointment.generalDoctorId = req.user.Identity || ''; // Set general doctor ID
+        recentAppointment.supervising_dept_doctor_id = specialistDoctor?.Identity || '';
+        recentAppointment.deptDoctorId = specialistDoctor?.Identity || '';
+        recentAppointment.generalDoctorId = req.user.Identity || '';
         await recentAppointment.save();
-        console.log(`✅ Marked appointment ${recentAppointment.bookingId} as ASSIGNED for patient ${patientId}`);
-        console.log(`✅ Assigned PG ${assignedPg.Identity} and Dept Doctor ${specialistDoctor?.Identity} to appointment`);
+        console.log(`[APPOINTMENT] ✅ UPDATED existing appointment ${recentAppointment.bookingId}`);
+        console.log(`[APPOINTMENT] doctorId set to: '${recentAppointment.doctorId}' (type: ${typeof recentAppointment.doctorId})`);
+        console.log(`[APPOINTMENT] Status: ${recentAppointment.status}, Date: ${recentAppointment.appointmentDate}`);
+      } else {
+        // Create NEW appointment
+        console.log(`[APPOINTMENT] No existing appointment found, creating NEW one...`);
+        try {
+          const patientUser = await User.findOne({ Identity: patientId }).lean();
+          const bookingId = `${patientId}-${Date.now()}`;
+          
+          const newAppointment = new Appointment({
+            bookingId,
+            patientId,
+            patientEmail: patientUser?.email || 'patient@dental.com',
+            generalDoctorId: req.user.Identity || req.user._id.toString(),
+            doctorId: specialistDoctorIdStr, // Store as STRING
+            approvedDoctorId: specialistDoctorIdStr,
+            chiefComplaint: chiefComplaint || 'Referral from General Dentistry',
+            appointmentDate: todayStr,
+            appointmentTime: '10:00',
+            status: 'assigned',
+            isProcessed: true,
+            assignedPgUgId: assignedPg.Identity || '',
+            assigned_pg_ug_id: assignedPg.Identity || '',
+            pgDoctorId: assignedPg.Identity || '',
+            supervisingDeptDoctorId: specialistDoctor?.Identity || '',
+            supervising_dept_doctor_id: specialistDoctor?.Identity || '',
+            deptDoctorId: specialistDoctor?.Identity || '',
+          });
+          
+          await newAppointment.save();
+          console.log(`[APPOINTMENT] ✅ CREATED new appointment ${bookingId}`);
+          console.log(`[APPOINTMENT] doctorId set to: '${newAppointment.doctorId}' (type: ${typeof newAppointment.doctorId})`);
+          console.log(`[APPOINTMENT] appointmentDate: ${newAppointment.appointmentDate}, Status: ${newAppointment.status}`);
+        } catch (createError) {
+          console.error(`[APPOINTMENT] ❌ Failed to create: ${createError.message}`);
+        }
       }
     } catch (appointmentError) {
-      console.error('⚠️ Failed to mark appointment as assigned:', appointmentError);
-      // Don't fail the entire request if appointment update fails
+      console.error(`[APPOINTMENT] ❌ Error processing appointment: ${appointmentError.message}`);
     }
 
     res.status(201).json({
@@ -743,15 +811,68 @@ router.patch('/referred-patients/:id/reschedule', auth, requireRole(['doctor']),
 router.get('/assigned-pg-cases', auth, requireRole(['pg', 'ug']), async (req, res) => {
   try {
     const pgIdentity = String(req.user?.Identity || '').trim();
+    const pgDepartment = String(req.user?.department || '').trim();
 
     await autoTransferPendingReferralsToPgQueue();
 
-    const cases = await GeneralCase.find({
+    // Get department aliases for filtering
+    const getDepartmentAliases = (departmentLabel) => {
+      const normalized = String(departmentLabel || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+      if (normalized.startsWith('prostho') || normalized.startsWith('protho') || normalized.startsWith('prosthon')) {
+        return ['prosthodontics', 'prothodontics', 'prosthondontics'];
+      }
+      if (normalized === 'pedodontics') {
+        return ['pedodontics'];
+      }
+      if (normalized === 'periodontics' || normalized === 'periodontology') {
+        return ['periodontics', 'periodontology'];
+      }
+      if (normalized.includes('conservative') || normalized.includes('endodontic')) {
+        return ['conservativedentistryandendodontics', 'conservativedentistry', 'endodontics'];
+      }
+      if (normalized.includes('oral') || normalized.includes('maxillofacial')) {
+        return ['oralandmaxillofacial', 'oralmaxillofacial', 'oralsurgery'];
+      }
+      return [normalized];
+    };
+
+    const departmentAliases = pgDepartment ? getDepartmentAliases(pgDepartment) : [];
+
+    let allCases = await GeneralCase.find({
       assignedPgId: pgIdentity,
       specialistStatus: 'approved',
+    }, 
+    {
+      referredDepartment: 1,
+      selectedDepartments: 1,
+      referralCurrentIndex: 1,
+      patientId: 1,
+      pgAssignedAt: 1,
+      createdAt: 1
     })
       .sort({ pgAssignedAt: -1, createdAt: -1 })
       .lean();
+
+    // Filter cases by department if PG has a department assigned
+    if (departmentAliases.length > 0) {
+      const normalizedAliases = departmentAliases.map(alias => 
+        String(alias || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '')
+      );
+      
+      allCases = allCases.filter(caseItem => {
+        // Try referredDepartment first, then fall back to selectedDepartments
+        let caseDeptStr = String(caseItem?.referredDepartment || '').trim();
+        if (!caseDeptStr && Array.isArray(caseItem?.selectedDepartments) && caseItem.selectedDepartments.length > 0) {
+          const idx = caseItem.referralCurrentIndex || 0;
+          caseDeptStr = String(caseItem.selectedDepartments[idx] || caseItem.selectedDepartments[0] || '').trim();
+        }
+        
+        const caseDept = caseDeptStr.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+        return normalizedAliases.includes(caseDept);
+      });
+    }
+
+    const cases = allCases;
 
     if (!cases.length) {
       return res.json({ success: true, data: [] });
@@ -789,28 +910,12 @@ router.get('/assigned-pg-cases', auth, requireRole(['pg', 'ug']), async (req, re
         appointmentTime: String(appt?.appointmentTime || '').trim(),
       });
     });
-
     const pedodonticsModule = await import('../models/PedodonticsCase.js');
-    const completeDentureModule = await import('../models/CompleteDentureCase.js');
-    const fpdModule = await import('../models/Fpd-model.js');
-    const implantModule = await import('../models/Implant-model.js');
-    const implantPatientModule = await import('../models/ImplantPatient-model.js');
-    const partialModule = await import('../models/partial-model.js');
 
     const PedodonticsCase = pedodonticsModule.default;
-    const CompleteDentureCase = completeDentureModule.default;
-    const FPD = fpdModule.default;
-    const Implant = implantModule.default;
-    const ImplantPatient = implantPatientModule.default;
-    const PartialDenture = partialModule.default;
 
     const caseSources = [
       { model: PedodonticsCase, department: 'Pedodontics', bucket: 'pedodontics' },
-      { model: CompleteDentureCase, department: 'Complete Denture', bucket: 'prosthodontics' },
-      { model: FPD, department: 'FPD', bucket: 'prosthodontics' },
-      { model: Implant, department: 'Implant', bucket: 'prosthodontics' },
-      { model: ImplantPatient, department: 'Implant Patient Surgery', bucket: 'prosthodontics' },
-      { model: PartialDenture, department: 'Partial Denture', bucket: 'prosthodontics' },
     ];
 
     const departmentCases = (

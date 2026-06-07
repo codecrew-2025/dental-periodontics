@@ -11,17 +11,11 @@ import otpRoutes from './routes/send-otp.js';
 import appointmentRoutes from './routes/appointment.js';
 import doctorPatientRoutes from './routes/doctor-patient-route.js';
 import pedodonticsRoutes from './routes/caseSheetRoutes.js';
-import completeDentureRoutes from './routes/complete-denture.js';
 import casesheetRoutes from './routes/casesheets.js';
-import FpdRoutes from './routes/fpd-route.js';
-import implantRoutes from './routes/Implant-route.js';  
-import implantPatientRoute from './routes/ImplantPatient-route.js';
-import partialRoute from './routes/partial-route.js';
 import oralRoutes from './routes/oral-route.js';
 import generalCaseRoutes from './routes/general-case.js';
 import consentFormRoutes from './routes/consent-form.js';
 import caseDraftRoutes from './routes/case-draft.js';
-import conservativeRoutes from './routes/conservative-route.js';
 
 import prescriptionRoutes from './routes/prescription.js';
 import patientDetailsRoutes from './routes/patient-details-route.js';
@@ -225,23 +219,8 @@ console.log('✓ Doctor-patient routes registered at /api/doctor-patient');
 app.use('/api/pedodontics', pedodonticsRoutes);
 console.log('✓ Pedodontics routes registered at /api/pedodontics');
 
-app.use('/api/complete-denture', completeDentureRoutes);
-console.log('✓ Complete Denture routes registered at /api/complete-denture');
-
 app.use('/api/casesheets', casesheetRoutes);
 console.log('✓ Unified casesheets route registered at /api/casesheets');
-
-app.use('/api/fpd', FpdRoutes);
-console.log('✓ FPD routes registered at /api/fpd');
-
-app.use('/api/implant', implantRoutes);
-console.log('✓ Implant routes registered at /api/implant');  
-
-app.use('/api/ImplantPatient', implantPatientRoute);
-console.log('✓ ImplantPatient routes registered at /api/ImplantPatient');
-
-app.use('/api/partial', partialRoute);
-console.log('✓ Partial Denture routes registered at /api/partial');
 
 app.use('/api/oral', oralRoutes);
 console.log('✓ Oral routes registered at /api/oral');
@@ -251,9 +230,6 @@ console.log('✓ General Case Sheet routes registered at /api/general');
 
 app.use('/api/case-drafts', caseDraftRoutes);
 console.log('✓ Case draft routes registered at /api/case-drafts');
-
-app.use('/api/conservative', conservativeRoutes);
-console.log('✓ Conservative routes registered at /api/conservative');
 
 app.use('/api/prescriptions', prescriptionRoutes);
 console.log('✓ Prescription routes registered at /api/prescriptions');

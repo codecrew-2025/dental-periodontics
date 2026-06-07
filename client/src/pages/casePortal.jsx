@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './casePortal.css';
-
+import { isDepartmentAllowed } from '../config/allowedDepartments';
 const CASE_CONSENT_NAV_STATE_KEY = 'caseSheetConsentApproved';
 
 const CasePortal = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [showProsthodontics, setShowProsthodontics] = useState(false);
+
   const [showOral, setShowOral] = useState(false);
   const [showPerio, setShowPerio] = useState(false);
 
@@ -15,18 +15,17 @@ const CasePortal = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const dept = params.get('dept');
-    if (!dept) return;
+    const path = String(location.pathname || '').trim().toLowerCase();
 
-    const value = dept.toLowerCase();
-
-    if (value === 'prosthodontics') {
-      setShowProsthodontics(true);
-    } else if (value === 'periodontics') {
+    if (dept === 'periodontics' || path === '/periodontics') {
       setShowPerio(true);
-    } else if (value === 'oral') {
+      return;
+    }
+
+    if (dept === 'oral' || path === '/oral-medicine') {
       setShowOral(true);
     }
-  }, [location.search]);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const navState = location.state || {};
@@ -63,27 +62,14 @@ const CasePortal = () => {
         <div className="heading">Select Case Sheet</div>
 
 
-        <div className="button-group-portal" id="mainButtonGroup" style={{ display: showProsthodontics || showOral || showPerio ? 'none' : 'flex' }}>
-          <button className="button-portal" onClick={() => setShowProsthodontics(true)}>Prosthodontics</button>
-          <button className="button-portal" onClick={() => startCaseFlow('/pedodontics')}>Pedodontics</button>
+        <div className="button-group-portal" id="mainButtonGroup" style={{ display: showOral || showPerio ? 'none' : 'flex' }}>
+          <button className="button-portal" onClick={() => isDepartmentAllowed('periodontics') && setShowPerio(true)} disabled={!isDepartmentAllowed('periodontics')} style={!isDepartmentAllowed('periodontics') ? {opacity: 0.4, cursor: 'not-allowed'} : {}}>Periodontics</button>
 
-
-          <button className="button-portal" onClick={() => setShowPerio(true)}>Periodontics</button>
-          <button className="button-portal" onClick={() => startCaseFlow('/casePortal')}>Conservative Dentistry and Endodontics</button>
-          <button className="button-portal" onClick={() => setShowOral(true)}>General</button>
-          <button className="button-portal" onClick={() => startCaseFlow('/casePortal')}>Orthoganthic Case History</button>
+          <button className="button-portal" onClick={() => isDepartmentAllowed('general') && setShowOral(true)} disabled={!isDepartmentAllowed('general')} style={!isDepartmentAllowed('general') ? {opacity: 0.4, cursor: 'not-allowed'} : {}}>General</button>
+          <button className="button-portal" onClick={() => isDepartmentAllowed('orthognathic') && startCaseFlow('/casePortal')} disabled={!isDepartmentAllowed('orthognathic')} style={!isDepartmentAllowed('orthognathic') ? {opacity: 0.4, cursor: 'not-allowed'} : {}}>Orthoganthic Case History</button>
         </div>
 
-        {/* Prosthodontics sub-options */}
-        {showProsthodontics && (
-          <div className="sub-options" id="prosthodonticsSubOptions">
-            <button className="button-portal" onClick={() => startCaseFlow('/ImplantPatient')}>Implant Patient Surgery</button>
-            <button className="button-portal" onClick={() => startCaseFlow('/complete_denture')}>Complete Denture</button>
-            <button className="button-portal" onClick={() => startCaseFlow('/Partial')}>Partial Denture</button>
-            <button className="button-portal" onClick={() => startCaseFlow('/Implant')}>Implant</button>
-            <button className="button-portal" onClick={() => startCaseFlow('/Fpd')}>F.P.D</button>
-          </div>
-        )}
+
 
         {/* Oral and Maxillofacial sub-options */}
         {showOral && (
@@ -99,8 +85,8 @@ const CasePortal = () => {
         {/* Periodontics sub-options */}
         {showPerio && (
           <div className="sub-options" id="perioSubOptions">
-            <button className="button-portal" onClick={() => startCaseFlow('periodontics longcase sheet.html')}>Long Case Sheet</button>
-            <button className="button-portal" onClick={() => startCaseFlow('periodont short case sheet.html')}>Short Case Sheet</button>
+            <button className="button-portal" onClick={() => startCaseFlow('/periodontics/long')}>Long Case Sheet</button>
+            <button className="button-portal" onClick={() => startCaseFlow('/periodontics/short')}>Short Case Sheet</button>
           </div>
         )}
       </div>

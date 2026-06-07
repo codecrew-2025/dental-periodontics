@@ -79,6 +79,24 @@ const AdminDashboard = () => {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [showPatientRegistration, setShowPatientRegistration] = useState(false);
   const [todayVisitStats, setTodayVisitStats] = useState(null);
+  const addressTextareaRef = useRef(null);
+
+  const resizeTextarea = (textarea) => {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    if (addressTextareaRef.current) {
+      resizeTextarea(addressTextareaRef.current);
+    }
+  }, [isEditMode, editPatientData.address]);
+
+  const handleTextareaInput = (event) => {
+    const textarea = event.target;
+    resizeTextarea(textarea);
+  };
 
   // Chief complaints options
   const chiefComplaints = [
@@ -1050,10 +1068,13 @@ const AdminDashboard = () => {
                           <div className="form-group">
                             <label>Address</label>
                             <textarea
+                              ref={addressTextareaRef}
                               name="address"
                               value={editPatientData.address}
                               onChange={handleEditInputChange}
+                              onInput={handleTextareaInput}
                               rows="3"
+                              style={{ overflow: 'hidden' }}
                             ></textarea>
                           </div>
 

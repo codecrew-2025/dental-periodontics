@@ -252,5 +252,54 @@ router.post('/token-for-userid', async (req, res) => {
   }
 });
 
+// Debug endpoint: department queue (no auth) - local testing only
+router.get('/department-queue/:deptKey', async (req, res) => {
+  try {
+    const deptKey = String(req.params.deptKey || '').trim().toLowerCase();
+    if (!deptKey) return res.status(400).json({ success: false, message: 'Department required' });
+
+    const doctors = await User.find({ role: 'doctor' }, { _id: 1, Identity: 1, department: 1 }).lean();
+    const matching = doctors.filter(d => {
+      const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+      return nd === deptKey;
+    });
+
+    if (!matching.length) return res.json({ success: true, appointments: [] });
+
+    const keys = Array.from(new Set(matching.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))));
+    const todayStr = new Date().toISOString().split('T')[0];
+    const activeStatuses = ['pending','assigned','rescheduled','in_progress'];
+
+    const appointments = await Appointment.find({
+      $or: [
+        { doctorId: { $in: keys } },
+        { supervisingDeptDoctorId: { $in: keys } },
+        { deptDoctorId: { $in: keys } }
+      ],
+      status: { $in: activeStatuses },
+      appointmentDate: { $gte: todayStr }
+    }).sort({ appointmentDate: 1, appointmentTime: 1 }).lean();
+
+    // Attach patient names using a similar helper as in appointment router
+    const patientIds = [...new Set(appointments.map(a => a.patientId))];
+    const users = patientIds.length
+      ? await User.find({ Identity: { $in: patientIds } }, { Identity: 1, name: 1, personalInfo: 1 }).lean()
+      : [];
+
+    const map = {};
+    users.forEach(u => { map[u.Identity] = u.personalInfo?.firstName || u.name || u.Identity; });
+
+    const enriched = appointments.map(appt => ({
+      ...appt,
+      patientName: map[String(appt.patientId)] || String(appt.patientId)
+    }));
+
+    res.json({ success: true, appointments: enriched });
+  } catch (err) {
+    console.error('Debug department-queue error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 export default router;
 

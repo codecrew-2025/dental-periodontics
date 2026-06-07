@@ -15,7 +15,7 @@ const detectDentalIssues = (form) => {
     issues.push({
       name: 'Dental Caries',
       severity: 'High',
-      specialists: ['Endodontics', 'Conservative Dentistry'],
+      specialists: [],
       investigations: ['IOPA', 'Bitewing'],
     });
   }
@@ -49,7 +49,7 @@ const detectDentalIssues = (form) => {
     issues.push({
       name: 'Tooth Loss',
       severity: 'Medium',
-      specialists: ['Prosthodontics', 'Implantology'],
+      specialists: [],
       investigations: ['OPG', 'CBCT for implant'],
     });
   }
@@ -210,11 +210,7 @@ const recommendReferralDepartment = (issues, age, provisionalDiagnosis = '') => 
     'Pedodontics',
     'Orthodontics',
     'Periodontics',
-    'Endodontics',
-    'Prosthodontics',
-    'Conservative Dentistry',
     'Oral & Maxillofacial Surgery',
-    'Implantology',
   ];
 
   departments.forEach((dept) => {

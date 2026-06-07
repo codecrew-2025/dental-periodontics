@@ -9,7 +9,8 @@
   },
   "scripts": {
     "start": "node Server.js",
-    "dev": "nodemon Server.js"
+    "dev": "nodemon Server.js",
+    "create-periodontics-chief": "node scripts/create-periodontics-chief.js"
   },
   "keywords": [],
   "author": "Your Name",

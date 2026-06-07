@@ -2,7 +2,9 @@ import React from 'react';
 import { useAuth } from './AuthContext';
 import { Navigate } from 'react-router-dom';
 
-const normalizeDepartment = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '');
+const normalizeDepartment = (value) => String(value || '').trim().toLowerCase()
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, '');
 const normalizeRole = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
 
 const getDashboardRouteByRole = (role) => {

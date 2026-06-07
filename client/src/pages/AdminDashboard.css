@@ -383,7 +383,9 @@ tr.selected {
 }
 
 .form-group textarea {
-    resize: vertical;
+    overflow: hidden;
+    resize: none;
+    min-height: 90px;
 }
 
 .billing-records,

@@ -22,10 +22,7 @@ const REFERRAL_DEPARTMENT_OPTIONS = [
   'Pedodontics',
   'Orthodontics',
   'Periodontics',
-  'Endodontics',
-  'Prosthodontics',
   'Oral & Maxillofacial Surgery',
-  'Conservative Dentistry',
   'Public Health Dentistry',
   'Other',
 ];
@@ -79,17 +76,18 @@ const INITIAL_FORM = {
   digitalSignature: null,
 };
 
-const OralMedicine = () => {
+const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
 
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [form, setForm] = useState(initialCaseData || INITIAL_FORM);
   const [currentPage, setCurrentPage] = useState(0);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
-  const [draftSaved, setDraftSaved] = useState(false);
+  // Draft save disabled - these state variables are kept but unused
+  // const [draftSaved, setDraftSaved] = useState(false);
   const [isDraftHydrated, setIsDraftHydrated] = useState(false);
   const [allergyMessage, setAllergyMessage] = useState('Loading allergies...');
   const [showAllergy, setShowAllergy] = useState(true);
@@ -101,6 +99,9 @@ const OralMedicine = () => {
   const [showConsentPrompt, setShowConsentPrompt] = useState(false);
   const [consentRedirectTarget, setConsentRedirectTarget] = useState('');
   const [referralPickerValue, setReferralPickerValue] = useState('');
+  const [deptAppointments, setDeptAppointments] = useState([]);
+  const [deptLoading, setDeptLoading] = useState(false);
+  const [deptError, setDeptError] = useState('');
   
   // General Doctor Algorithm recommendations
   const [clinicalIssues, setClinicalIssues] = useState([]);
@@ -109,15 +110,22 @@ const OralMedicine = () => {
   const [urgencyLevel, setUrgencyLevel] = useState({ level: 'ROUTINE', recommendation: '' });
   const [patientEducation, setPatientEducation] = useState('');
   
-  const draftTimerRef = useRef(null);
+  const draftTimerRef = useRef(null); // Unused - kept for compatibility
 
-  const patientId = localStorage.getItem('CurrentpatientId') || '';
-  const patientName = localStorage.getItem('CurrentpatientName') || '';
+  const initialPatientId = String(initialCaseData?.patientId || '').trim();
+  const initialPatientName = String(initialCaseData?.patientName || '').trim();
+  const patientId = initialPatientId || localStorage.getItem('CurrentpatientId') || '';
+  const patientName = initialPatientName || localStorage.getItem('CurrentpatientName') || '';
   const doctorId = localStorage.getItem('doctorId') || '';
   const doctorName = localStorage.getItem('doctorName') || user?.name || '';
   const token = localStorage.getItem('token') || '';
 
   const buildApiUrl = (path) => `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+
+  useEffect(() => {
+    if (initialPatientId) localStorage.setItem('CurrentpatientId', initialPatientId);
+    if (initialPatientName) localStorage.setItem('CurrentpatientName', initialPatientName);
+  }, [initialPatientId, initialPatientName]);
 
   useEffect(() => {
     const navState = location.state || {};
@@ -128,8 +136,17 @@ const OralMedicine = () => {
   }, []); // eslint-disable-line
 
   useEffect(() => {
-    const prefill = location.state?.redoEdit ? location.state?.prefillCaseData : null;
-    const editCaseId = String(location.state?.editCaseId || localStorage.getItem('redoEditCaseId') || '').trim();
+    if (initialCaseData) {
+      setIsDraftHydrated(true);
+      if (initialCaseData.digitalSignature) {
+        setSignaturePreview(initialCaseData.digitalSignature);
+      }
+      return;
+    }
+
+    const isRedoEditSession = Boolean(location.state?.redoEdit);
+    const prefill = isRedoEditSession ? location.state?.prefillCaseData : null;
+    const editCaseId = String(location.state?.editCaseId || (isRedoEditSession ? localStorage.getItem('redoEditCaseId') : '') || '').trim();
     if (prefill && editCaseId) {
       setForm(prev => ({ ...prev, ...prefill }));
       if (typeof prefill.digitalSignature === 'string' && prefill.digitalSignature.startsWith('data:')) {
@@ -139,58 +156,47 @@ const OralMedicine = () => {
       setIsDraftHydrated(true);
       return;
     }
-    if (!patientId) { setIsDraftHydrated(true); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const draft = await loadCaseDraft({ patientId, routeKey: DRAFT_ROUTE_KEY });
-        if (!cancelled && draft?.data?.form) {
-          const currentName = String(localStorage.getItem('CurrentpatientName') || '').trim();
-          const { age: _a, sex: _s, patientName: _n,
-                  chiefComplaint: _cc, historyOfPresentIllness: _hpi,
-                  pastMedicalHistory: _pmh, pastSurgicalHistory: _psh,
-                  pastDentalHistory: _pdh, ...draftForm } = draft.data.form;
-          setForm(prev => ({ ...prev, ...draftForm, ...(currentName ? { patientName: currentName } : {}) }));
-          if (typeof draft.data.signaturePreview === 'string' && draft.data.signaturePreview.trim()) {
-            setSignaturePreview(draft.data.signaturePreview);
-          }
-          // Always start from page 0 — never restore the last page from draft
-          setCurrentPage(0);
-        }
-      } finally {
-        if (!cancelled) setIsDraftHydrated(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line
 
-  useEffect(() => {
-    if (!isDraftHydrated || !patientId) return;
-    clearTimeout(draftTimerRef.current);
-    draftTimerRef.current = setTimeout(async () => {
-      await saveCaseDraft({ patientId, routeKey: DRAFT_ROUTE_KEY, step: currentPage, data: { form, signaturePreview } });
-      setDraftSaved(true);
-      setTimeout(() => setDraftSaved(false), 2000);
-    }, 1500);
-    return () => clearTimeout(draftTimerRef.current);
-  }, [form, currentPage, signaturePreview, isDraftHydrated, patientId]);
+    if (!isRedoEditSession && localStorage.getItem('redoEditCaseId')) {
+      localStorage.removeItem('redoEditCaseId');
+      localStorage.removeItem('redoEditDepartmentKey');
+    }
 
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      const pid = String(localStorage.getItem('CurrentpatientId') || '').trim();
-      if (pid && isDraftHydrated) {
-        saveCaseDraft({ patientId: pid, routeKey: DRAFT_ROUTE_KEY, step: currentPage, data: { form, signaturePreview } });
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [form, currentPage, signaturePreview, isDraftHydrated]);
+    // Draft loading disabled
+    setIsDraftHydrated(true);
+  }, [patientId, location.state, initialCaseData]);
+
+  // Draft auto-save disabled
+  // useEffect(() => {
+  //   if (!isDraftHydrated || !patientId) return;
+  //   clearTimeout(draftTimerRef.current);
+  //   draftTimerRef.current = setTimeout(async () => {
+  //     await saveCaseDraft({ patientId, routeKey: DRAFT_ROUTE_KEY, step: currentPage, data: { form, signaturePreview } });
+  //     setDraftSaved(true);
+  //     setTimeout(() => setDraftSaved(false), 2000);
+  //   }, 1500);
+  //   return () => clearTimeout(draftTimerRef.current);
+  // }, [form, currentPage, signaturePreview, isDraftHydrated, patientId]);
+
+  // Draft save on page unload disabled
+  // useEffect(() => {
+  //   const handleBeforeUnload = () => {
+  //     const pid = String(localStorage.getItem('CurrentpatientId') || '').trim();
+  //     if (pid && isDraftHydrated) {
+  //       saveCaseDraft({ patientId: pid, routeKey: DRAFT_ROUTE_KEY, step: currentPage, data: { form, signaturePreview } });
+  //     }
+  //   };
+  //   window.addEventListener('beforeunload', handleBeforeUnload);
+  //   return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  // }, [form, currentPage, signaturePreview, isDraftHydrated]);
 
   useEffect(() => {
     if (patientName) setForm(prev => ({ ...prev, patientName }));
   }, [patientName]); // eslint-disable-line
 
   useEffect(() => {
+    if (initialCaseData) return;
+
     let isMounted = true;
     const toListString = (v) => Array.isArray(v) ? v.map(x => String(x).trim()).filter(Boolean).join(', ') : String(v || '').trim();
     const extractPatient = (r) => {
@@ -268,7 +274,15 @@ const OralMedicine = () => {
     if (shared?.dataUrl) setXrayPreview(prev => prev || shared.dataUrl);
   }, []);
 
-  useEffect(() => { window.scrollTo(0, 0); }, [currentPage]);
+  useEffect(() => { 
+    setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      const wrapper = document.querySelector('.omr-wrapper');
+      if (wrapper) wrapper.scrollTop = 0;
+    }, 10);
+  }, [currentPage]);
 
   const formatAllergyTicker = (raw) => {
     const r = (raw || '').trim();
@@ -340,10 +354,18 @@ const OralMedicine = () => {
 
   const validate = () => {
     const e = {};
-    if (!form.patientName.trim()) e.patientName = 'Patient name is required.';
-    if (!form.chiefComplaint.trim()) e.chiefComplaint = 'Chief complaint is required.';
-    if (!form.sex) e.sex = 'Sex is required.';
-    if (!form.age) e.age = 'Age is required.';
+    if (!form.patientName?.trim()) e.patientName = 'Patient name is required.';
+    if (!form.chiefComplaint?.trim()) e.chiefComplaint = 'Chief complaint is required.';
+    
+    // Check for referral-specific requirements if departments are selected
+    const referralDepartments = Array.isArray(form.referralDepartments)
+      ? form.referralDepartments.map((d) => String(d || '').trim()).filter(Boolean)
+      : [];
+    if (referralDepartments.length > 0) {
+      if (!form.treatmentPlan?.trim()) e.treatmentPlan = 'Treatment plan is required when creating a referral.';
+    }
+    
+    console.log('[OralMedicine] Validation check:', { errors: e, referralDepartments });
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -358,21 +380,46 @@ const OralMedicine = () => {
   };
 
   const handleSubmit = async (redirectTo = 'dashboard') => {
-    if (!validate()) { showToast('Please fill required fields.', 'error'); return; }
-    if (!patientId) { showToast('No patient loaded.', 'error'); return; }
-    if (!doctorId) { showToast('Doctor identity not found. Please log in again.', 'error'); return; }
+    console.log('[OralMedicine] handleSubmit START - redirectTo:', redirectTo);
+    if (!validate()) { 
+      console.log('[OralMedicine] ❌ Validation failed');
+      showToast('Please fill required fields.', 'error'); 
+      return; 
+    }
+    console.log('[OralMedicine] ✓ Validation passed');
+    
+    if (!patientId) { 
+      console.log('[OralMedicine] ❌ No patientId');
+      showToast('No patient loaded.', 'error'); 
+      return; 
+    }
+    console.log('[OralMedicine] ✓ patientId:', patientId);
+    
+    if (!doctorId) { 
+      console.log('[OralMedicine] ❌ No doctorId');
+      showToast('Doctor identity not found. Please log in again.', 'error'); 
+      return; 
+    }
+    console.log('[OralMedicine] ✓ doctorId:', doctorId);
+    
     if (!token) {
+      console.log('[OralMedicine] ❌ No token');
       showMessageBox('Session Expired', 'Your session has expired. Please log in again.');
       setTimeout(() => navigate('/login'), 1500);
       return;
     }
+    console.log('[OralMedicine] ✓ token exists');
+    
     if (!form.digitalSignature) {
+      console.log('[OralMedicine] ❌ No digitalSignature');
       showMessageBox('Error', 'Please upload your digital signature before submitting.');
       return;
     }
+    console.log('[OralMedicine] ✓ digitalSignature uploaded');
+    
     setSubmitting(true);
     try {
-      const redoEditCaseId = String(location.state?.editCaseId || localStorage.getItem('redoEditCaseId') || '').trim();
+      const redoEditCaseId = String(location.state?.editCaseId || (location.state?.redoEdit ? localStorage.getItem('redoEditCaseId') : '') || '').trim();
       const isRedoEdit = Boolean(redoEditCaseId);
       const fileToDataUrl = (file) => new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -415,19 +462,23 @@ const OralMedicine = () => {
         }
         return;
       }
+      console.log('[OralMedicine] About to submit to /api/oral with payload:', { patientId, doctorId, referralDepartments: referralDepartments.length });
       const res = await fetch(buildApiUrl('/api/oral'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
+      console.log('[OralMedicine] /api/oral response:', { status: res.status, ok: res.ok, message: data.message });
       if (res.status === 401) {
         showMessageBox('Session Expired', 'Your session has expired. Please log in again.');
         setTimeout(() => navigate('/login'), 1500);
         return;
       }
       if (res.ok) {
+        console.log('[OralMedicine] ✓ /api/oral succeeded, checking referrals... referralDepartments.length:', referralDepartments.length);
         if (referralDepartments.length > 0) {
+          console.log('[OralMedicine] 📤 Sending referral to /api/general/save with departments:', referralDepartments);
           const referralRes = await fetch(buildApiUrl('/api/general/save'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -455,22 +506,55 @@ const OralMedicine = () => {
           });
 
           const referralData = await referralRes.json().catch(() => ({}));
+          console.log('[OralMedicine] /api/general/save response:', { 
+            status: referralRes.status, 
+            ok: referralRes.ok, 
+            message: referralData.message 
+          });
+          
           if (referralRes.status === 401) {
             showMessageBox('Session Expired', 'Your session has expired. Please log in again.');
             setTimeout(() => navigate('/login'), 1500);
             return;
           }
           if (!referralRes.ok) {
+            console.error('[OralMedicine] Referral save failed:', {
+              status: referralRes.status,
+              statusText: referralRes.statusText,
+              message: referralData.message,
+              fullResponse: referralData,
+              sentDepartments: referralDepartments,
+              sentPayload: {
+                patientId,
+                patientName: form.patientName || patientName,
+                doctorId,
+                doctorName,
+                chiefComplaint: form.chiefComplaint,
+                treatmentPlan: form.treatmentPlan,
+                selectedDepartments: referralDepartments,
+              }
+            });
             showMessageBox('Referral Error', referralData.message || 'Failed to create referral case sheet.');
             return;
           }
+          console.log('[OralMedicine] ✅ Referral created successfully! Response:', referralData);
+        } else {
+          console.log('[OralMedicine] ℹ️  No referral departments selected, skipping /api/general/save');
         }
 
         if (data.data?._id) localStorage.setItem('caseId', data.data._id);
         await clearCaseDraft({ patientId, routeKey: DRAFT_ROUTE_KEY });
         const pName = form.patientName || patientName || 'Patient';
-        const referral = referralDepartments.length ? `\n\nReferred priority: ${referralDepartments.join(' → ')}` : '';
-        showMessageBox('✅ General Department Case Sheet Submitted', `Case sheet for ${pName} has been completed by General Department.\n\nInitial diagnosis and referral recommendations have been recorded successfully.${referral}`);
+        
+        // Enhanced message for referrals
+        let successMessage = `Case sheet for ${pName} has been completed by General Department.\n\nInitial diagnosis and recommendations have been recorded successfully.`;
+        
+        if (referralDepartments.length > 0) {
+          const deptList = referralDepartments.join(', ');
+          successMessage += `\n\n✅ REFERRAL CREATED:\nThe patient has been referred to: ${deptList}\n\nAn appointment has been automatically scheduled and will appear in the specialist's "My Appointments" queue.`;
+        }
+        
+        showMessageBox('✅ General Department Case Sheet Submitted', successMessage);
         const role = user?.role || localStorage.getItem('role') || '';
         const dashRoute = role.includes('ug') ? '/ug-dashboard'
           : role.includes('pg') ? '/pg-dashboard'
@@ -478,6 +562,12 @@ const OralMedicine = () => {
           : '/doctor-dashboard';
         setTimeout(() => navigate(redirectTo === 'prescription' ? '/prescriptions' : dashRoute), 1500);
       } else {
+        console.error('[OralMedicine] ❌ /api/oral failed:', { 
+          status: res.status,
+          statusText: res.statusText,
+          message: data.message,
+          data 
+        });
         showMessageBox('Error', data.message || 'Submission failed.');
       }
     } catch {
@@ -487,9 +577,20 @@ const OralMedicine = () => {
     }
   };
 
+  const normalizeDepartmentKey = (value) => String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const userDepartmentKey = normalizeDepartmentKey(user?.department || localStorage.getItem('doctorDepartment') || localStorage.getItem('pgDepartment') || localStorage.getItem('ugDepartment') || '');
+  const canReferToPedodontics = () => false;
+
   const addReferralDepartment = (department) => {
     const value = String(department || '').trim();
     if (!value) return;
+
+    const normalizedValue = value.toLowerCase();
+    if (normalizedValue === 'pedodontics') {
+      showToast('Pedodontics referrals are currently disabled.', 'error');
+      return;
+    }
+
     const current = Array.isArray(form.referralDepartments) ? form.referralDepartments : [];
     if (current.includes(value)) {
       showToast('Department already added.', 'error');
@@ -498,7 +599,7 @@ const OralMedicine = () => {
     setForm(prev => ({ ...prev, referralDepartments: [...(Array.isArray(prev.referralDepartments) ? prev.referralDepartments : []), value] }));
     setReferralPickerValue('');
   };
-
+  
   const moveReferralDepartment = (fromIndex, toIndex) => {
     const current = Array.isArray(form.referralDepartments) ? [...form.referralDepartments] : [];
     if (fromIndex < 0 || fromIndex >= current.length) return;
@@ -519,7 +620,23 @@ const OralMedicine = () => {
     <input className="omr-uinput" type={type} value={form[field] || ''} onChange={e => set(field, e.target.value)} style={style} />
   );
   const ta = (field, rows = 3, large = false) => (
-    <textarea className={`omr-ta${large ? ' omr-ta-lg' : ''}`} rows={rows} value={form[field] || ''} onChange={e => set(field, e.target.value)} />
+    <textarea 
+      className={`omr-ta${large ? ' omr-ta-lg' : ''}`} 
+      rows={rows} 
+      value={form[field] || ''} 
+      onChange={e => {
+        set(field, e.target.value);
+        e.target.style.height = 'auto';
+        e.target.style.height = e.target.scrollHeight + 'px';
+      }}
+      style={{ overflow: 'hidden' }}
+    />
+  );
+  const sectionTitle = (text, required = false) => (
+    <p className={`omr-section-title${required ? ' required' : ''}`}>
+      {text}
+      {required && <span className="omr-required-star">*</span>}
+    </p>
   );
 
   const handleXrayUpload = (file) => {
@@ -565,7 +682,7 @@ const OralMedicine = () => {
         )}
       </div>
       <h2 className="omr-sheet-title" style={{ marginTop: 8 }}>ORAL MEDICINE AND RADIOLOGY</h2>
-      <p className="omr-section-title">CHIEF COMPLAINT:</p>
+      {sectionTitle('CHIEF COMPLAINT:', true)}
       {ta('chiefComplaint', 4, true)}
       {errors.chiefComplaint && <p className="omr-error">{errors.chiefComplaint}</p>}
       <p className="omr-section-title">HISTORY OF PRESENTING ILLNESS:</p>
@@ -690,7 +807,7 @@ const OralMedicine = () => {
             <div>
               <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Detected Issues:</strong>
               <ul style={{ margin: '4px 0 0', paddingLeft: '20px', color: '#c7d2fe', fontSize: '0.85rem' }}>
-                {clinicalIssues.map((issue, idx) => <li key={idx}>{issue}</li>)}
+                {clinicalIssues.map((issue, idx) => <li key={idx}>{issue.name}</li>)}
               </ul>
             </div>
             
@@ -761,7 +878,7 @@ const OralMedicine = () => {
         ))}
       </div>
       <p className="omr-section-title">Clinical Diagnosis:</p>{ta('clinicalDiagnosis', 3)}
-      <p className="omr-section-title">Treatment planning:</p>{ta('treatmentPlan', 4)}
+      {sectionTitle('Treatment planning:', true)}{ta('treatmentPlan', 4)}
       <p className="omr-section-title">Prognosis:</p>{ta('prognosis', 3)}
 
       <p className="omr-section-title" style={{ marginTop: 24 }}>CHARGEABLE INVESTIGATIONS:</p>
@@ -988,12 +1105,6 @@ const OralMedicine = () => {
               ? <>Patient: <strong>{localStorage.getItem('CurrentpatientName') || patientId}</strong> &nbsp;|&nbsp; ID: {patientId}</>
               : 'No patient loaded'}
           </span>
-          {draftSaved && <span className="omr-draft-saved">✓ Draft saved</span>}
-        </div>
-
-        <div className="omr-progress-wrap">
-          <div className="omr-progress-bar" style={{ width: `${((currentPage + 1) / TOTAL_PAGES) * 100}%` }} />
-          <span className="omr-progress-label">Page {currentPage + 1} of {TOTAL_PAGES} — {pageTitles[currentPage]}</span>
         </div>
 
         <div className="omr-sheet">
@@ -1003,7 +1114,9 @@ const OralMedicine = () => {
               SRM Dental College
             </h2>
           </div>
-          {pages[currentPage]()}
+          <fieldset disabled={readOnly} style={{ border: 'none', margin: 0, padding: 0 }}>
+            {pages[currentPage]()}
+          </fieldset>
         </div>
 
         <div className="omr-submit-bar">
@@ -1012,9 +1125,9 @@ const OralMedicine = () => {
           )}
           {currentPage < TOTAL_PAGES - 1 ? (
             <button type="button" className="omr-btn-submit" onClick={handleNext}>Next →</button>
-          ) : (
+          ) : !readOnly && (
             <>
-              <button type="button" className="omr-btn-submit" onClick={handleSubmit} disabled={submitting}>
+              <button type="button" className="omr-btn-submit" onClick={() => handleSubmit('dashboard')} disabled={submitting}>
                 {submitting ? 'Submitting...' : 'Submit Case Sheet ✓'}
               </button>
               <button

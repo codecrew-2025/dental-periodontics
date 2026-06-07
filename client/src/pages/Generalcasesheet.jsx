@@ -5,6 +5,7 @@ import { API_BASE_URL } from '../config/api';
 import { getCurrentPatientId, getSharedXrayImage, saveSharedXrayImage } from '../utils/sharedXray';
 import { clearCaseDraft, loadCaseDraft, saveCaseDraft } from '../utils/caseDraft';
 import { setStoredPatientId } from '../utils/patientIdentity';
+import { isDepartmentAllowed } from '../config/allowedDepartments';
 
 const GeneralCaseSheet = () => {
   const navigate = useNavigate();
@@ -246,7 +247,6 @@ const GeneralCaseSheet = () => {
   // Departments list
   const departments = [
     'Prosthodontics',
-    'Pedodontics',
     'Periodontics',
     'Conservative Dentistry and Endodontics',
     'Oral and Maxillofacial'
@@ -255,24 +255,22 @@ const GeneralCaseSheet = () => {
   // Decide which page to go to after saving, based on selected department(s)
   const getNextRouteForDepartments = () => {
     // If the logged-in doctor is from the General department, always go back to dashboard
-    const doctorDepartment = String(localStorage.getItem('doctorDepartment') || '').trim().toLowerCase().replace(/[_\s]+/g, '');
+    const doctorDepartment = String(localStorage.getItem('doctorDepartment') || '').trim().toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, '');
     if (doctorDepartment === 'general' || doctorDepartment === 'generaldentistry') {
       return '/doctor-dashboard';
     }
 
-    // Priority: Prosthodontics, Pedodontics, Periodontics, Conservative, Oral, General
+    // Priority: Prosthodontics, Periodontics, Conservative, Oral, General
     if (selectedDepartments.includes('Prosthodontics')) {
       // Open Prosthodontics flow inside CasePortal (to choose specific prostho case sheet)
       return '/casePortal?dept=prosthodontics';
     }
 
-    if (selectedDepartments.includes('Pedodontics')) {
-      return '/pedodontics';
-    }
-
     if (selectedDepartments.includes('Periodontics')) {
       // Open Periodontics options inside CasePortal
-      return '/casePortal?dept=periodontics';
+      return '/periodontics';
     }
 
     if (selectedDepartments.includes('Conservative Dentistry and Endodontics')) {
@@ -903,16 +901,20 @@ const GeneralCaseSheet = () => {
         <div className="general-case-heading">Select Case Sheet</div>
 
         <div className="general-case-checkbox-group-list">
-          {departments.map(dept => (
-            <label key={dept} className="general-case-checkbox-item">
+          {departments.map(dept => {
+            const deptKey = dept === 'Conservative Dentistry and Endodontics' ? 'conservative' : dept === 'Oral and Maxillofacial' ? 'oral' : dept;
+            const isAllowed = isDepartmentAllowed(deptKey);
+            return (
+            <label key={dept} className="general-case-checkbox-item" style={!isAllowed ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>
               <input
                 type="checkbox"
                 checked={selectedDepartments.includes(dept)}
-                onChange={() => handleDepartmentChange(dept)}
+                onChange={() => isAllowed && handleDepartmentChange(dept)}
+                disabled={!isAllowed}
               />
               {dept}
             </label>
-          ))}
+          )})}
         </div>
 
         {/* Description field */}

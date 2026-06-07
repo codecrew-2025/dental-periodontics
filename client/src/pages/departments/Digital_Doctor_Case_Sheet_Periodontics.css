@@ -1,0 +1,593 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 40px 20px;
+  min-height: 100vh;
+  background:
+    linear-gradient(rgba(6, 12, 42, 0.56), rgba(6, 12, 42, 0.56)),
+    url('/images/campus.png') center/cover no-repeat;
+  background-size: cover;
+  background-attachment: fixed;
+}
+
+.header-logo {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.75);
+  background: rgba(255,255,255,0.05);
+  display: block;
+  margin: 0 auto 14px auto;
+}
+
+/* ── Case sheet card ─────────────────────────────────────────────────────── */
+.case-sheet {
+  background-color: rgba(38, 40, 107, 0.90);
+  border-radius: 12px;
+  padding: 30px;
+  width: 95%;
+  max-width: 980px;
+  color: white;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+
+.case-sheet form,
+.case-sheet fieldset {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.header-section {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.logo-placeholder {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 10px auto;
+  background: rgba(255,255,255,0.08);
+  font-size: 0.8rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: rgba(255,255,255,0.8);
+}
+
+.college-title {
+  font-size: 1.55rem !important;
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+  margin-top: 4px !important;
+}
+
+.header-section h3 {
+  margin: 6px 0 2px;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+}
+
+.header-section h4 {
+  margin: 2px 0;
+  font-size: 0.85rem;
+  font-weight: normal;
+  opacity: 0.85;
+}
+
+/* ── Section headings ────────────────────────────────────────────────────── */
+h2 {
+  border-bottom: 1px solid rgba(255,255,255,0.6);
+  padding-bottom: 5px;
+  margin-top: 22px;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+/* ── Form controls ───────────────────────────────────────────────────────── */
+.form-group {
+  margin-bottom: 14px;
+}
+
+label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+  font-size: 0.88rem;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 4px;
+  height: 30px;
+  font-family: Arial, sans-serif;
+  font-size: 0.83rem;
+  color: #222;
+  box-sizing: border-box;
+}
+
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 300px;
+  font-family: Arial, sans-serif;
+  font-size: 0.85rem;
+  color: #222;
+}
+
+input[type="file"] {
+  width: 100%;
+  padding: 6px;
+  background: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #333;
+}
+
+.section-sub-label {
+  display: block;
+  font-weight: bold;
+  margin: 8px 0 4px;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.periodontics-page-wrapper .table-container,
+.periodontics-page-wrapper .measurement-table-container {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+}
+
+.periodontics-page-wrapper .gingiva-table {
+  width: auto;
+  min-width: 1000px;
+  display: inline-table;
+  border-collapse: collapse;
+  margin: 0;
+  color: white;
+  table-layout: fixed;
+  font-size: 0.78rem;
+}
+
+.periodontics-page-wrapper .gingiva-table th,
+.periodontics-page-wrapper .gingiva-table td {
+  border: 1px solid rgba(255,255,255,0.7);
+}
+
+.periodontics-page-wrapper .gingiva-table th {
+  padding: 10px 12px;
+  text-align: center;
+  background-color: rgba(255,255,255,0.12);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.periodontics-page-wrapper .gingiva-table td {
+  padding: 10px 12px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.periodontics-page-wrapper .gingiva-table .gingiva-row-label {
+  text-align: left;
+  min-width: 180px;
+  max-width: 180px;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.periodontics-page-wrapper .gingiva-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: rgba(10, 25, 80, 0.92);
+}
+
+.periodontics-page-wrapper .gingiva-table td input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.periodontics-page-wrapper .gingiva-table tbody tr:first-of-type td {
+  background: rgba(255,255,255,0.08);
+  font-weight: 700;
+}
+
+.periodontics-page-wrapper .measurement-table-container {
+  min-height: 260px;
+  padding: 16px 12px 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+
+.periodontics-page-wrapper .measurement-table-container::-webkit-scrollbar {
+  height: 16px;
+}
+
+.periodontics-page-wrapper .measurement-table-container::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+}
+
+.periodontics-page-wrapper .measurement-table-container::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.25);
+  border-radius: 999px;
+}
+
+.periodontics-page-wrapper .measurement-table {
+  width: auto;
+  min-width: 900px;
+  display: inline-table;
+  border-collapse: collapse;
+  margin: 0;
+  color: white;
+  table-layout: auto;
+  font-size: 0.78rem;
+}
+
+.periodontics-page-wrapper .measurement-table,
+.periodontics-page-wrapper .measurement-table th,
+.periodontics-page-wrapper .measurement-table td {
+  border: 1px solid rgba(255,255,255,0.7);
+}
+
+.periodontics-page-wrapper .measurement-table th,
+.periodontics-page-wrapper .measurement-table td {
+  min-width: 60px;
+}
+
+.periodontics-page-wrapper .measurement-table th {
+  padding: 8px 12px;
+  text-align: center;
+  background-color: rgba(255,255,255,0.12);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.periodontics-page-wrapper .measurement-table td {
+  padding: 8px 10px;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.periodontics-page-wrapper .measurement-table td input[type="text"] {
+  width: 100%;
+  min-width: 72px;
+  box-sizing: border-box;
+}
+
+.periodontics-page-wrapper .measurement-table .table-label {
+  font-weight: bold;
+  text-align: left !important;
+  vertical-align: middle;
+  background-color: rgba(255,255,255,0.08);
+  min-width: 220px;
+  padding: 10px 12px;
+  white-space: normal;
+  word-break: keep-all;
+}
+
+.periodontics-page-wrapper .attachment-table {
+  width: auto;
+  min-width: 980px;
+  display: inline-table;
+  border-collapse: collapse;
+  margin: 0;
+  color: white;
+  table-layout: fixed;
+  font-size: 0.78rem;
+}
+
+.periodontics-page-wrapper .attachment-table th,
+.periodontics-page-wrapper .attachment-table td {
+  border: 1px solid rgba(255,255,255,0.7);
+}
+
+.periodontics-page-wrapper .attachment-table th {
+  padding: 10px 12px;
+  text-align: center;
+  background-color: rgba(255,255,255,0.12);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.periodontics-page-wrapper .attachment-table td {
+  padding: 10px 12px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.periodontics-page-wrapper .attachment-table .attachment-label {
+  text-align: left;
+  white-space: nowrap;
+  min-width: 170px;
+  padding: 10px 12px;
+  font-weight: bold;
+  background-color: rgba(255,255,255,0.08);
+}
+
+.periodontics-page-wrapper .attachment-table td input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.periodontics-page-wrapper .tooth-chart {
+  width: max-content;
+  min-width: 1120px;
+  display: inline-table;
+  border-collapse: collapse;
+  table-layout: auto;
+  margin: 0;
+  color: white;
+  font-size: 0.78rem;
+}
+
+.periodontics-page-wrapper .tooth-chart th,
+.periodontics-page-wrapper .tooth-chart td {
+  border: 1px solid rgba(255,255,255,0.7);
+  min-width: 68px;
+  box-sizing: border-box;
+}
+
+.periodontics-page-wrapper .tooth-chart th {
+  padding: 10px 10px;
+  text-align: center;
+  background-color: rgba(255,255,255,0.12);
+  white-space: nowrap;
+}
+
+.periodontics-page-wrapper .tooth-chart td {
+  padding: 6px 8px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.periodontics-page-wrapper .table-container {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+}
+
+td input[type="text"] {
+  height: 26px;
+  padding: 2px 3px;
+  font-size: 0.72rem;
+  border: none;
+  border-radius: 2px;
+  color: #222;
+}
+
+.tooth-chart td {
+  width: calc(100% / 16);
+}
+
+.table-label {
+  font-weight: bold;
+  text-align: center !important;
+  vertical-align: middle;
+  background-color: rgba(255,255,255,0.08);
+  min-width: 24px;
+}
+
+/* ── Navigation buttons ──────────────────────────────────────────────────── */
+.navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,0.2);
+}
+
+button {
+  padding: 10px 24px;
+  background-color: #ffffff;
+  color: #26286b;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  transition: all 0.25s ease;
+}
+
+button:hover:not(:disabled) {
+  background-color: #e6e6ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.submit-btn {
+  background-color: #4CAF50;
+  color: white;
+  padding: 12px 32px;
+  font-size: 1rem;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background-color: #43a047;
+}
+
+/* ── Page indicator ──────────────────────────────────────────────────────── */
+.page-indicator {
+  text-align: center;
+  color: rgba(255,255,255,0.55);
+  font-size: 0.78rem;
+  margin-top: 10px;
+}
+
+/* ── Signature / Doctor section ──────────────────────────────────────────── */
+.signature-section {
+  background-color: rgba(255,255,255,0.08);
+  padding: 16px;
+  border-radius: 8px;
+  margin: 18px 0;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.doctor-fields {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.doctor-fields .form-group {
+  flex: 1;
+  min-width: 200px;
+}
+
+.signature-preview {
+  max-width: 200px;
+  max-height: 100px;
+  margin-top: 8px;
+  border: 1px solid white;
+  border-radius: 4px;
+  display: block;
+}
+
+.required-field::after {
+  content: " *";
+  color: #ff6b6b;
+}
+
+/* ── Status bar with patient info ─────────────────────────────────────────── */
+.status-bar {
+  width: 90%;
+  max-width: 900px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-family: Arial, sans-serif;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.85);
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 40px;
+}
+
+.status-bar-pid {
+  font-weight: 600;
+}
+
+/* ── Allergy alert banner ────────────────────────────────────────────────── */
+.allergy-alert {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100vw;
+  background: #ffffff;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.16);
+  z-index: 9999;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+
+.allergy-alert .alert-icon {
+  font-size: 18px;
+  color: #b91c1c;
+  flex-shrink: 0;
+}
+
+.allergy-alert .allergy-flow-window {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.allergy-alert #allergyMessage {
+  display: inline-block;
+  white-space: nowrap;
+  color: #7f1d1d;
+  font-weight: 700;
+  font-size: 0.95rem;
+  animation: allergyTextFlow 14s linear infinite;
+}
+
+.allergy-alert .close-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: #7f1d1d;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 6px;
+}
+
+.allergy-alert .close-btn:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+@keyframes allergyTextFlow {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100vw); }
+}
+
+/* ── Active page visibility ───────────────────────────────────────────────── */
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}

@@ -3,31 +3,22 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
 
 const normalizeRole = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
-const normalizeDepartment = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '');
+const normalizeDepartment = (value) => String(value || '').trim().toLowerCase()
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, '');
 
 const doctorDepartmentCaseApiPrefixes = {
   pedodontics: ['/api/pedodontics'],
-  prosthodontics: ['/api/complete-denture', '/api/fpd', '/api/implant', '/api/implantpatient', '/api/partial'],
-  prothodontics: ['/api/complete-denture', '/api/fpd', '/api/implant', '/api/implantpatient', '/api/partial'],
-  prosthondontics: ['/api/complete-denture', '/api/fpd', '/api/implant', '/api/implantpatient', '/api/partial'],
-  completedenture: ['/api/complete-denture'],
-  fpd: ['/api/fpd'],
-  fixedpartialdenture: ['/api/fpd'],
-  implantology: ['/api/implant', '/api/implantpatient'],
-  implant: ['/api/implant'],
-  implantpatient: ['/api/implantpatient'],
-  partial: ['/api/partial'],
-  partialdenture: ['/api/partial'],
-  // Oral Medicine & Radiology department acts as General Department for primary screening
-  // All general/oral variants map to the same /api/oral route
   oral: ['/api/oral'],
   general: ['/api/oral'],
   generaldentistry: ['/api/oral'],
   oralandmaxillofacial: ['/api/oral'],
+  oralmaxillofacial: ['/api/oral'],
   oralandmaxillofacialsurgery: ['/api/oral'],
+  oralmaxillofacialsurgery: ['/api/oral'],
   oralmedicine: ['/api/oral'],
   oralmedicineandradiology: ['/api/oral'],
-  oralmedicineradiology: ['/api/oral']
+  oralmedicineradiology: ['/api/oral'],
 };
 
 const allRestrictedDoctorCasePrefixes = Array.from(

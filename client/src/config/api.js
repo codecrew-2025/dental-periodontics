@@ -2,12 +2,24 @@ const DEFAULT_DEV_API = 'http://localhost:5000';
 
 const normalizeBase = (value) => {
   if (!value) return '';
-  return value.endsWith('/') ? value.slice(0, -1) : value;
+  let normalized = value.trim();
+  if (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
+
+  // Accept shorthand host:port values in development env vars
+  if (/^:\d+$/.test(normalized)) {
+    normalized = `http://localhost${normalized}`;
+  } else if (/^[^:/?#]+:\d+$/.test(normalized) && !/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(normalized)) {
+    normalized = `http://${normalized}`;
+  } else if (normalized.startsWith('//')) {
+    normalized = `http:${normalized}`;
+  }
+
+  return normalized;
 };
 
 const resolveApiBase = () => {
   const rawEnvBase = import.meta.env.VITE_API_BASE_URL;
-  const envBase = typeof rawEnvBase === 'string' ? rawEnvBase.trim() : '';
+  const envBase = typeof rawEnvBase === 'string' ? normalizeBase(rawEnvBase) : '';
   const isVercelHost =
     typeof window !== 'undefined' && /\.vercel\.app$/i.test(window.location.hostname || '');
 

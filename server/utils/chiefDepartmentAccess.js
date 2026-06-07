@@ -1,5 +1,7 @@
 const normalizeRole = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
-const normalizeDepartment = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '');
+const normalizeDepartment = (value) => String(value || '').trim().toLowerCase()
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, '');
 
 export const isChiefRole = (role) => {
   const normalizedRole = normalizeRole(role);

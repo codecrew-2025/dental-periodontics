@@ -3,12 +3,7 @@ import auth from '../middleware/auth.js';
 import requireRole from '../middleware/role.js';
 import Bill from '../models/bill-model.js';
 import PedodonticsCase from '../models/PedodonticsCase.js';
-import CompleteDentureCase from '../models/CompleteDentureCase.js';
-import Fpd from '../models/Fpd-model.js';
-import Implant from '../models/Implant-model.js';
-import ImplantPatientCase from '../models/ImplantPatient-model.js';
-import PartialDentureCase from '../models/partial-model.js';
-import GeneralCase from '../models/GeneralCase.js';
+import OralCase from '../models/Oral-model.js';
 
 const router = express.Router();
 
@@ -28,21 +23,11 @@ router.get('/patient/:patientId/today-cases', auth, requireRole(['admin']), asyn
 		const { start, end } = getTodayWindow();
 
 		const [
-			generalCases,
 			pedodontics,
-			completeDenture,
-			fpd,
-			implant,
-			implantPatient,
-			partial,
+			oral,
 		] = await Promise.all([
-			GeneralCase.find({ patientId, createdAt: { $gte: start, $lt: end } }).select('patientId patientName doctorName createdAt'),
 			PedodonticsCase.find({ patientId, createdAt: { $gte: start, $lt: end } }).select('patientId patientName doctorName createdAt'),
-			CompleteDentureCase.find({ patientId, createdAt: { $gte: start, $lt: end } }).select('patientId patientName doctorName createdAt'),
-			Fpd.find({ patientId, createdAt: { $gte: start, $lt: end } }).select('patientId patientName doctorName createdAt'),
-			Implant.find({ patientId, createdAt: { $gte: start, $lt: end } }).select('patientId patientName doctorName createdAt'),
-			ImplantPatientCase.find({ patientId, createdAt: { $gte: start, $lt: end } }).select('patientId patientName doctorName createdAt'),
-			PartialDentureCase.find({ patientId, createdAt: { $gte: start, $lt: end } }).select('patientId patientName doctorName createdAt'),
+			OralCase.find({ patientId, createdAt: { $gte: start, $lt: end } }).select('patientId patientName doctorName createdAt'),
 		]);
 
 		const mapCases = (department, list) =>
@@ -56,13 +41,8 @@ router.get('/patient/:patientId/today-cases', auth, requireRole(['admin']), asyn
 			}));
 
 		const allCases = [
-			...mapCases('general', generalCases),
 			...mapCases('pedodontics', pedodontics),
-			...mapCases('complete_denture', completeDenture),
-			...mapCases('fpd', fpd),
-			...mapCases('implant', implant),
-			...mapCases('implant_patient', implantPatient),
-			...mapCases('partial_denture', partial),
+			...mapCases('oral', oral),
 		].sort((a, b) => new Date(b.caseDate) - new Date(a.caseDate));
 
 		return res.json({ success: true, data: allCases });

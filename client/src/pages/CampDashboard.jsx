@@ -73,6 +73,23 @@ const CampDashboard = () => {
   const [updateLoading, setUpdateLoading] = useState(false);
   const [showPatientRegistration, setShowPatientRegistration] = useState(false);
   const [todayVisitStats, setTodayVisitStats] = useState(null);
+  const addressTextareaRef = useRef(null);
+
+  const resizeTextarea = (textarea) => {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    if (addressTextareaRef.current) {
+      resizeTextarea(addressTextareaRef.current);
+    }
+  }, [isEditMode, editPatientData.address]);
+
+  const handleTextareaInput = (event) => {
+    resizeTextarea(event.target);
+  };
 
   const chiefComplaints = [
     "Pain/Toothache", "Dental Caries (Cavities)", "Sensitivity",
@@ -772,7 +789,7 @@ const CampDashboard = () => {
                                 </select>
                               </div>
                             </div>
-                            <div className="form-group"><label>Address</label><textarea name="address" value={editPatientData.address} onChange={handleEditInputChange} rows="3"></textarea></div>
+                            <div className="form-group"><label>Address</label><textarea ref={addressTextareaRef} name="address" value={editPatientData.address} onChange={handleEditInputChange} onInput={handleTextareaInput} rows="3" style={{ overflow: 'hidden' }}></textarea></div>
                             <div className="action-buttons" style={{ marginTop: '20px' }}>
                               <button className="btn-primary" onClick={handleUpdatePatient} disabled={updateLoading}>{updateLoading ? 'Updating...' : 'Save Changes'}</button>
                               <button className="btn-secondary" onClick={handleCancelEdit} disabled={updateLoading}>Cancel</button>

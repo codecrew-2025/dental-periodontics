@@ -31,16 +31,25 @@ const CaseHistory = () => {
       setError("");
 
       const token = localStorage.getItem("token");
-      const endpoints = [
-        { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: "Pedodontics" },
-        { url: buildApiUrl(`/api/complete-denture/patient/${encodeURIComponent(patientId)}`), department: "Complete Denture" },
-        { url: buildApiUrl(`/api/fpd/patient/${encodeURIComponent(patientId)}`), department: "FPD" },
-        { url: buildApiUrl(`/api/implant/patient/${encodeURIComponent(patientId)}`), department: "Implant" },
-        { url: buildApiUrl(`/api/ImplantPatient/patient/${encodeURIComponent(patientId)}`), department: "Implant Patient Surgery" },
-        { url: buildApiUrl(`/api/partial/patient/${encodeURIComponent(patientId)}`), department: "Partial Denture" },
-        { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: "Oral Medicine and Radiology" },
-        { url: buildApiUrl(`/api/general/patient/${encodeURIComponent(patientId)}`), department: "General" },
-      ];
+      const normalizedDepartment = String(user?.department || '').trim().toLowerCase();
+      const normalizedRole = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
+      const isDoctorOrPG = normalizedRole === 'doctor' || normalizedRole === 'pg';
+      const endpoints = [];
+
+      if (normalizedDepartment.includes('oral') || normalizedDepartment.includes('general') || normalizedDepartment.includes('dentistry')) {
+        endpoints.push({ url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: "Oral Medicine and Radiology" });
+      }
+
+      if (normalizedDepartment.includes('pedodont')) {
+        endpoints.push({ url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: "Pedodontics" });
+      }
+
+      if (!endpoints.length && !isDoctorOrPG) {
+        endpoints.push(
+          { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: "Oral Medicine and Radiology" },
+          { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: "Pedodontics" }
+        );
+      }
 
       const results = await Promise.all(
         endpoints.map(async ({ url, department }) => {

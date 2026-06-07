@@ -11,7 +11,7 @@ import { API_BASE_URL, DEV_API_ORIGIN } from '../config/api';
 import { downloadCsv, getReportFilename } from '../utils/reportExport';
 import { getPatientResumeTarget } from '../utils/caseDraft';
 import { getStoredPatientId, setStoredPatientId } from '../utils/patientIdentity';
-
+import { isDepartmentAllowed } from '../config/allowedDepartments';
 const DoctorDashboard = () => {
   // State for form data
   const navigate = useNavigate();
@@ -113,6 +113,30 @@ const DoctorDashboard = () => {
   const [hpiSelections, setHpiSelections] = useState([]);
   const [pastMedicalHistory, setPastMedicalHistory] = useState([]);
   const [personalHabits, setPersonalHabits] = useState([]);
+
+  const resizeTextarea = (textarea) => {
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+
+  const handleTextareaInput = (event) => {
+    resizeTextarea(event.target);
+  };
+
+  useEffect(() => {
+    const textareas = Array.from(document.querySelectorAll('.doctor-dashboard-content textarea'));
+    textareas.forEach((textarea) => {
+      textarea.style.overflow = 'hidden';
+      textarea.style.resize = 'none';
+      resizeTextarea(textarea);
+      textarea.addEventListener('input', handleTextareaInput);
+    });
+
+    return () => {
+      textareas.forEach((textarea) => textarea.removeEventListener('input', handleTextareaInput));
+    };
+  }, [activeView, showForm]);
   const [isLoading, setIsLoading] = useState(false);
   const [canNavigateCases, setCanNavigateCases] = useState(false);
   const [caseStatuses, setCaseStatuses] = useState([]);
@@ -505,11 +529,9 @@ const DoctorDashboard = () => {
     oralandmaxillofacial: 'Oral and Maxillofacial Surgery',
     oralandmaxillofacialsurgery: 'Oral and Maxillofacial Surgery',
     pedodontics: 'Pedodontics',
-    prosthodontics: 'Prosthodontics',
+
     periodontics: 'Periodontics',
-    conservative: 'Conservative Dentistry and Endodontics',
-    conservativedentistry: 'Conservative Dentistry and Endodontics',
-    endodontics: 'Conservative Dentistry and Endodontics',
+
     implant: 'Implantology',
     implantology: 'Implantology',
     general: 'General Dentistry',
@@ -543,7 +565,7 @@ const DoctorDashboard = () => {
     doctorDepartmentKey.includes('communitydentistry');
   const currentRoleKey = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
   const isSpecialistDoctor = Boolean(
-    doctorDepartmentKey && doctorDepartmentKey !== 'general' && doctorDepartmentKey !== 'generaldentistry' && !doctorDepartmentKey.includes('oral')
+    doctorDepartmentKey && doctorDepartmentKey !== 'general' && doctorDepartmentKey !== 'generaldentistry'
   );
   const canUseReferralQueue = currentRoleKey === 'doctor' && isSpecialistDoctor;
 
@@ -565,11 +587,10 @@ const DoctorDashboard = () => {
 
     if (departmentKey.includes('publichealthdentistry') || departmentKey.includes('publichealth') || departmentKey.includes('communitydentistry')) return '/general-case-sheet';
     if (departmentKey === 'pedodontics') return '/pedodontics';
-    if (departmentKey === 'periodontics') return '/casePortal?dept=periodontics';
+    if (departmentKey === 'periodontics') return '/periodontics';
     if (departmentKey.includes('oral') || departmentKey.includes('maxillofacial')) return '/oral-medicine';
-    if (departmentKey.includes('conservative') || departmentKey.includes('endodontic')) return '/conservative-dentistry';
     if (departmentKey === 'general' || departmentKey === 'generaldentistry') return '/oral-medicine';
-    return '/casePortal?dept=prosthodontics';
+    return '/casePortal';
   };
 
   const formatPgCaseCompletionStatus = (appointment) => {
@@ -632,14 +653,25 @@ const DoctorDashboard = () => {
       setCaseStatusError('');
 
       const token = localStorage.getItem('token');
-      const endpoints = [
-        { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' },
-        { url: buildApiUrl(`/api/complete-denture/patient/${encodeURIComponent(patientId)}`), department: 'Complete Denture' },
-        { url: buildApiUrl(`/api/fpd/patient/${encodeURIComponent(patientId)}`), department: 'FPD' },
-        { url: buildApiUrl(`/api/implant/patient/${encodeURIComponent(patientId)}`), department: 'Implant' },
-        { url: buildApiUrl(`/api/ImplantPatient/patient/${encodeURIComponent(patientId)}`), department: 'Implant Patient Surgery' },
-        { url: buildApiUrl(`/api/partial/patient/${encodeURIComponent(patientId)}`), department: 'Partial Denture' },
-      ];
+      const normalizedDepartment = String(user?.department || '').trim().toLowerCase();
+      const normalizedRole = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
+      const isDoctorOrPG = normalizedRole === 'doctor' || normalizedRole === 'pg';
+      const endpoints = [];
+
+      if (normalizedDepartment.includes('oral') || normalizedDepartment.includes('general') || normalizedDepartment.includes('dentistry')) {
+        endpoints.push({ url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: 'Oral Medicine and Radiology' });
+      }
+
+      if (normalizedDepartment.includes('pedodont')) {
+        endpoints.push({ url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' });
+      }
+
+      if (!endpoints.length && !isDoctorOrPG) {
+        endpoints.push(
+          { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: 'Oral Medicine and Radiology' },
+          { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' }
+        );
+      }
 
       const results = await Promise.all(
         endpoints.map(async ({ url, department }) => {
@@ -703,7 +735,22 @@ const DoctorDashboard = () => {
   };
 
   const goToDepartmentCaseSheet = async () => {
+    const deptKey = String(localStorage.getItem('doctorDepartment') || user?.department || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+    if (!isDepartmentAllowed(deptKey)) {
+      window.alert("Your department is currently disabled in this application.");
+      return;
+    }
     const route = getCaseSheetRoute();
+
+    // For Oral Medicine, always require the consent form first.
+    if (deptKey.includes('oral')) {
+      const patientId = getStoredPatientId();
+      const resumeTarget = patientId ? await getPatientResumeTarget(patientId) : null;
+      const targetRoute = resumeTarget?.routeKey || route;
+      navigate(`/consent-form?redirect=${encodeURIComponent(targetRoute)}`, { replace: true });
+      return;
+    }
+
     if (route === '/general-case-sheet') {
       navigate(route);
       return;
@@ -1131,6 +1178,10 @@ const DoctorDashboard = () => {
           [name]: ''
         }));
       }
+    }
+
+    if (e.target.tagName === 'TEXTAREA') {
+      resizeTextarea(e.target);
     }
   };
 
@@ -1972,13 +2023,10 @@ const DoctorDashboard = () => {
 
   const getApprovalStatus = (caseItem) => {
     if (!caseItem.chiefApproval) return 'Pending';
-    if (caseItem.chiefApproval.toLowerCase().includes('approved'))
-      return 'Approved';
-    if (
-      caseItem.chiefApproval.toLowerCase().includes('redo') ||
-      caseItem.chiefApproval.toLowerCase().includes('resend')
-    )
-      return 'Resent';
+    const lower = caseItem.chiefApproval.toLowerCase();
+    if (lower.includes('approved')) return 'Approved';
+    if (lower.includes('redo') || lower.includes('resend') || lower.includes('rejected')) return 'Resent';
+    if (lower.includes('pending')) return 'Pending';
     return caseItem.chiefApproval;
   };
 
@@ -4170,7 +4218,7 @@ const DoctorDashboard = () => {
                   aria-label="Close"
                   title="Close"
                 >
-                  ✕
+                  ×
                 </button>
                 <p>{messageContent}</p>
               </>
@@ -4183,7 +4231,7 @@ const DoctorDashboard = () => {
                   aria-label="Close"
                   title="Close"
                 >
-                  ✕
+                  ×
                 </button>
                 <h3>{messageTitle}</h3>
                 <p>{messageContent}</p>
@@ -4251,9 +4299,7 @@ const DoctorDashboard = () => {
               onClick={closeCaseSheetPreview}
               aria-label="Close"
               title="Close"
-            >
-              ✕
-            </button>
+            >\n                      &times;\n                    </button>
 
             <h3>General Case Sheet (View)</h3>
 

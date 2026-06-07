@@ -490,9 +490,7 @@
 }
 /* Typography */
 .dashboard-title {
-  position: sticky;
-  top: 24px;
-  z-index: 10;
+  position: relative;
   font-size: 2.25rem;
   font-weight: 700;
   text-align: center;
@@ -596,7 +594,8 @@
 }
 
 .input-group textarea {
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
   min-height: 100px;
   line-height: 1.6;
 }

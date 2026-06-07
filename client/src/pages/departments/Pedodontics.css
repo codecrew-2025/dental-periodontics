@@ -418,3 +418,39 @@ button:disabled {
 .message-box button:hover {
   background-color: #2e7ae6;
 }
+
+/* ══════════════════════════════════════════
+   READ-ONLY / VIEW MODE — fieldset:disabled overrides
+   Inputs/textareas stay visually styled but non-editable
+══════════════════════════════════════════ */
+fieldset:disabled input[type="text"],
+fieldset:disabled input[type="number"],
+fieldset:disabled textarea {
+  opacity: 1 !important;
+  cursor: default !important;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #1e2a5e !important;
+  border-color: #ccc !important;
+}
+
+fieldset:disabled input[type="radio"],
+fieldset:disabled input[type="checkbox"] {
+  opacity: 0.7 !important;
+  cursor: default !important;
+  pointer-events: none;
+}
+
+fieldset:disabled input[type="file"] {
+  opacity: 0 !important;
+  cursor: default !important;
+  pointer-events: none;
+  height: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+/* Hide upload section completely in read-only */
+fieldset:disabled .xray-upload-section input[type="file"] {
+  display: none !important;
+}

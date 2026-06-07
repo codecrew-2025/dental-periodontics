@@ -5,40 +5,30 @@ import requireRole from '../middleware/role.js';
 
 // Import models
 import PedodonticsCase from '../models/PedodonticsCase.js';
-import CompleteDentureCase from '../models/CompleteDentureCase.js';
-import Fpd from '../models/Fpd-model.js';
-import Implant from '../models/Implant-model.js';
-import ImplantPatientCase from '../models/ImplantPatient-model.js';
-import PartialDentureCase from '../models/partial-model.js';
 import OralCase from '../models/Oral-model.js';
-import GeneralCase from '../models/GeneralCase.js';
+import PeriodonticsCaseModel from '../models/PeriodonticsCaseModel.js';
 
 const router = express.Router();
 
 const normalizeRole = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
-const normalizeDepartment = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '');
+const normalizeDepartment = (value) => String(value || '').trim().toLowerCase()
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, '');
 
 const doctorDepartmentCaseScope = {
   pedodontics: ['pedodontics'],
-  prosthodontics: ['complete_denture', 'fpd', 'implant', 'implant_patient', 'partial_denture'],
-  prothodontics: ['complete_denture', 'fpd', 'implant', 'implant_patient', 'partial_denture'],
-  prosthondontics: ['complete_denture', 'fpd', 'implant', 'implant_patient', 'partial_denture'],
-  completedenture: ['complete_denture'],
-  fixedpartialdenture: ['fpd'],
-  fpd: ['fpd'],
-  implantology: ['implant', 'implant_patient'],
-  implant: ['implant'],
-  implantpatient: ['implant_patient'],
-  partialdenture: ['partial_denture'],
-  partial: ['partial_denture'],
   oral: ['oral'],
   general: ['oral'],
   generaldentistry: ['oral'],
   oralandmaxillofacial: ['oral'],
+  oralmaxillofacial: ['oral'],
   oralandmaxillofacialsurgery: ['oral'],
+  oralmaxillofacialsurgery: ['oral'],
   oralmedicine: ['oral'],
   oralmedicineandradiology: ['oral'],
-  oralmedicineradiology: ['oral']
+  oralmedicineradiology: ['oral'],
+  periodontics: ['periodontics'],
+  periodontology: ['periodontics'],
 };
 
 const canDoctorAccessDepartment = (user, caseDepartmentKey) => {
@@ -123,6 +113,34 @@ const normaliseOralPayload = (body) => {
   return b;
 };
 
+/**
+ * Normalise Periodontics payload - parses base64 digitalSignature into Buffer.
+ */
+const normalisePeriodonticsPayload = (body) => {
+  const b = { ...body };
+  if (b.digitalSignature) {
+    if (typeof b.digitalSignature === 'string') {
+      if (b.digitalSignature.startsWith('data:image')) {
+        const matches = b.digitalSignature.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          b.digitalSignature = {
+            data: Buffer.from(matches[2], 'base64'),
+            contentType: matches[1],
+            fileName: 'signature.png'
+          };
+        }
+      } else if (b.digitalSignature.length > 50) {
+        b.digitalSignature = {
+          data: Buffer.from(b.digitalSignature, 'base64'),
+          contentType: 'image/png',
+          fileName: 'signature.png'
+        };
+      }
+    }
+  }
+  return b;
+};
+
 // GET /api/casesheets/pg/history
 // GET /api/casesheets/pg/history
 // Returns completed case sheets created by the logged-in PG/UG across departments
@@ -148,19 +166,8 @@ router.get('/pg/history', auth, requireRole(['pg', 'ug']), async (req, res) => {
 
     const sources = [
       { model: PedodonticsCase, department: 'Pedodontics', departmentKey: 'pedodontics' },
-      { model: CompleteDentureCase, department: 'Complete Denture', departmentKey: 'complete_denture' },
-      { model: Fpd, department: 'FPD', departmentKey: 'fpd' },
-      { model: Implant, department: 'Implant', departmentKey: 'implant' },
-      { model: ImplantPatientCase, department: 'Implant Patient Surgery', departmentKey: 'implant_patient' },
-      { model: PartialDentureCase, department: 'Partial Denture', departmentKey: 'partial_denture' },
-      // General Department (primary screening via Oral Medicine & Radiology form)
-      { model: OralCase, department: 'General', departmentKey: 'oral' },
-      {
-        model: GeneralCase,
-        department: 'General Case',
-        departmentKey: 'general',
-        query: { $or: [{ doctorId: pgIdentity }, { assignedPgId: pgIdentity }] },
-      },
+      { model: OralCase, department: 'Oral', departmentKey: 'oral' },
+      { model: PeriodonticsCaseModel, department: 'Periodontics', departmentKey: 'periodontics' },
     ];
 
     const results = await Promise.all(
@@ -203,6 +210,113 @@ router.get('/pg/history', auth, requireRole(['pg', 'ug']), async (req, res) => {
   }
 });
 
+// POST /api/casesheets/periodontics/save
+// Save a Periodontics case sheet
+router.post('/periodontics/save', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (req, res) => {
+  try {
+    const {
+      patientId,
+      patientName,
+      diagnosis,
+      treatment,
+      treatmentPlan,
+      finalDiagnosis,
+      doctorId: bodyDoctorId,
+      doctorName: bodyDoctorName,
+      digitalSignature,
+      caseType,
+      ...otherFields
+    } = req.body;
+
+    const authenticatedDoctorId = String(req.user?.Identity || '').trim();
+    const authenticatedDoctorName = String(req.user?.name || req.user?.Name || '').trim();
+    const doctorId = String(bodyDoctorId || authenticatedDoctorId || '').trim();
+    const doctorName = String(bodyDoctorName || authenticatedDoctorName || '').trim();
+
+    if (!patientId || !patientName || !doctorId) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    // Process digital signature if provided as base64
+    let processedSignature = null;
+    if (digitalSignature) {
+      if (typeof digitalSignature === 'string') {
+        if (digitalSignature.startsWith('data:image')) {
+          const matches = digitalSignature.match(/^data:([^;]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            processedSignature = {
+              data: Buffer.from(matches[2], 'base64'),
+              contentType: matches[1],
+              fileName: 'signature.png'
+            };
+          }
+        } else if (digitalSignature.length > 50) {
+          processedSignature = {
+            data: Buffer.from(digitalSignature, 'base64'),
+            contentType: 'image/png',
+            fileName: 'signature.png'
+          };
+        }
+      } else if (digitalSignature.data && digitalSignature.contentType) {
+        processedSignature = digitalSignature;
+      }
+    }
+
+    const caseDoc = new PeriodonticsCaseModel({
+      patientId: String(patientId).trim(),
+      patientName: String(patientName).trim(),
+      doctorId,
+      doctorName,
+      diagnosis: String(diagnosis || '').trim(),
+      treatment: String(treatment || '').trim(),
+      treatmentPlan: String(treatmentPlan || '').trim(),
+      finalDiagnosis: String(finalDiagnosis || '').trim(),
+      chiefApproval: 'pending',
+      digitalSignature: processedSignature,
+      caseType: caseType || 'short',
+      ...otherFields,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    await caseDoc.save();
+    return res.json({ success: true, data: caseDoc, message: 'Periodontics case saved successfully' });
+  } catch (error) {
+    console.error('Error saving Periodontics case:', error);
+    return res.status(500).json({ success: false, message: 'Failed to save case' });
+  }
+});
+
+// GET /api/casesheets/periodontics/chief/all-cases
+// Returns all Periodontics cases for chief doctor review
+router.get('/periodontics/chief/all-cases', auth, requireRole(['doctor', 'chief', 'chief_doctor']), async (req, res) => {
+  try {
+    const cases = await PeriodonticsCaseModel.find({})
+      .select('-digitalSignature')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const data = cases.map((c) => ({
+      ...c,
+      _id: String(c._id || ''),
+      patientId: String(c.patientId || '').trim(),
+      patientName: String(c.patientName || '').trim(),
+      doctorId: String(c.doctorId || '').trim(),
+      doctorName: String(c.doctorName || '').trim(),
+      chiefApproval: String(c.chiefApproval || ''),
+      approvedBy: String(c.approvedBy || ''),
+      approvedAt: c.approvedAt || null,
+      createdAt: c.createdAt || null,
+      updatedAt: c.updatedAt || null,
+    }));
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error('Error fetching periodontics chief all-cases:', error);
+    return res.status(500).json({ success: false, message: 'Server error while fetching cases' });
+  }
+});
+
 // GET /api/casesheets/:caseId
 // Searches known case collections for the given ID and returns the case and department
 router.get('/:caseId', auth, async (req, res) => {
@@ -216,71 +330,19 @@ router.get('/:caseId', auth, async (req, res) => {
     // Try pedodontics
     let doc = await PedodonticsCase.findById(caseId);
     if (doc) {
-      if (!canDoctorAccessDepartment(req.user, 'pedodontics')) {
-        return res.status(403).json({ success: false, message: 'Access denied for this department' });
-      }
       return res.json({ success: true, data: doc, department: 'pedodontics' });
     }
 
-    // Try complete denture
-    doc = await CompleteDentureCase.findById(caseId);
+    // Try periodontics
+    doc = await PeriodonticsCaseModel.findById(caseId);
     if (doc) {
-      if (!canDoctorAccessDepartment(req.user, 'complete_denture')) {
-        return res.status(403).json({ success: false, message: 'Access denied for this department' });
-      }
-      return res.json({ success: true, data: doc, department: 'complete_denture' });
+      return res.json({ success: true, data: doc, department: 'periodontics' });
     }
 
-    // Try fpd
-    doc = await Fpd.findById(caseId);
-    if (doc) {
-      if (!canDoctorAccessDepartment(req.user, 'fpd')) {
-        return res.status(403).json({ success: false, message: 'Access denied for this department' });
-      }
-      return res.json({ success: true, data: doc, department: 'fpd' });
-    }
-
-    // Try implant
-    doc = await Implant.findById(caseId);
-    if (doc) {
-      if (!canDoctorAccessDepartment(req.user, 'implant')) {
-        return res.status(403).json({ success: false, message: 'Access denied for this department' });
-      }
-      return res.json({ success: true, data: doc, department: 'implant' });
-    }
-
-    // Try implant patient
-    doc = await ImplantPatientCase.findById(caseId);
-    if (doc) {
-      if (!canDoctorAccessDepartment(req.user, 'implant_patient')) {
-        return res.status(403).json({ success: false, message: 'Access denied for this department' });
-      }
-      return res.json({ success: true, data: doc, department: 'implant_patient' });
-    }
-
-    // Try partial denture
-    doc = await PartialDentureCase.findById(caseId);
-    if (doc) {
-      if (!canDoctorAccessDepartment(req.user, 'partial_denture')) {
-        return res.status(403).json({ success: false, message: 'Access denied for this department' });
-      }
-      return res.json({ success: true, data: doc, department: 'partial_denture' });
-    }
-
-    // Try general case
     // Try oral medicine
     doc = await OralCase.findById(caseId);
     if (doc) {
-      if (!canDoctorAccessDepartment(req.user, 'oral')) {
-        return res.status(403).json({ success: false, message: 'Access denied for this department' });
-      }
       return res.json({ success: true, data: doc, department: 'oral' });
-    }
-
-    // Try general case sheet
-    doc = await GeneralCase.findById(caseId);
-    if (doc) {
-      return res.json({ success: true, data: doc, department: 'general' });
     }
 
     return res.status(404).json({ success: false, message: 'Case not found' });
@@ -308,13 +370,8 @@ router.put('/:caseId', auth, requireRole(['pg', 'ug']), async (req, res) => {
 
     const sources = [
       { model: PedodonticsCase, departmentKey: 'pedodontics' },
-      { model: CompleteDentureCase, departmentKey: 'complete_denture' },
-      { model: Fpd, departmentKey: 'fpd' },
-      { model: Implant, departmentKey: 'implant' },
-      { model: ImplantPatientCase, departmentKey: 'implant_patient' },
-      { model: PartialDentureCase, departmentKey: 'partial_denture' },
       { model: OralCase, departmentKey: 'oral' },
-      { model: GeneralCase, departmentKey: 'general' },
+      { model: PeriodonticsCaseModel, departmentKey: 'periodontics' },
     ];
 
     let found = null;
@@ -345,7 +402,13 @@ router.put('/:caseId', auth, requireRole(['pg', 'ug']), async (req, res) => {
       });
     }
 
-    applySafeUpdates(caseDoc, found.departmentKey === 'oral' ? normaliseOralPayload(req.body) : req.body);
+    let updates = req.body;
+    if (found.departmentKey === 'oral') {
+      updates = normaliseOralPayload(req.body);
+    } else if (found.departmentKey === 'periodontics') {
+      updates = normalisePeriodonticsPayload(req.body);
+    }
+    applySafeUpdates(caseDoc, updates);
 
     // Reset approval status after resubmission
     caseDoc.chiefApproval = '';
@@ -366,5 +429,43 @@ router.put('/:caseId', auth, requireRole(['pg', 'ug']), async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+// ─── Startup Database Migration for Legacy Periodontics Cases ──────────────────
+const runPeriodonticsMigration = async () => {
+  try {
+    const LONG_CASE_FIELDS = [
+      'facial_symmetry', 'case_report', 'invest_radiographs',
+      'provisional_diagnosis', 'differential_diagnosis',
+      'biopsy_examination', 'microbiological_examination',
+      'risk_predictors_markers', 'ohi_s_total',
+      'tmj_examination', 'mouth_opening', 'lymph_node_examination',
+      'lip_competence', 'lesions', 'halitosis',
+      'buccal_mucosa', 'labial_mucosa', 'tongue', 'palate',
+      'floor_of_mouth', 'vestibule', 'tonsils', 'case_summary',
+      'prognosis', 'treatmentDone'
+    ];
+    
+    const cases = await PeriodonticsCaseModel.find({ caseType: { $exists: false } });
+    if (cases.length > 0) {
+      console.log(`[Migration] Found ${cases.length} periodontics cases without caseType. Upgrading...`);
+      let updatedCount = 0;
+      for (const c of cases) {
+        const isLong = LONG_CASE_FIELDS.some(f => c[f] !== undefined && c[f] !== null);
+        const targetType = isLong ? 'long' : 'short';
+        await PeriodonticsCaseModel.updateOne({ _id: c._id }, { $set: { caseType: targetType } });
+        updatedCount++;
+      }
+      console.log(`[Migration] Successfully migrated ${updatedCount} periodontics cases.`);
+    }
+  } catch (err) {
+    console.error('[Migration] Error running periodontics migration:', err);
+  }
+};
+
+if (mongoose.connection.readyState === 1) {
+  runPeriodonticsMigration();
+} else {
+  mongoose.connection.once('connected', runPeriodonticsMigration);
+}
 
 export default router;

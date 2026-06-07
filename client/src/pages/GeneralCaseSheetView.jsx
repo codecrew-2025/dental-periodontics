@@ -175,10 +175,8 @@ const GeneralCaseSheetView = () => {
   const treatmentPlanText = String(generalCase?.treatmentPlan || '').trim();
 
   const allDepartments = [
-    'Prosthodontics',
     'Pedodontics',
     'Periodontics',
-    'Conservative Dentistry and Endodontics',
     'Oral and Maxillofacial',
   ];
 

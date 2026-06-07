@@ -9,32 +9,35 @@ const departmentConfig = [
   // General Department (Primary Screening)
   { key: 'general', label: 'General', modelPath: '../models/Oral-model.js' },
   { key: 'pedodontics', label: 'Pedodontics', modelPath: '../models/PedodonticsCase.js' },
-  { key: 'completeDenture', label: 'Complete Denture', modelPath: '../models/CompleteDentureCase.js' },
-  { key: 'fpd', label: 'Fixed Partial Denture', modelPath: '../models/Fpd-model.js' },
-  { key: 'implant', label: 'Implant', modelPath: '../models/Implant-model.js' },
-  { key: 'implantPatient', label: 'Implant Patient', modelPath: '../models/ImplantPatient-model.js' },
-  { key: 'partial', label: 'Partial Denture', modelPath: '../models/partial-model.js' }
+  { key: 'periodontics', label: 'Periodontics', modelPath: '../models/PeriodonticsCaseModel.js' }
 ];
 
 const normalizeRole = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
-const normalizeDepartment = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '');
+const normalizeDepartment = (value) => String(value || '').trim().toLowerCase()
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, '');
 
 const chiefDepartmentScopeMap = {
   // General Department (Primary Screening)
   general: ['general'],
   generaldentistry: ['general'],
   oral: ['general'],
+  oralandmaxillofacial: ['general'],
+  oralmaxillofacial: ['general'],
+  oralandmaxillofacialsurgery: ['general'],
+  oralmaxillofacialsurgery: ['general'],
   oralmedicine: ['general'],
   oralmedicineandradiology: ['general'],
   // Specialty Departments
   pedodontics: ['pedodontics'],
+  periodontics: ['periodontics'],
+  periodontology: ['periodontics'],
   prosthodontics: ['completeDenture', 'fpd', 'implant', 'implantPatient', 'partial'],
   prothodontics: ['completeDenture', 'fpd', 'implant', 'implantPatient', 'partial'],
   prosthondontics: ['completeDenture', 'fpd', 'implant', 'implantPatient', 'partial'],
   completedenture: ['completeDenture'],
   fixedpartialdenture: ['fpd'],
   fpd: ['fpd'],
-  general: 'general',
   implant: ['implant'],
   implantology: ['implant', 'implantPatient'],
   implantpatient: ['implantPatient'],
@@ -43,6 +46,7 @@ const chiefDepartmentScopeMap = {
 
 const billingDepartmentKeyMap = {
   pedodontics: 'pedodontics',
+  periodontics: 'periodontics',
   completeDenture: 'complete_denture',
   fpd: 'fpd',
   implant: 'implant',
@@ -871,11 +875,7 @@ router.get('/weekly', auth, requireRole(['admin', 'chief', 'chief-doctor', 'doct
   try {
     const { PatientDetails } = await import('../models/patientDetails.js');
     const PedodonticsCase = (await import('../models/PedodonticsCase.js')).default;
-    const CompleteDentureCase = (await import('../models/CompleteDentureCase.js')).default;
-    const Fpd = (await import('../models/Fpd-model.js')).default;
-    const Implant = (await import('../models/Implant-model.js')).default;
-    const ImplantPatientCase = (await import('../models/ImplantPatient-model.js')).default;
-    const Partial = (await import('../models/partial-model.js')).default;
+    // Removed missing models
 
     // Allow up to 52 weeks for yearly/monthly aggregation
     const weeksRequested = Math.max(1, Math.min(parseInt(req.query.weeks, 10) || 1, 52));
@@ -900,29 +900,15 @@ router.get('/weekly', auth, requireRole(['admin', 'chief', 'chief-doctor', 'doct
       const newPatients = await PatientDetails.countDocuments({ createdAt: { $gte: start, $lt: end } });
 
       // Case sheet counts per department in window
-      const [pedCount, completeDentureCount, fpdCount, implantCount, implantPatientCount, partialCount] = await Promise.all([
-        canUseDepartment('pedodontics') ? PedodonticsCase.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-        canUseDepartment('completeDenture') ? CompleteDentureCase.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-        canUseDepartment('fpd') ? Fpd.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-        canUseDepartment('implant') ? Implant.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-        canUseDepartment('implantPatient') ? ImplantPatientCase.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-        canUseDepartment('partial') ? Partial.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0
+      const [pedCount] = await Promise.all([
+        canUseDepartment('pedodontics') ? PedodonticsCase.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0
       ]);
 
-      console.log(`Case sheet counts - Implant: ${implantCount}, ImplantPatient: ${implantPatientCount}`);
-
-
-      // Combine implant counts for legacy field, but also expose implantPatient separately
-      const totalImplantCount = implantCount + implantPatientCount;
+      const totalImplantCount = 0;
 
       // Unique patientIds seen in case-sheets in window
       const idsArrays = await Promise.all([
-        canUseDepartment('pedodontics') ? PedodonticsCase.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-        canUseDepartment('completeDenture') ? CompleteDentureCase.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-        canUseDepartment('fpd') ? Fpd.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-        canUseDepartment('implant') ? Implant.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-        canUseDepartment('implantPatient') ? ImplantPatientCase.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-        canUseDepartment('partial') ? Partial.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : []
+        canUseDepartment('pedodontics') ? PedodonticsCase.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : []
       ]);
 
       const idSet = new Set();
@@ -990,12 +976,7 @@ router.get('/weekly', auth, requireRole(['admin', 'chief', 'chief-doctor', 'doct
         newPatientsVisited: newPatientsCount,
         oldPatientsVisited: oldPatientsCount,
         caseSheetCounts: {
-          pedodontics: pedCount,
-          completeDenture: completeDentureCount,
-          fpd: fpdCount,
-          implant: implantCount, // show implant and implantPatient separately
-          implantPatient: implantPatientCount,
-          partial: partialCount
+          pedodontics: pedCount
         },
         // For backward compatibility, keep totalImplantCount if needed elsewhere
         totalImplantCount
@@ -1031,11 +1012,7 @@ router.get('/today', auth, requireRole(['admin', 'chief', 'chief-doctor', 'docto
   try {
     const { PatientDetails } = await import('../models/patientDetails.js');
     const PedodonticsCase = (await import('../models/PedodonticsCase.js')).default;
-    const CompleteDentureCase = (await import('../models/CompleteDentureCase.js')).default;
-    const Fpd = (await import('../models/Fpd-model.js')).default;
-    const Implant = (await import('../models/Implant-model.js')).default;
-    const ImplantPatientCase = (await import('../models/ImplantPatient-model.js')).default;
-    const Partial = (await import('../models/partial-model.js')).default;
+    // Removed missing models
 
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1057,22 +1034,12 @@ router.get('/today', auth, requireRole(['admin', 'chief', 'chief-doctor', 'docto
     // Reuse the same logic as buildWeekPayload but inline for this day window
     const newPatients = await PatientDetails.countDocuments({ createdAt: { $gte: start, $lt: end } });
 
-    const [pedCount, completeDentureCount, fpdCount, implantCount, implantPatientCount, partialCount] = await Promise.all([
-      canUseDepartment('pedodontics') ? PedodonticsCase.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-      canUseDepartment('completeDenture') ? CompleteDentureCase.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-      canUseDepartment('fpd') ? Fpd.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-      canUseDepartment('implant') ? Implant.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-      canUseDepartment('implantPatient') ? ImplantPatientCase.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0,
-      canUseDepartment('partial') ? Partial.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0
+    const [pedCount] = await Promise.all([
+      canUseDepartment('pedodontics') ? PedodonticsCase.countDocuments({ createdAt: { $gte: start, $lt: end } }) : 0
     ]);
 
     const idsArrays = await Promise.all([
-      canUseDepartment('pedodontics') ? PedodonticsCase.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-      canUseDepartment('completeDenture') ? CompleteDentureCase.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-      canUseDepartment('fpd') ? Fpd.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-      canUseDepartment('implant') ? Implant.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-      canUseDepartment('implantPatient') ? ImplantPatientCase.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : [],
-      canUseDepartment('partial') ? Partial.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : []
+      canUseDepartment('pedodontics') ? PedodonticsCase.find({ createdAt: { $gte: start, $lt: end } }).select('patientId -_id') : []
     ]);
 
     const idSet = new Set();

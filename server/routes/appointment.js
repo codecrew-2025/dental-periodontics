@@ -16,9 +16,52 @@ import requireRole from "../middleware/role.js";
 dotenv.config();
 const router = Router()
 
-const normalizeDepartment = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '');
+const normalizeDepartment = (value) => String(value || '').trim().toLowerCase()
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, '');
 const normalizeRole = (value) => String(value || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
-const GENERAL_DOCTOR_DEPARTMENT_KEYS = new Set(['general', 'generaldentistry', 'oral', 'oralmedicine', 'oralmedicineandradiology', 'oralmedicineradiology']);
+const GENERAL_DOCTOR_DEPARTMENT_KEYS = new Set([
+  'general',
+  'generaldentistry',
+  'oral',
+  'oralmedicine',
+  'oralmedicineandradiology',
+  'oralmedicineradiology',
+  'oralandmaxillofacial',
+  'oralmaxillofacial',
+  'oralandmaxillofacialsurgery',
+  'oralmaxillofacialsurgery',
+]);
+
+const getDepartmentAliases = (departmentLabel) => {
+  const normalized = String(departmentLabel || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+
+  if (normalized.startsWith('prostho') || normalized.startsWith('protho') || normalized.startsWith('prosthon')) {
+    return ['prosthodontics', 'prothodontics', 'prosthondontics'];
+  }
+
+  if (normalized === 'pedodontics') {
+    return ['pedodontics'];
+  }
+
+  if (normalized === 'periodontics' || normalized === 'periodontology') {
+    return ['periodontics', 'periodontology'];
+  }
+
+  if (normalized.includes('conservative') || normalized.includes('endodontic') || normalized.includes('endodontics')) {
+    return ['conservativedentistryandendodontics', 'conservativedentistry', 'endodontics'];
+  }
+
+  if (normalized.includes('oral') || normalized.includes('maxillofacial')) {
+    return ['oralandmaxillofacial', 'oralmaxillofacial', 'oralsurgery'];
+  }
+
+  if (['general', 'generaldentistry', 'oralmedicine', 'oralmedicineandradiology'].includes(normalized)) {
+    return ['general', 'generaldentistry', 'oralmedicine', 'oralmedicineandradiology'];
+  }
+
+  return [normalized];
+};
 
 /* ✅ CONFIRM ROUTER LOAD */
 console.log("✅ Appointment router loaded successfully");
@@ -607,6 +650,81 @@ router.post(["/", "/appointments"], async (req, res) => {
   }
 });
 
+// Also expose under a less ambiguous path to avoid parameter conflicts
+router.get('/department-queue/:deptKey', auth, requireRole(['doctor','chief-doctor','chief','admin']), async (req, res) => {
+  try {
+    const deptKey = String(req.params.deptKey || '').trim().toLowerCase();
+    if (!deptKey) return res.status(400).json({ success: false, message: 'Department required' });
+
+    const doctors = await User.find({ role: 'doctor' }, { _id: 1, Identity: 1, department: 1 }).lean();
+    const aliases = getDepartmentAliases(deptKey);
+    const matching = doctors.filter(d => {
+      const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+      return aliases.includes(nd);
+    });
+
+    if (!matching.length) return res.json({ success: true, appointments: [] });
+
+    const keys = Array.from(new Set(matching.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))));
+    const todayStr = new Date().toISOString().split('T')[0];
+    const activeStatuses = ['pending','assigned','rescheduled','in_progress'];
+
+    const appointments = await Appointment.find({
+      $or: [
+        { doctorId: { $in: keys } },
+        { supervisingDeptDoctorId: { $in: keys } },
+        { deptDoctorId: { $in: keys } }
+      ],
+      status: { $in: activeStatuses },
+      appointmentDate: { $gte: todayStr }
+    }).sort({ appointmentDate: 1, appointmentTime: 1 }).lean();
+
+    const enriched = await attachPatientName(appointments);
+    return res.json({ success: true, appointments: enriched });
+  } catch (err) {
+    console.error('Error fetching department appointments (queue):', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch department appointments' });
+  }
+});
+
+// Public (dev) variant - no auth required. Useful for quick debugging locally.
+// NOTE: Remove or protect this route before deploying to production.
+router.get('/department-queue-public/:deptKey', async (req, res) => {
+  try {
+    const deptKey = String(req.params.deptKey || '').trim().toLowerCase();
+    if (!deptKey) return res.status(400).json({ success: false, message: 'Department required' });
+
+    const doctors = await User.find({ role: 'doctor' }, { _id: 1, Identity: 1, department: 1 }).lean();
+    const aliases = getDepartmentAliases(deptKey);
+    const matching = doctors.filter(d => {
+      const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+      return aliases.includes(nd);
+    });
+
+    if (!matching.length) return res.json({ success: true, appointments: [] });
+
+    const keys = Array.from(new Set(matching.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))));
+    const todayStr = new Date().toISOString().split('T')[0];
+    const activeStatuses = ['pending','assigned','rescheduled','in_progress'];
+
+    const appointments = await Appointment.find({
+      $or: [
+        { doctorId: { $in: keys } },
+        { supervisingDeptDoctorId: { $in: keys } },
+        { deptDoctorId: { $in: keys } }
+      ],
+      status: { $in: activeStatuses },
+      appointmentDate: { $gte: todayStr }
+    }).sort({ appointmentDate: 1, appointmentTime: 1 }).lean();
+
+    const enriched = await attachPatientName(appointments);
+    return res.json({ success: true, appointments: enriched });
+  } catch (err) {
+    console.error('Error fetching department appointments (public debug):', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch department appointments' });
+  }
+});
+
 /* ================= PATIENT APPOINTMENTS ================= */
 router.get("/appointments/patient/:patientId", async (req, res) => {
   try {
@@ -641,9 +759,24 @@ router.get("/my-appointments", auth, requireRole(["doctor", "chief-doctor"]), as
         isProcessed: { $ne: true },
       }).sort({ appointmentDate: 1, appointmentTime: 1 });
     } else {
-      // Specialist doctors see only appointments assigned to them
+      // Specialist doctors see appointments assigned to ANY doctor in their department
+      const aliases = getDepartmentAliases(userDepartment);
+      const deptDoctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief'] } }, { _id: 1, Identity: 1, department: 1 }).lean();
+      const matchingDeptDoctors = deptDoctors.filter(d => {
+        const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+        return aliases.includes(nd);
+      });
+      
+      const deptDoctorKeys = Array.from(new Set(
+        matchingDeptDoctors.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))
+      ));
+
       appointments = await Appointment.find({
-        doctorId,
+        $or: [
+          { doctorId: { $in: deptDoctorKeys } },
+          { supervisingDeptDoctorId: { $in: deptDoctorKeys } },
+          { deptDoctorId: { $in: deptDoctorKeys } }
+        ],
         status: { $in: ["pending", "assigned", "in_progress", "rescheduled"] },
         appointmentDate: { $gte: todayStr },
       }).sort({ appointmentDate: 1, appointmentTime: 1 });
@@ -728,34 +861,52 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
 
       return res.json({ success: true, appointments: enrichedWithPg });
     } else {
-      // 🔥 FIX: PG/UG sees appointments for patients assigned to them
+      // 🔥 FIX: PG/UG sees the SAME appointments that doctors in their department are seeing
       const pgIdentity = String(req.user?.Identity || '').trim();
       if (!pgIdentity) {
         return res.status(400).json({ success: false, message: 'PG Identity not found on account' });
       }
 
-      // Get all patient IDs assigned to this PG/UG from GeneralCase
-      const GeneralCase = (await import('../models/GeneralCase.js')).default;
-      const assignedCases = await GeneralCase.find(
-        { assignedPgId: pgIdentity, specialistStatus: 'approved' },
-        { patientId: 1 }
-      ).lean();
+      // Get PG's department from user profile
+      const pgDepartment = String(req.user?.department || '').trim();
+      if (!pgDepartment) {
+        return res.status(400).json({ success: false, message: 'No department found for PG' });
+      }
 
-      const assignedPatientIds = [...new Set(
-        assignedCases.map((c) => String(c.patientId || '').trim()).filter(Boolean)
-      )];
+      const isGeneralDoctor = GENERAL_DOCTOR_DEPARTMENT_KEYS.has(normalizeDepartment(pgDepartment));
+      
+      let appointments;
+      
+      if (isGeneralDoctor) {
+        // General/Oral department PGs see ALL pending and assigned appointments (like general doctors)
+        appointments = await Appointment.find({
+          status: { $in: ["pending", "assigned", "rescheduled"] },
+          appointmentDate: { $gte: todayStr },
+          isProcessed: { $ne: true },
+        }).sort({ appointmentDate: 1, appointmentTime: 1 });
+      } else {
+        // Specialist PGs see appointments assigned to ANY doctor in their department (like specialist doctors)
+        const aliases = getDepartmentAliases(pgDepartment);
+        const deptDoctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief'] } }, { _id: 1, Identity: 1, department: 1 }).lean();
+        const matchingDeptDoctors = deptDoctors.filter(d => {
+          const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+          return aliases.includes(nd);
+        });
+        
+        const deptDoctorKeys = Array.from(new Set(
+          matchingDeptDoctors.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))
+        ));
 
-      // Fetch appointments for these patients OR appointments directly assigned to this PG
-      const appointments = await Appointment.find({
-        $or: [
-          { patientId: { $in: assignedPatientIds } },
-          { doctorId: pgIdentity },
-          { assigned_pg_ug_id: pgIdentity },
-          { pgDoctorId: pgIdentity },
-        ],
-        status: { $nin: excludedStatuses },
-        appointmentDate: { $gte: todayStr },
-      }).sort({ appointmentDate: 1, appointmentTime: 1 });
+        appointments = await Appointment.find({
+          $or: [
+            { doctorId: { $in: deptDoctorKeys } },
+            { supervisingDeptDoctorId: { $in: deptDoctorKeys } },
+            { deptDoctorId: { $in: deptDoctorKeys } }
+          ],
+          status: { $in: ["pending", "assigned", "in_progress", "rescheduled"] },
+          appointmentDate: { $gte: todayStr },
+        }).sort({ appointmentDate: 1, appointmentTime: 1 });
+      }
 
       const enriched = await attachPatientName(appointments);
       res.json({ success: true, appointments: enriched });
@@ -763,6 +914,51 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
   } catch (err) {
     console.error("❌ Error fetching PG appointments:", err);
     res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+/* ================= TEST ROUTE ================= */
+router.get('/test-deptqueue', async (req, res) => {
+  return res.json({ success: true, message: 'Department queue test route works' });
+});
+
+/* ================= DEPARTMENT QUEUE ================= */
+// Returns upcoming appointments for a department by finding doctors in that department
+router.get('/department/:deptKey', auth, requireRole(['doctor','chief-doctor','chief','admin']), async (req, res) => {
+  try {
+    const deptKey = String(req.params.deptKey || '').trim().toLowerCase();
+    if (!deptKey) return res.status(400).json({ success: false, message: 'Department required' });
+
+    // Find doctors belonging to this department
+    const doctors = await User.find({ role: 'doctor' }, { _id: 1, Identity: 1, department: 1 }).lean();
+    const aliases = getDepartmentAliases(deptKey);
+    const matching = doctors.filter(d => {
+      const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+      return aliases.includes(nd);
+    });
+
+    if (!matching.length) return res.json({ success: true, appointments: [] });
+
+    const keys = Array.from(new Set(matching.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))));
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const activeStatuses = ['pending','assigned','rescheduled','in_progress'];
+
+    const appointments = await Appointment.find({
+      $or: [
+        { doctorId: { $in: keys } },
+        { supervisingDeptDoctorId: { $in: keys } },
+        { deptDoctorId: { $in: keys } }
+      ],
+      status: { $in: activeStatuses },
+      appointmentDate: { $gte: todayStr }
+    }).sort({ appointmentDate: 1, appointmentTime: 1 }).lean();
+
+    const enriched = await attachPatientName(appointments);
+    return res.json({ success: true, appointments: enriched });
+  } catch (err) {
+    console.error('Error fetching department appointments:', err);
+    return res.status(500).json({ success: false, message: 'Failed to fetch department appointments' });
   }
 });
 

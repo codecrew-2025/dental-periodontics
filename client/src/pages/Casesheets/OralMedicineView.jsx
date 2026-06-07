@@ -67,12 +67,18 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
 
   return (
     <div className="digital-doctor-case-sheet">
-      <div className="case-sheet">
-        <div className="header">
+      <div className="case-sheet-header">
+        <a href="/" className="logo-main">
+          <img src="/logo.png" alt="SRM Dental College Logo" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/40x40/E0F2F7/2C3E50?text=LOGO'; }} />
+          <span>SRM Dental College</span>
+        </a>
+        <div className="case-sheet-title">
           <h1>ORAL MEDICINE AND RADIOLOGY</h1>
-          <h2>CASE SHEET</h2>
+          <p>Case Sheet</p>
         </div>
+      </div>
 
+      <div className="case-sheet">
         {/* ── Page 1: Patient Information & History ── */}
         {currentPage === 0 && (
           <div className="page active">
