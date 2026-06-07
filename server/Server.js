@@ -55,7 +55,7 @@ connectDB().catch((error) => {
 
 // If DB config is missing or initialization failed, fail fast with a helpful message.
 // (On Vercel we don't `process.exit`, so without this the API can look like random 404s/timeouts.)
-app.use('/api', (req, res, next) => {
+app.use('/api', async (req, res, next) => {
   const isDebugRoute = req.path === '/debug/routes';
   const isHealthRoute = req.path === '/health';
   const isOtpDiagnosticRoute = req.path === '/otp/email-status' || req.path === '/otp/test-email';
@@ -78,15 +78,25 @@ app.use('/api', (req, res, next) => {
   }
 
   if (dbInitError || mongoose.connection.readyState === 0) {
-    const publicMessage = isProduction
-      ? 'Service temporarily unavailable. Please try again shortly.'
-      : 'Database not connected. Check MONGO_URI and MongoDB network access.';
-    return res.status(503).json({
-      success: false,
-      message: publicMessage,
-      error: process.env.NODE_ENV === 'development' ? (dbInitError?.message || null) : null,
-      timestamp: new Date().toISOString(),
-    });
+    if (!dbInitError) {
+      try {
+        await connectDB();
+      } catch (error) {
+        dbInitError = error;
+      }
+    }
+
+    if (dbInitError || mongoose.connection.readyState === 0) {
+      const publicMessage = isProduction
+        ? 'Service temporarily unavailable. Please try again shortly.'
+        : 'Database not connected. Check MONGO_URI and MongoDB network access.';
+      return res.status(503).json({
+        success: false,
+        message: publicMessage,
+        error: process.env.NODE_ENV === 'development' ? (dbInitError?.message || null) : null,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 
   return next();
