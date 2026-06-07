@@ -77,7 +77,7 @@ app.use('/api', async (req, res, next) => {
     });
   }
 
-  if (dbInitError || mongoose.connection.readyState === 0) {
+  if (dbInitError || mongoose.connection.readyState !== 1) {
     if (!dbInitError) {
       try {
         await connectDB();
@@ -86,7 +86,7 @@ app.use('/api', async (req, res, next) => {
       }
     }
 
-    if (dbInitError || mongoose.connection.readyState === 0) {
+    if (dbInitError || mongoose.connection.readyState !== 1) {
       const publicMessage = isProduction
         ? 'Service temporarily unavailable. Please try again shortly.'
         : 'Database not connected. Check MONGO_URI and MongoDB network access.';
