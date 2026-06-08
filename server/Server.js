@@ -353,10 +353,13 @@ app.get('/api/debug/patient-details-test', async (req, res) => {
 // Global error handler
 app.use((error, req, res, next) => {
   console.error('Global error handler caught error:', error);
+  const debugEnabled = String(process.env.DEBUG_ERRORS || '').trim() === '1';
   res.status(500).json({
     success: false,
     message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong',
+    // When DEBUG_ERRORS=1 include the real error message and stack for diagnosis.
+    error: debugEnabled ? (error && error.message ? String(error.message) : String(error)) : (process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'),
+    stack: debugEnabled ? (error && error.stack ? String(error.stack) : null) : undefined,
     timestamp: new Date().toISOString()
   });
 });
