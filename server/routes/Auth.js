@@ -189,11 +189,7 @@ router.post('/login/patientlogin', async (req, res) => {
   } catch (err) {
     console.error('Login Error stack:', err && err.stack ? err.stack : err);
     const safeMessage = (err && err.message) ? String(err.message).slice(0, 200) : 'Server error during login';
-    const debugEnabled = String(process.env.DEBUG_ERRORS || '').trim() === '1';
-    res.status(500).json({
-      message: debugEnabled ? (err && err.message ? String(err.message) : String(err)) : safeMessage,
-      stack: debugEnabled && err && err.stack ? String(err.stack) : undefined
-    });
+    res.status(500).json({ message: safeMessage });
   }
 });
 
@@ -322,12 +318,7 @@ router.post('/login/doctorlogin', async (req, res) => {
     });
   } catch (err) {
     console.error('Doctor Login Error:', err);
-    const debugEnabled = String(process.env.DEBUG_ERRORS || '').trim() === '1';
-    const msg = (err && err.message) ? String(err.message).slice(0, 200) : 'Server error during login';
-    res.status(500).json({
-      message: debugEnabled ? (err && err.message ? String(err.message) : String(err)) : msg,
-      stack: debugEnabled && err && err.stack ? String(err.stack) : undefined
-    });
+    res.status(500).json({ message: 'Server error during login' });
   }
 });
 
