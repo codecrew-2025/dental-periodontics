@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './ChiefDoctorDashboard.css';
 import './DoctorDashboard.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import AssignPG from './AssignPG';
 import AssignUG from './AssignUG';
@@ -15,6 +15,7 @@ import { isDepartmentAllowed } from '../config/allowedDepartments';
 const DoctorDashboard = () => {
   // State for form data
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
 
   const formatDateInput = (date) => {
@@ -1390,8 +1391,10 @@ const DoctorDashboard = () => {
         throw new Error(json?.message || `Failed to load reschedule requests (${res.status})`);
       }
       const json = await res.json();
+      console.log('[DEBUG] Reschedule requests fetched:', json);
       setRescheduleRequests(Array.isArray(json.requests) ? json.requests : []);
     } catch (err) {
+      console.error('[DEBUG] Error fetching reschedule requests:', err);
       setRescheduleRequestsError(err.message || 'Failed to load reschedule requests');
     } finally {
       if (!silent) setRescheduleRequestsLoading(false);
@@ -1694,6 +1697,18 @@ const DoctorDashboard = () => {
       setReferredActionType('');
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const view = String(params.get('view') || '').trim();
+    if (view === 'rescheduleRequests') {
+      setActiveView('rescheduleRequests');
+      fetchRescheduleRequests();
+    } else if (view === 'referrals') {
+      setActiveView('referrals');
+      fetchReferredPatients();
+    }
+  }, [location.search]);
 
   // ================= CASE MANAGEMENT FUNCTIONS =================
 
@@ -2747,8 +2762,8 @@ const DoctorDashboard = () => {
                               <div style={{ fontSize: '12px', color: '#555' }}>{req.appointmentTime || '—'}</div>
                             </td>
                             <td style={{ color: '#2b6cb0', fontWeight: 600 }}>
-                              <div>{formatDisplayDate(req.rescheduleRequest?.requestedDate)}</div>
-                              <div style={{ fontSize: '12px' }}>{req.rescheduleRequest?.requestedTime || '—'}</div>
+                              <div>{formatDisplayDate(req.rescheduleRequest?.proposedDate)}</div>
+                              <div style={{ fontSize: '12px' }}>{req.rescheduleRequest?.proposedTime || '—'}</div>
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>

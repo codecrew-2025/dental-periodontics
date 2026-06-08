@@ -1,14 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
 import './PeriodonticsView.css';
 
 const PeriodonticsView = ({ caseData: propCaseData }) => {
   const { caseId: paramsCaseId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [caseData, setCaseData] = useState(propCaseData || null);
   const [loading, setLoading] = useState(!propCaseData);
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = 4;
+
+  const roleKey = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
+  const handleClickReferredDepartment = () => {
+    if (!caseData?.referredDepartment) return;
+    if (roleKey === 'pg') {
+      navigate('/pg-dashboard?view=assigned-cases');
+      return;
+    }
+    if (roleKey === 'ug') {
+      navigate('/ug-dashboard?view=assigned-cases');
+      return;
+    }
+    navigate('/doctor-dashboard?view=referrals');
+  };
 
   useEffect(() => {
     if (propCaseData) return;
@@ -115,6 +132,19 @@ const PeriodonticsView = ({ caseData: propCaseData }) => {
             {field('APPROVED BY:', caseData.approvedBy)}
             {field('APPROVED AT:', caseData.approvedAt ? new Date(caseData.approvedAt).toLocaleString() : '')}
             {field('LAST UPDATED:', caseData.updatedAt ? new Date(caseData.updatedAt).toLocaleString() : '')}
+            {caseData.referredDepartment && (
+              <div className="form-group-casesheet">
+                <label>REFERRED DEPARTMENT:</label>
+                <div 
+                  className="readonly-field clickable-referral"
+                  onClick={handleClickReferredDepartment}
+                  style={{ cursor: 'pointer', textDecoration: 'underline', color: '#0066cc' }}
+                  title="Click to view referral details"
+                >
+                  {caseData.referredDepartment}
+                </div>
+              </div>
+            )}
             {area('ADDITIONAL NOTES:', caseData.additionalNotes)}
           </div>
         )}

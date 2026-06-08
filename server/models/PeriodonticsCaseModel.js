@@ -56,7 +56,16 @@ const PeriodonticsCaseSchema = new mongoose.Schema({
   approvedAt: {
     type: Date
   },
-  
+
+  // Referral
+  referredDepartment: {
+    type: String,
+    default: null
+  },
+
+  // Additional notes
+  additionalNotes: String,
+
   // Timestamps
   createdAt: {
     type: Date,

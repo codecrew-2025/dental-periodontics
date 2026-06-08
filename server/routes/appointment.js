@@ -1871,6 +1871,15 @@ router.put("/:bookingId/approve", auth, requireRole(["pg", "ug", "doctor", "chie
     if (!isPgRequester) {
       appointment.doctorId = appointment.doctorId || actingDoctorId;
     }
+    
+    // 🔥 When PG/UG approves, link them to the appointment for reschedule authorization
+    if (isPgRequester) {
+      const pgIdentity = String(req.user?.Identity || '').trim();
+      if (pgIdentity && !appointment.assigned_pg_ug_id) {
+        appointment.assigned_pg_ug_id = pgIdentity;
+      }
+    }
+    
     appointment.approvedDoctorId = actingDoctorId;
     // Sanitize legacy/invalid rescheduleRequest.requestStatus values to avoid schema enum validation errors
     try {
@@ -2060,8 +2069,8 @@ router.put("/:bookingId/cancel", async (req, res) => {
   }
 });
 
-/* ================= ✅ RESCHEDULE FIX ================= */
-router.put("/:bookingId/reschedule", auth, requireRole(["doctor", "chief-doctor", "pg", "ug"]), async (req, res) => {
+/* ================= ✅ RESCHEDULE REQUEST (PG/UG ONLY) ================= */
+router.put("/:bookingId/reschedule", auth, requireRole(["pg", "ug"]), async (req, res) => {
   try {
     const appointmentDate = req.body.appointmentDate || req.body.proposedDate;
     const appointmentTime = req.body.appointmentTime || req.body.proposedTime;
@@ -2111,10 +2120,13 @@ router.put("/:bookingId/reschedule", auth, requireRole(["doctor", "chief-doctor"
     }
 
     // Authorization:
-    // - Doctors can reschedule only appointments assigned to them.
-    // - PGs can reschedule only appointments for patients assigned to them (via GeneralCase.assignedPgId).
+    // - PGs/UG can reschedule appointments if they're visible in their dashboard
+    // - This means: (1) they have GeneralCase assignment, OR (2) appointment is in pending/assigned/rescheduled status (visible in pg-appointments)
     if (isPgRequester) {
       const pgIdentity = String(req.user?.Identity || '').trim();
+      const pgDepartment = String(req.user?.department || '').trim();
+      const appointmentStatus = String(appointment.status || '').trim().toLowerCase();
+      
       if (!pgIdentity) {
         return res.status(400).json({
           success: false,
@@ -2122,6 +2134,21 @@ router.put("/:bookingId/reschedule", auth, requireRole(["doctor", "chief-doctor"
         });
       }
 
+      // Check if appointment is in a status visible in pg-appointments (general or specialist dashboard)
+      const isVisibleStatus = ['pending', 'assigned', 'in_progress', 'confirmed', 'rescheduled'].includes(appointmentStatus);
+
+      if (!isVisibleStatus) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only reschedule pending or assigned appointments.',
+        });
+      }
+
+      // Additional check: try to verify this PG is linked to this appointment
+      // Either via GeneralCase, or via appointment-level fields, or as a general doctor seeing it in their queue
+      let isAuthorized = false;
+
+      // Check 1: GeneralCase assignment (specialist workflow)
       const { default: GeneralCase } = await import('../models/GeneralCase.js');
       const assignment = await GeneralCase.findOne({
         patientId: appointment.patientId,
@@ -2131,13 +2158,39 @@ router.put("/:bookingId/reschedule", auth, requireRole(["doctor", "chief-doctor"
         .sort({ pgAssignedAt: -1, createdAt: -1 })
         .lean();
 
-      // Fallbacks: accept appointment-level assigned_pg_ug_id or pgDoctorId as valid linkage
-      const fallbackMatches = [
-        String(appointment.assigned_pg_ug_id || '').trim(),
-        String(appointment.pgDoctorId || '').trim(),
-      ].filter(Boolean);
+      if (assignment?._id) {
+        isAuthorized = true;
+      }
 
-      if (!assignment?._id && !fallbackMatches.includes(pgIdentity)) {
+      // Check 2: Appointment-level linkage (assigned_pg_ug_id, pgDoctorId)
+      if (!isAuthorized) {
+        const linkedIds = [
+          String(appointment.assigned_pg_ug_id || '').trim(),
+          String(appointment.pgDoctorId || '').trim(),
+        ].filter(Boolean);
+        if (linkedIds.includes(pgIdentity)) {
+          isAuthorized = true;
+        }
+      }
+
+      // Check 3: General doctor seeing appointment in their queue
+      if (!isAuthorized && GENERAL_DOCTOR_DEPARTMENT_KEYS.has(normalizeDepartment(pgDepartment))) {
+        isAuthorized = true;
+      }
+
+      // Check 4: Specialist PG seeing appointment assigned to their department doctor
+      if (!isAuthorized && pgDepartment) {
+        const aliases = getDepartmentAliases(pgDepartment);
+        const appointmentDoctor = await User.findById(appointment.doctorId).lean();
+        if (appointmentDoctor) {
+          const nd = String(appointmentDoctor.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+          if (aliases.includes(nd)) {
+            isAuthorized = true;
+          }
+        }
+      }
+
+      if (!isAuthorized) {
         return res.status(403).json({
           success: false,
           message: 'You can only reschedule appointments for patients assigned to you.',
@@ -2158,6 +2211,7 @@ router.put("/:bookingId/reschedule", auth, requireRole(["doctor", "chief-doctor"
       appointment.status = 'reschedule_requested';
 
       await appointment.save();
+      console.log(`[DEBUG] PG/UG ${pgIdentity} submitted reschedule request for booking ${req.params.bookingId}: ${appointmentDate} at ${normalizedAppointmentTime}`);
 
       // 📧 DUAL NOTIFICATION: Notify BOTH Supervisor (action) AND Department Doctor (info)
       if (req.user.createdBy) {
@@ -2224,125 +2278,15 @@ router.put("/:bookingId/reschedule", auth, requireRole(["doctor", "chief-doctor"
         requiresApproval: true,
       });
     } else {
-      // Only the assigned doctor can reschedule
-      if (!appointment.doctorId || !requesterKeys.includes(String(appointment.doctorId))) {
-        return res.status(403).json({
-          success: false,
-          message: "You can only reschedule appointments assigned to you.",
-        });
-      }
-    }
-
-    // 🔒 Prevent rescheduling into a slot where this doctor is already booked
-    const assignedDoctorId = String(appointment.doctorId || '').trim();
-    if (!assignedDoctorId) {
-      return res.status(400).json({
+      // Should not reach here since endpoint is restricted to PG/UG only
+      return res.status(403).json({
         success: false,
-        message: 'This appointment has no assigned doctor and cannot be rescheduled.',
+        message: 'Only PG/UG can submit reschedule requests.',
       });
     }
-
-    const doctorConflict = await Appointment.findOne({
-      appointmentDate,
-      appointmentTime: normalizedAppointmentTime,
-      doctorId: assignedDoctorId,
-      status: { $ne: "cancelled" },
-      bookingId: { $ne: req.params.bookingId },
-    });
-
-    if (doctorConflict) {
-      return res.status(409).json({
-        success: false,
-        message: "You already have an appointment in this time slot.",
-      });
-    }
-
-    // 🔒 Prevent rescheduling into a globally full slot (same rule used by slot booking)
-    const doctors = await getAssignableDoctors();
-    const slotCapacity = doctors.length;
-
-    if (!slotCapacity) {
-      return res.status(503).json({
-        success: false,
-        message: "No doctors available to assign right now.",
-      });
-    }
-
-    const slotBookedCount = await Appointment.countDocuments({
-      appointmentDate,
-      appointmentTime: normalizedAppointmentTime,
-      status: { $ne: "cancelled" },
-      bookingId: { $ne: req.params.bookingId },
-    });
-
-    if (slotBookedCount >= slotCapacity) {
-      return res.status(409).json({
-        success: false,
-        message: "This time slot is fully booked. Please choose a different time.",
-      });
-    }
-
-    // 🔥 Store OLD date & time
-    const oldDate = appointment.appointmentDate;
-    const oldTime = appointment.appointmentTime;
-
-    // 🔥 Update appointment
-    appointment.appointmentDate = appointmentDate;
-    appointment.appointmentTime = normalizedAppointmentTime;
-    appointment.status = "rescheduled"; // lowercase (as you want)
-    
-    if (appointment.needsGeneralApproval && isGeneralDoctor) {
-      appointment.needsGeneralApproval = false;
-    }
-
-    await appointment.save();
-
-    // 🔥 SEND RESCHEDULE EMAIL (SEPARATE MAIL)
-    const patientEmail = await resolvePatientEmail(appointment.patientId, appointment.patientEmail);
-    const rescheduledByLabel = isPgRequester
-      ? (req.user?.name || req.user?.Identity || 'PG')
-      : (req.user?.name || req.user?.Identity || 'Doctor');
-    sendEmail(
-      patientEmail || appointment.patientEmail,
-      "Appointment Rescheduled – SRM Dental College",
-      `
-      <div style="font-family: Arial, sans-serif; line-height:1.6;">
-        <h2>Appointment Rescheduled</h2>
-
-        <p>Dear Patient,</p>
-
-        <p>Your appointment has been <b>rescheduled</b> by <b>${rescheduledByLabel}</b>.</p>
-
-        <table border="1" cellpadding="8" cellspacing="0">
-          <tr>
-            <td><b>Booking ID</b></td>
-            <td>${appointment.bookingId}</td>
-          </tr>
-          <tr>
-            <td><b>Old Date & Time</b></td>
-            <td>${oldDate} at ${oldTime}</td>
-          </tr>
-          <tr>
-            <td><b>New Date & Time</b></td>
-            <td>${appointmentDate} at ${normalizedAppointmentTime}</td>
-          </tr>
-          <tr>
-            <td><b>Status</b></td>
-            <td>RESCHEDULED</td>
-          </tr>
-        </table>
-
-        <p>Please attend the appointment at the updated time.</p>
-
-        <p>Regards,<br/>
-        <b>SRM Dental College</b></p>
-      </div>
-      `
-    ).catch((err) => console.error('Reschedule email failed:', err));
-
-    res.json({ success: true, appointment });
-  } catch {
-    res.status(500).json({ success: false });
+  } catch (err) {
+    console.error('Reschedule request error:', err);
+    res.status(500).json({ success: false, message: 'Failed to process reschedule request' });
   }
 });
 
@@ -2432,7 +2376,10 @@ router.get("/reschedule-requests", auth, requireRole(["doctor", "chief-doctor"])
       .map((s) => String(s.Identity || '').trim())
       .filter(Boolean);
 
+    console.log(`[DEBUG] Doctor ${req.user.name} (${req.user._id}): Found ${assignedStudents.length} assigned students: ${studentIdentities.join(', ')}`);
+
     if (!studentIdentities.length) {
+      console.log(`[DEBUG] No assigned students found, returning empty requests`);
       return res.json({ success: true, requests: [] });
     }
 
@@ -2441,6 +2388,8 @@ router.get("/reschedule-requests", auth, requireRole(["doctor", "chief-doctor"])
       "rescheduleRequest.requestedBy": { $in: studentIdentities },
       "rescheduleRequest.requestStatus": "pending",
     }).sort({ "rescheduleRequest.requestedAt": -1 }).lean();
+    
+    console.log(`[DEBUG] Found ${appointments.length} pending reschedule requests matching students`);
 
     // Attach patient name
     const enriched = await attachPatientName(appointments);

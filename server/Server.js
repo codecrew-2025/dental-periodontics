@@ -56,6 +56,9 @@ connectDB().catch((error) => {
 // If DB config is missing or initialization failed, fail fast with a helpful message.
 // (On Vercel we don't `process.exit`, so without this the API can look like random 404s/timeouts.)
 app.use('/api', async (req, res, next) => {
+  try {
+    console.log(`[API-MW] ${req.method} ${req.path}`);
+  } catch (e) {}
   const isDebugRoute = req.path === '/debug/routes';
   const isHealthRoute = req.path === '/health';
   const isOtpDiagnosticRoute = req.path === '/otp/email-status' || req.path === '/otp/test-email';
@@ -103,6 +106,19 @@ app.use('/api', async (req, res, next) => {
 });
 
 // Middlewares
+// Unconditional brief request logger to aid debugging (always enabled)
+app.use((req, res, next) => {
+  try {
+    console.log(`[REQ] ${req.method} ${req.originalUrl}`);
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+      // body may not be parsed yet; capture raw via a flag if needed.
+      // We'll also log after body-parsing middleware in development.
+    }
+  } catch (e) {
+    // swallow logging errors
+  }
+  next();
+});
 const corsOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())

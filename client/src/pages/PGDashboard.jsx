@@ -2,7 +2,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './ChiefDoctorDashboard.css';
 import './PGDashboard.css';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { API_BASE_URL, DEV_API_ORIGIN } from '../config/api';
 import {
@@ -15,6 +15,7 @@ import { isDepartmentAllowed } from '../config/allowedDepartments';
 const PGDashboard = ({ brandTitleOverride }) => {
   // State for form data
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
 
   const departmentKeyToRoute = {
@@ -572,12 +573,22 @@ const PGDashboard = ({ brandTitleOverride }) => {
     }
   };
 
-  const handleRescheduleCalendarDateSelection = (dateValue) => {
+  const handleRescheduleCalendarDateSelection = async (dateValue) => {
     setRescheduleSelectedDate(dateValue);
-    // Fetch booked slots for this date
-    fetchBookedSlotsForDate(dateValue);
-    // Generate available time slots
-    setRescheduleAvailableSlots(ALLOWED_APPOINTMENT_TIMES);
+    // Fetch booked slots for this date and wait for results so availability can be computed
+    await fetchBookedSlotsForDate(dateValue);
+
+    // Compute available time slots based on fetched booked slots and draft
+    const bookingId = String(activeRescheduleBookingId || '').trim();
+    const draft = bookingId ? (rescheduleDrafts[bookingId] || {}) : {};
+    const computedAvailable = getAvailableTimesForDraft({ ...draft, appointmentDate: dateValue }) || ALLOWED_APPOINTMENT_TIMES;
+    setRescheduleAvailableSlots(computedAvailable.length ? computedAvailable : ALLOWED_APPOINTMENT_TIMES);
+
+    // Auto-select the first available time to improve UX (user can change it)
+    if (bookingId) {
+      const first = computedAvailable && computedAvailable.length ? computedAvailable[0] : '';
+      updateRescheduleDraft(bookingId, { appointmentDate: dateValue, appointmentTime: first });
+    }
   };
 
   const beginRescheduleForAppointment = (appointment) => {
@@ -2067,6 +2078,18 @@ const PGDashboard = ({ brandTitleOverride }) => {
     day: '2-digit',
   });
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const view = String(params.get('view') || '').trim();
+    if (view === 'assigned-cases') {
+      setActiveView('assigned-cases');
+      fetchPgCaseSheetHistory();
+    } else if (view === 'my-appointments') {
+      setActiveView('my-appointments');
+      fetchPgAppointments();
+    }
+  }, [location.search]);
+
   return (
     <div className="chief-layout">
       <header className="chief-topbar">
@@ -2901,10 +2924,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
                           const rescheduleReqStatus = String(appointment?.rescheduleRequest?.requestStatus || 'none').trim().toLowerCase();
                           const hasPendingReschedule = rescheduleReqStatus === 'pending';
                           const hasApprovedReschedule = rescheduleReqStatus === 'approved';
-                          const canApproveAppointment = appointmentStatus === 'pending';
-                          const canRescheduleAppointment = appointmentStatus === 'pending' && !hasPendingReschedule;
-                          // Show action buttons only when appointment is confirmed/assigned
-                          const isConfirmed = appointmentStatus === 'confirmed' || appointmentStatus === 'assigned' || appointmentStatus === 'in_progress' || appointmentStatus === 'rescheduled';
+                          const actionableStatuses = ['pending', 'assigned', 'confirmed', 'in_progress', 'rescheduled'];
+                          const isActionable = actionableStatuses.includes(appointmentStatus);
+                          const canApproveAppointment = ['pending', 'assigned', 'confirmed', 'in_progress', 'rescheduled'].includes(appointmentStatus);
+                          const canRescheduleAppointment = !['rejected', 'cancelled', 'completed', 'closed'].includes(appointmentStatus);
 
                           return (
                             <tr key={bookingId || `${appointment?.patientId}-${appointment?.appointmentDate}`} className="pg-assigned-row">
@@ -2953,42 +2976,65 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                   }}>
                                     ✕ Rejected
                                   </span>
-                                ) : isConfirmed ? (
-                                  <div style={{ display: 'inline-flex', gap: '6px', flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center' }}>
+                                ) : (
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
+                                    {canApproveAppointment && (
+                                      <button
+                                        type="button"
+                                        className="view-button"
+                                        onClick={() => approveAppointment(appointment)}
+                                        disabled={isSubmitting}
+                                        style={{
+                                          background: '#2f855a',
+                                          color: '#fff',
+                                          padding: '6px 12px',
+                                          fontSize: '0.8em',
+                                          whiteSpace: 'nowrap',
+                                          border: 'none',
+                                          borderRadius: '8px',
+                                          cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                                          opacity: isSubmitting ? 0.6 : 1,
+                                        }}
+                                      >
+                                        Accept
+                                      </button>
+                                    )}
+
                                     <button
                                       type="button"
                                       className="view-button"
                                       onClick={() => beginRescheduleForAppointment(appointment)}
-                                      disabled={isSubmitting || hasPendingReschedule}
-                                      title={hasPendingReschedule ? 'A reschedule request is already pending approval' : ''}
+                                      disabled={isSubmitting || !canRescheduleAppointment}
+                                      title={hasPendingReschedule ? 'Reschedule request is pending approval' : 'Open reschedule options'}
                                       style={{
-                                        background: '#48bb78',
+                                        background: '#3182ce',
                                         color: '#fff',
-                                        padding: '4px 10px',
-                                        fontSize: '0.75em',
-                                        minWidth: '78px',
+                                        padding: '6px 12px',
+                                        fontSize: '0.8em',
                                         whiteSpace: 'nowrap',
                                         border: 'none',
-                                        borderRadius: '6px',
-                                        cursor: isSubmitting || hasPendingReschedule ? 'not-allowed' : 'pointer',
-                                        opacity: hasPendingReschedule ? 0.6 : 1,
+                                        borderRadius: '8px',
+                                        cursor: isSubmitting || !canRescheduleAppointment ? 'not-allowed' : 'pointer',
+                                        opacity: isSubmitting || !canRescheduleAppointment ? 0.6 : 1,
                                       }}
                                     >
-                                      {isSubmitting ? 'Saving...' : '✓ Approved'}
+                                      {hasPendingReschedule ? 'Reschedule Pending' : 'Reschedule'}
                                     </button>
+
+                                    {!['confirmed','assigned','in_progress','rescheduled'].includes(appointmentStatus) && appointmentStatus !== 'pending' && (
+                                      <span style={{ 
+                                        background: '#ed8936', 
+                                        color: '#fff', 
+                                        borderRadius: '12px', 
+                                        padding: '4px 10px', 
+                                        fontSize: '12px', 
+                                        fontWeight: 600,
+                                        display: 'inline-block'
+                                      }}>
+                                        {appointmentStatus === 'rescheduled' ? 'Rescheduled' : 'Pending'}
+                                      </span>
+                                    )}
                                   </div>
-                                ) : (
-                                  <span style={{ 
-                                    background: '#ed8936', 
-                                    color: '#fff', 
-                                    borderRadius: '12px', 
-                                    padding: '4px 10px', 
-                                    fontSize: '12px', 
-                                    fontWeight: 600,
-                                    display: 'inline-block'
-                                  }}>
-                                    ⏳ Pending
-                                  </span>
                                 )}
                               </td>
                             </tr>
@@ -3039,7 +3085,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                       justifyContent: 'center'
                     }}
                   >
-                    ΓÇ╣
+                    ‹
                   </button>
                   
                   <h4 style={{ 
@@ -3071,7 +3117,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                       justifyContent: 'center'
                     }}
                   >
-                    ΓÇ║
+                    ›
                   </button>
                 </div>
 

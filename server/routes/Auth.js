@@ -1,5 +1,6 @@
 // server/routes/Auth.js
 import { User } from '../models/User.js';
+import fs from 'fs';
 import generateNextPatientId from '../utils/patientIdGenerator.js';
 import generateRandomPassword from '../utils/passwordGenerator.js';
 import { hash, compare } from 'bcryptjs';
@@ -115,19 +116,24 @@ const newUser = new User({
 });
 
 router.post('/login/patientlogin', async (req, res) => {
-  const { identifier, password } = req.body;
+  try {
+    fs.appendFileSync('./logs/login_debug.log', `[${new Date().toISOString()}] rawBody: ${JSON.stringify(req.body)}\n`);
+  } catch (e) {
+    // ignore logging failures
+  }
+  console.log('Login route raw body:', req.body);
+  const { identifier, password } = req.body || {};
   const normalizedIdentifier = String(identifier || '').trim();
+  if (!normalizedIdentifier || !String(password || '').trim()) {
+    return res.status(400).json({ message: 'Identifier and password are required.' });
+  }
   const normalizedPhone = normalizePhoneNumber(normalizedIdentifier);
   const loosePhoneRegex = buildLoosePhoneRegex(normalizedPhone);
   console.log("➡️ Login attempt with identifier:", normalizedIdentifier);
 
   try {
-    let user = await User.findOne({
-      $or: [
-        { Identity: { $regex: new RegExp("^" + escapedIdentifier + "$", "i") } },
-        { phone: normalizedIdentifier }
-      ]
-    });
+    // Use helper to find by Identity/email; fall back to phone (loose match)
+    let user = await findUserByIdentifier(normalizedIdentifier);
 
     if (!user && loosePhoneRegex) {
       user = await User.findOne({
@@ -181,8 +187,9 @@ router.post('/login/patientlogin', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Login Error:', err);
-    res.status(500).json({ message: 'Server error during login' });
+    console.error('Login Error stack:', err && err.stack ? err.stack : err);
+    const safeMessage = (err && err.message) ? String(err.message).slice(0, 200) : 'Server error during login';
+    res.status(500).json({ message: safeMessage });
   }
 });
 

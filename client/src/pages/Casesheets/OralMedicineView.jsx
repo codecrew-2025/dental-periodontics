@@ -1,14 +1,32 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
 import './OralMedicineView.css';
 
 const OralMedicineView = ({ caseData: propCaseData }) => {
   const { caseId: paramsCaseId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
   const [caseData, setCaseData] = useState(propCaseData || null);
   const [loading, setLoading] = useState(!propCaseData);
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = 8;
+
+  const roleKey = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
+  const handleClickReferredDepartment = () => {
+    if (!caseData?.referredDepartment) return;
+    if (roleKey === 'pg') {
+      navigate('/pg-dashboard?view=assigned-cases');
+      return;
+    }
+    if (roleKey === 'ug') {
+      navigate('/ug-dashboard?view=assigned-cases');
+      return;
+    }
+    navigate('/doctor-dashboard?view=referrals');
+  };
 
   useEffect(() => {
     if (propCaseData) return;
@@ -334,20 +352,32 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
 
             {/* Referred to Department */}
             {caseData.referredDepartment && (
-              <div style={{
-                marginTop: 20,
-                padding: '12px 16px',
-                background: 'rgba(99,102,241,0.12)',
-                border: '1.5px solid rgba(165,180,252,0.4)',
-                borderRadius: 8,
-              }}>
+              <button
+                type="button"
+                onClick={handleClickReferredDepartment}
+                style={{
+                  width: '100%',
+                  marginTop: 20,
+                  padding: '14px 18px',
+                  textAlign: 'left',
+                  background: 'rgba(99,102,241,0.12)',
+                  border: '1.5px solid rgba(165,180,252,0.4)',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  color: 'inherit',
+                  display: 'block',
+                }}
+              >
                 <h3 style={{ margin: '0 0 6px', color: '#c7d2fe', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Referred to Department
                 </h3>
                 <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem' }}>
                   {caseData.referredDepartment}
                 </p>
-              </div>
+                <div style={{ marginTop: 8, fontSize: '0.85rem', opacity: 0.8 }}>
+                  Open referral queue for approval / reschedule
+                </div>
+              </button>
             )}
 
             {/* Chargeable Investigations */}
