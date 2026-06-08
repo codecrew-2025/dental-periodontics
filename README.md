@@ -5,7 +5,7 @@ A full-stack web application designed for SRM Dental Hospital to streamline pati
 
 ## 🚀 Live Demo
 
-**Deployed on Vercel:** https://dental-endodontics-livid.vercel.app/
+**Deployed on Vercel:** https://dental-public-health-dentistry-livid.vercel.app/
 
 ## 🌐 Deploy to Render (Single Service)
 
