@@ -1540,10 +1540,16 @@ const PGDashboard = ({ brandTitleOverride }) => {
       const patientRouteUrl = `${departmentRoute}${separator}patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName || currentPatientId)}&department=${encodeURIComponent(resolvedDepartmentLabel)}${caseIdParam}`;
       console.log('[PGDashboard] openAssignedCaseRoute ->', { currentPatientId, currentPatientName, resolvedDepartmentLabel, departmentRoute, patientRouteUrl });
       // Try opening in a new tab; if blocked by popup blocker, navigate in the same tab as a fallback
+      // Try opening in a new tab; if blocked by popup blocker, navigate using SPA router
       const newWin = window.open(patientRouteUrl, '_blank', 'noopener,noreferrer');
       if (!newWin) {
-        console.debug('[PGDashboard] window.open blocked, navigating in same tab');
-        window.location.href = patientRouteUrl;
+        console.debug('[PGDashboard] window.open blocked, navigating via router');
+        try {
+          navigate(patientRouteUrl, { replace: false });
+        } catch (navErr) {
+          console.debug('[PGDashboard] router navigate failed, falling back to location.href', navErr);
+          window.location.href = patientRouteUrl;
+        }
       }
     } catch (error) {
       console.error('[openAssignedCaseRoute] Error:', error);

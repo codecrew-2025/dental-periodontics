@@ -15,6 +15,21 @@ const normalizeXraySrc = (value) => {
   return `data:image/jpeg;base64,${raw}`;
 };
 
+const decodeSignature = (sig) => {
+  if (!sig) return '';
+  if (typeof sig === 'string') return sig;
+  // If object with Buffer-like shape
+  const buf = sig.data || sig;
+  const arr = buf?.data || (Array.isArray(buf) ? buf : null);
+  if (arr && Array.isArray(arr)) {
+    const bytes = new Uint8Array(arr);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+    return `data:${sig.contentType || 'image/png'};base64,${btoa(binary)}`;
+  }
+  return '';
+};
+
 const pickLatestByTimestamp = (rows) => {
   const list = Array.isArray(rows) ? rows : [];
   if (!list.length) return null;
@@ -383,6 +398,21 @@ const GeneralCaseSheetView = () => {
                 <p>No X-ray uploaded</p>
               </div>
             )}
+
+              {/* Defensive Signature Preview - show if any signature fields exist on generalCase */}
+              {(generalCase?.digitalSignature || generalCase?.doctorSignature || generalCase?.pgSignature) && (
+                <div style={{ marginTop: 12 }} className="general-case-image-preview">
+                  <h3>Signature Preview</h3>
+                  <div className="general-case-preview-container">
+                    <img
+                      src={normalizeXraySrc(decodeSignature(generalCase.digitalSignature || generalCase.doctorSignature || generalCase.pgSignature))}
+                      alt="Signature Preview"
+                      className="general-case-preview-image"
+                      style={{ maxHeight: 120 }}
+                    />
+                  </div>
+                </div>
+              )}
           </div>
         </div>
       </div>
