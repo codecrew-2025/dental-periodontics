@@ -12,6 +12,16 @@ import {
 import { getPatientResumeTarget } from '../utils/caseDraft';
 import { setStoredPatientId } from '../utils/patientIdentity';
 import { isDepartmentAllowed } from '../config/allowedDepartments';
+
+const normalizeXraySrc = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('/')) return raw;
+  return `data:image/jpeg;base64,${raw}`;
+};
+
 const UGDashboard = () => {
   // State for form data
   const navigate = useNavigate();
@@ -2428,7 +2438,7 @@ const UGDashboard = () => {
                           <div style={{ fontSize: 12, marginBottom: 4, color: '#64748b' }}>X-ray</div>
                           {String(generalCasePreview.xrayImage || '').trim() ? (
                             <img
-                              src={String(generalCasePreview.xrayImage || '').trim()}
+                              src={normalizeXraySrc(generalCasePreview.xrayImage)}
                               alt="X-ray"
                               style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, border: '1px solid #cbd5e1' }}
                             />
