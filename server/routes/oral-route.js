@@ -63,8 +63,25 @@ const normalisePayload = (body) => {
 router.post('/', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (req, res) => {
   try {
     const payload = normalisePayload(req.body);
+    
+    // Debug: Log if signature is in the payload
+    if (payload.digitalSignature) {
+      console.log(`[ORAL-API] POST - Received digitalSignature, length: ${payload.digitalSignature.length}`);
+    } else {
+      console.log(`[ORAL-API] POST - NO digitalSignature in payload`);
+    }
+    
     const oralCase = new OralCase(payload);
     await oralCase.save();
+    
+    // Debug: Log if signature was saved
+    const savedSig = oralCase.digitalSignature;
+    if (savedSig) {
+      console.log(`[ORAL-API] POST - Saved case with digitalSignature, length: ${savedSig.length}`);
+    } else {
+      console.log(`[ORAL-API] POST - Saved case WITHOUT digitalSignature`);
+    }
+    
     res.status(201).json({
       success: true,
       message: 'Oral case created successfully',
@@ -123,6 +140,14 @@ router.get('/:id', auth, async (req, res) => {
     if (!oralCase) {
       return res.status(404).json({ success: false, message: 'Oral case not found' });
     }
+    // Debug: Log the signature field
+    const hasSignature = !!(oralCase.digitalSignature || oralCase.doctorSignature || oralCase.pgSignature);
+    if (hasSignature) {
+      const sigLength = (oralCase.digitalSignature || '').length || (oralCase.doctorSignature || '').length || (oralCase.pgSignature || '').length;
+      console.log(`[ORAL-API] GET /:id - Case ${req.params.id} has signature field, length: ${sigLength}`);
+    } else {
+      console.log(`[ORAL-API] GET /:id - Case ${req.params.id} has NO signature fields`);
+    }
     res.status(200).json({ success: true, data: oralCase });
   } catch (error) {
     console.error('Error fetching oral case:', error);
@@ -134,6 +159,14 @@ router.get('/:id', auth, async (req, res) => {
 router.put('/:id', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (req, res) => {
   try {
     const payload = normalisePayload(req.body);
+    
+    // Debug: Log if signature is in the update payload
+    if (payload.digitalSignature) {
+      console.log(`[ORAL-API] PUT - Received digitalSignature, length: ${payload.digitalSignature.length}`);
+    } else {
+      console.log(`[ORAL-API] PUT - NO digitalSignature in update payload`);
+    }
+    
     const updatedCase = await OralCase.findByIdAndUpdate(
       req.params.id,
       payload,
@@ -142,6 +175,14 @@ router.put('/:id', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (re
     if (!updatedCase) {
       return res.status(404).json({ success: false, message: 'Oral case not found' });
     }
+    
+    // Debug: Log if signature was saved after update
+    if (updatedCase.digitalSignature) {
+      console.log(`[ORAL-API] PUT - Updated case with digitalSignature, length: ${updatedCase.digitalSignature.length}`);
+    } else {
+      console.log(`[ORAL-API] PUT - Updated case WITHOUT digitalSignature`);
+    }
+    
     res.status(200).json({ success: true, message: 'Oral case updated successfully', data: updatedCase });
   } catch (error) {
     console.error('Error updating oral case:', error);
