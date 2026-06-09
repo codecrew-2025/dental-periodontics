@@ -1,13 +1,11 @@
 // api/index.js - Vercel serverless handler for Express backend
-import path from 'path';
-import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-
-const __dirname = path.dirname(path.join(process.cwd(), 'api'));
-dotenv.config({ path: path.resolve(__dirname, '.env') });
-
-// Import Server.js app (already configured Express app)
 import app from '../server/Server.js';
 
-// Export handler for Vercel
+// Load .env only in local development
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
+
+// Export Express app - Vercel will wrap it as a serverless handler
 export default app;
