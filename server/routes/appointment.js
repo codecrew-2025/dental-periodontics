@@ -963,15 +963,21 @@ router.get('/department/:deptKey', auth, requireRole(['doctor','chief-doctor','c
 });
 
 /* ================= DOCTOR – ALL ================= */
-router.get("/all-appointments", auth, requireRole(["admin", "chief", "chief-doctor"]), async (req, res) => {
-  try {
-    const appointments = await Appointment.find().sort({ createdAt: -1 });
-    const enriched = await attachPatientName(appointments);
-    res.json({ success: true, appointments: enriched });
-  } catch {
-    res.status(500).json({ success: false });
+router.get(
+  "/all-appointments",
+  auth,
+  requireRole(["admin", "phc1", "phc2", "chief", "chief-doctor", "c", "camp"]),
+  async (req, res) => {
+    try {
+      const appointments = await Appointment.find().sort({ createdAt: -1 });
+      const enriched = await attachPatientName(appointments);
+      res.json({ success: true, appointments: enriched });
+    } catch (err) {
+      console.error('Error in /all-appointments:', err);
+      res.status(500).json({ success: false, message: 'Failed to load appointments' });
+    }
   }
-});
+);
 
 /* ================= CHIEF - ASSIGNED DOCTORS OVERVIEW ================= */
 router.get('/assigned-doctors/overview', auth, requireRole(['chief', 'chief-doctor']), async (req, res) => {

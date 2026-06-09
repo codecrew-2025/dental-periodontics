@@ -272,7 +272,7 @@ const AppRoutes = () => {
         <Route
           path="/doctor-schedule"
           element={
-            <ProtectedRoute allowedRoles={['doctor', 'chief', 'chief-doctor', 'admin']}>
+            <ProtectedRoute allowedRoles={['doctor', 'chief', 'chief-doctor', 'admin', 'phc1', 'phc2', 'c']}>
               <DoctorSchedule />
             </ProtectedRoute>
           }

@@ -27,8 +27,17 @@ const DoctorSchedule = () => {
   };
 
   /* ================= TOKEN ================= */
-  const getToken = () =>
-    localStorage.getItem("doctorToken") || localStorage.getItem("token");
+  const getToken = () => {
+    const role = String(localStorage.getItem('role') || '').trim().toLowerCase();
+    const primaryToken = localStorage.getItem('token');
+    const doctorToken = localStorage.getItem('doctorToken');
+
+    if (!primaryToken && role === 'doctor') {
+      return doctorToken || null;
+    }
+
+    return primaryToken || doctorToken || null;
+  };
 
   const normalizeScheduleStatus = (status) =>
     String(status || "pending").trim().toLowerCase();
@@ -128,11 +137,22 @@ const DoctorSchedule = () => {
         showMessage(res.data.message || "Failed to load appointments", "error");
       }
     } catch (error) {
+      const status = error.response?.status;
+      const serverMessage = error.response?.data?.message;
       console.error("Error loading appointments:", error.response || error);
-      if (error.response && error.response.status === 401) {
+
+      if (status === 401) {
         showMessage("Login required or session expired. Please log in again.", "error");
+      } else if (status === 403) {
+        showMessage(
+          serverMessage || "Access denied: your account cannot view these appointments.",
+          "error"
+        );
       } else {
-        showMessage("Failed to load appointments from server.", "error");
+        showMessage(
+          serverMessage || "Failed to load appointments from server.",
+          "error"
+        );
       }
     }
   };
