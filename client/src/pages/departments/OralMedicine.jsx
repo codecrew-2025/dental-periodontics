@@ -957,17 +957,29 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
         <div className="form-group-casesheet">
           <label htmlFor="digitalSignature">Upload Digital Signature *</label>
           <input
+            id="digitalSignature"
             type="file"
             accept="image/*"
             onChange={(e) => handleFileChange(e.target.files[0])}
             required
+            style={{
+              display: 'block',
+              marginTop: '8px',
+              padding: '8px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              backgroundColor: '#f9f9f9',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
           />
           {signaturePreview && (
             <div id="signaturePreview" style={{ marginTop: '10px' }}>
               <img
                 src={signaturePreview}
                 alt="Signature Preview"
-                style={{ maxWidth: '150px', maxHeight: '100px', marginTop: '10px' }}
+                style={{ maxWidth: '150px', maxHeight: '100px', marginTop: '10px', border: '1px solid #ddd', padding: '4px', borderRadius: '4px' }}
               />
             </div>
           )}

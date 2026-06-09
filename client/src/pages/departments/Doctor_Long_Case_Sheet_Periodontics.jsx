@@ -532,12 +532,24 @@ function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewS
                   accept="image/*"
                   onChange={handleSignatureChange}
                   required
+                  style={{
+                    display: 'block',
+                    marginTop: '8px',
+                    padding: '8px',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    backgroundColor: '#f9f9f9',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
                 />
                 {signaturePreviewSrc && (
                   <img
                     className="signature-preview"
                     src={signaturePreviewSrc}
                     alt="Signature Preview"
+                    style={{ marginTop: '8px', border: '1px solid #ddd', padding: '4px', borderRadius: '4px' }}
                   />
                 )}
               </>
