@@ -1,19 +1,13 @@
-// api/index.js - Vercel serverless function to export the Express app
+// api/index.js - Vercel serverless handler for Express backend
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+const __dirname = path.dirname(path.join(process.cwd(), 'api'));
+dotenv.config({ path: path.resolve(__dirname, '.env') });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Import Server.js app (already configured Express app)
+import app from '../server/Server.js';
 
-// Import the main app from Server.js
-import('../server/Server.js').then((module) => {
-  // The Server.js already starts listening, but for Vercel we just export the app
-}).catch((err) => {
-  console.error('Failed to load Server.js:', err);
-});
-
-// Re-export from Server.js for Vercel
-export { default } from '../server/Server.js';
+// Export handler for Vercel
+export default app;

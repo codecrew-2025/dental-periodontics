@@ -33,13 +33,13 @@ const resolveApiBase = () => {
     return envBase || localNetworkDevBase;
   }
 
-  // This project is deployed as a single Vercel app (static + /api function).
-  // Prefer same-origin in production on Vercel to avoid stale external API env values.
+  // On Vercel, both frontend and backend run on same origin, use empty string for same-origin requests
   if (isVercelHost) {
+    console.log('🔗 Using same-origin API (Vercel deployment)');
     return '';
   }
 
-  // In production, default to same-origin when not explicitly configured.
+  // In production on other hosts, default to same-origin when not explicitly configured.
   return envBase;
 };
 
