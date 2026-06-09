@@ -117,7 +117,18 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchTodayStats = async () => {
       try {
-        const res = await fetch(buildApiUrl('/api/reports/today'));
+        const token = user?.token || localStorage.getItem('token');
+        if (!token) {
+          console.warn('No token available for fetching today stats');
+          return;
+        }
+
+        const res = await fetch(buildApiUrl('/api/reports/today'), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
         if (!res.ok) return;
         const data = await res.json();
         if (data && data.success) {
@@ -129,7 +140,7 @@ const AdminDashboard = () => {
     };
 
     fetchTodayStats();
-  }, []);
+  }, [user]);
 
   const handleLogout = () => {
     logout(); 
