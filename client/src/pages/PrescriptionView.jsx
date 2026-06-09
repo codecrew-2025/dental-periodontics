@@ -5,6 +5,16 @@ import { API_BASE_URL } from '../config/api';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
+const normalizeXraySrc = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('blob:')) return raw;
+  if (raw.startsWith('/')) return raw;
+  return `data:image/jpeg;base64,${raw}`;
+};
+
 const PrescriptionView = () => {
     const buildApiUrl = (path) =>
       `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
@@ -839,7 +849,7 @@ const PrescriptionView = () => {
               {prescription.doctorSignature && (
                 <div style={{ marginBottom: '5px' }}>
                   <img 
-                    src={prescription.doctorSignature} 
+                    src={normalizeXraySrc(prescription.doctorSignature)} 
                     alt="Doctor Signature" 
                     style={{ 
                       maxWidth: '150px', 

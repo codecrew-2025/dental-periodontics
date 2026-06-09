@@ -4,6 +4,16 @@ import './prescription.css';
 import { API_BASE_URL } from '../config/api';
 import { getStoredPatientId } from '../utils/patientIdentity';
 
+const normalizeXraySrc = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('blob:')) return raw;
+  if (raw.startsWith('/')) return raw;
+  return `data:image/jpeg;base64,${raw}`;
+};
+
 const CaseSheetPrescription = () => {
   const [patientId, setPatientId] = useState('');
   const [prescriptions, setPrescriptions] = useState([]);
@@ -611,7 +621,7 @@ const CaseSheetPrescription = () => {
                 {selectedPrescription.doctorSignature && (
                   <div style={{ marginBottom: '5px' }}>
                     <img 
-                      src={selectedPrescription.doctorSignature} 
+                      src={normalizeXraySrc(selectedPrescription.doctorSignature)} 
                       alt="Doctor Signature" 
                       style={{ 
                         maxWidth: '150px', 
