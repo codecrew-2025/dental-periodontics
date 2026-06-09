@@ -637,7 +637,8 @@ router.get('/patient/:patientId', auth, async (req, res) => {
         'department', 'selectedDepartments', 'referredDepartment',
         'specialistStatus', 'assignedPgId', 'assignedPgName',
         'specialistDoctorId', 'specialistDoctorName',
-        'createdAt', 'updatedAt', 'specialistAssignedAt', 'pgAssignedAt'
+        'createdAt', 'updatedAt', 'specialistAssignedAt', 'pgAssignedAt',
+        'xrayImage'
       ])
       .sort({ createdAt: -1 })
       .skip(skip)
