@@ -134,10 +134,53 @@ const findLinkedPatientUser = async ({ normalizedId, compactId }) => {
   return linkedPatientUser;
 };
 
+const generateNextNumericPatientId = async () => {
+  const startingNumber = 2600000;
+  const numericRegex = /^\d+$/;
+
+  const [lastUser, lastPatient] = await Promise.all([
+    User.findOne({ Identity: { $regex: numericRegex }, role: 'patient' })
+      .sort({ Identity: -1 })
+      .lean(),
+    PatientDetails.findOne({ patientId: { $regex: numericRegex } })
+      .sort({ patientId: -1 })
+      .lean(),
+  ]);
+
+  let maxNumericId = 0;
+
+  if (lastUser && numericRegex.test(String(lastUser.Identity || ''))) {
+    maxNumericId = Math.max(maxNumericId, Number(lastUser.Identity));
+  }
+
+  if (lastPatient && numericRegex.test(String(lastPatient.patientId || ''))) {
+    maxNumericId = Math.max(maxNumericId, Number(lastPatient.patientId));
+  }
+
+  const legacyPatients = await loadLegacyPatients();
+  for (const entry of legacyPatients) {
+    const candidate = String(entry?.patientId || '').trim();
+    if (numericRegex.test(candidate)) {
+      maxNumericId = Math.max(maxNumericId, Number(candidate));
+    }
+  }
+
+  const nextNumber = maxNumericId >= startingNumber ? maxNumericId + 1 : startingNumber;
+  if (nextNumber > 9999999) {
+    throw new Error('Maximum numeric patient IDs reached');
+  }
+
+  return String(nextNumber);
+};
+
 // GET /api/patient-details/next-id - generate next available patient ID
 router.get('/next-id', async (req, res) => {
   try {
-    const patientId = await generateNextPatientId();
+    const style = String(req.query.style || 'camp').toLowerCase();
+    const patientId = style === 'numeric'
+      ? await generateNextNumericPatientId()
+      : await generateNextPatientId();
+
     return res.status(200).json({ success: true, patientId });
   } catch (error) {
     console.error('Error generating next patient ID:', error);

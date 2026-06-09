@@ -283,7 +283,7 @@ const AdminDashboard = () => {
     try {
       setGeneratingPatientId(true);
       // Ask backend for next ID so it stays in sync with signup
-      const res = await fetch(buildApiUrl('/api/patient-details/next-id'));
+      const res = await fetch(buildApiUrl('/api/patient-details/next-id?style=numeric'));
       const data = await res.json();
 
       if (!res.ok || !data.success || !data.patientId) {

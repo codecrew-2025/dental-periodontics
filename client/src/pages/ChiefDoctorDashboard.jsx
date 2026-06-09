@@ -756,7 +756,7 @@ const ChiefDoctorDashboard = () => {
 
   const openFullCaseSheet = (caseItem) => {
     if (!caseItem?._id) return;
-    localStorage.setItem("viewCaseDepartment", caseItem.department);
+    localStorage.setItem("viewCaseDepartment", caseItem.department || 'general');
     window.open(`/case-sheet-view/${caseItem._id}`, "_blank");
   };
 
@@ -1802,10 +1802,10 @@ const ChiefDoctorDashboard = () => {
                 <button
                   type="button"
                   onClick={() => {
-                    if (caseSheetPreviewItem) openFullCaseSheet(caseSheetPreviewItem);
+                    if (caseSheetPreviewGeneralCase) openFullCaseSheet(caseSheetPreviewGeneralCase);
                     closeCaseSheetPreview();
                   }}
-                  disabled={!caseSheetPreviewItem?._id}
+                  disabled={!caseSheetPreviewGeneralCase?._id}
                 >
                   Open Case Sheet
                 </button>

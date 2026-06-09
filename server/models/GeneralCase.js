@@ -50,6 +50,10 @@ const GeneralCaseSchema = new mongoose.Schema({
   description: String,
   generalDescription: String,
   selectedDepartments: [String],
+  department: {
+    type: String,
+    default: 'general'
+  },
   referralCurrentIndex: {
     type: Number,
     default: 0,

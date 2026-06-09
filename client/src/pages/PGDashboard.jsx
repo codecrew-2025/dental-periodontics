@@ -1452,65 +1452,92 @@ const PGDashboard = ({ brandTitleOverride }) => {
   }, [user]);
 
   const openAssignedCaseRoute = async (patientIdOverride = '') => {
+    console.log('[openAssignedCaseRoute] Starting...');
     const overrideId = typeof patientIdOverride === 'string' ? patientIdOverride : '';
     const currentPatientId = String(
       overrideId || localStorage.getItem('CurrentpatientId') || generatedUserId || formData.uniqueId || ''
     ).trim();
 
+    console.log('[openAssignedCaseRoute] Patient ID:', currentPatientId);
+
     if (!currentPatientId) {
+      console.error('[openAssignedCaseRoute] Patient ID missing');
       showMessage('Patient ID not found for opening the case sheet.', 'error');
       return;
     }
 
-    setStoredPatientId(currentPatientId);
+    try {
+      setStoredPatientId(currentPatientId);
 
-    const currentPatientName = String(
-      localStorage.getItem('CurrentpatientName') ||
-      [formData.firstName, formData.middleName, formData.lastName].filter(Boolean).join(' ') ||
-      ''
-    ).trim();
-    if (currentPatientName) {
-      localStorage.setItem('CurrentpatientName', currentPatientName);
-    }
-
-    await cacheGeneralCaseXrayForPatient(currentPatientId);
-
-    const resolvedDepartmentLabel = String(
-      pgDepartmentLabel ||
-      user?.department ||
-      localStorage.getItem('ugDepartment') ||
-      'Public Health Dentistry'
-    ).trim();
-    const normalizedDept = normalizeDepartment(resolvedDepartmentLabel);
-    const isPublicHealthDept =
-      normalizedDept.includes('publichealthdentistry') ||
-      normalizedDept.includes('publichealth') ||
-      normalizedDept.includes('communitydentistry');
-
-    let ensuredCaseId = '';
-    if (isPublicHealthDept) {
-      try {
-        ensuredCaseId = await ensurePublicHealthCaseSheetGenerated({
-          patientId: currentPatientId,
-          patientName: currentPatientName || currentPatientId,
-        });
-      } catch (caseError) {
-        showMessage(caseError?.message || 'Failed to prepare public health case sheet.', 'error');
+      const currentPatientName = String(
+        localStorage.getItem('CurrentpatientName') ||
+        [formData.firstName, formData.middleName, formData.lastName].filter(Boolean).join(' ') ||
+        ''
+      ).trim();
+      if (currentPatientName) {
+        localStorage.setItem('CurrentpatientName', currentPatientName);
       }
-    }
 
-    const departmentRoute = isPublicHealthDept
-      ? (ensuredCaseId ? '/general-case-view' : '/general-case-sheet')
-      : getCaseRouteForDepartment(resolvedDepartmentLabel);
-    const separator = departmentRoute.includes('?') ? '&' : '?';
-    const caseIdParam = ensuredCaseId ? `&caseId=${encodeURIComponent(ensuredCaseId)}` : '';
-    const patientRouteUrl = `${departmentRoute}${separator}patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName || currentPatientId)}&department=${encodeURIComponent(resolvedDepartmentLabel)}${caseIdParam}`;
-    console.debug('[PGDashboard] openAssignedCaseRoute ->', { currentPatientId, currentPatientName, resolvedDepartmentLabel, departmentRoute, patientRouteUrl });
-    // Try opening in a new tab; if blocked by popup blocker, navigate in the same tab as a fallback
-    const newWin = window.open(patientRouteUrl, '_blank', 'noopener,noreferrer');
-    if (!newWin) {
-      console.debug('[PGDashboard] window.open blocked, navigating in same tab');
-      window.location.href = patientRouteUrl;
+      console.log('[openAssignedCaseRoute] Patient Name:', currentPatientName);
+
+      await cacheGeneralCaseXrayForPatient(currentPatientId);
+
+      const resolvedDepartmentLabel = String(
+        pgDepartmentLabel ||
+        user?.department ||
+        localStorage.getItem('ugDepartment') ||
+        'Public Health Dentistry'
+      ).trim();
+      const normalizedDept = normalizeDepartment(resolvedDepartmentLabel);
+      
+      console.log('[openAssignedCaseRoute] Department:', resolvedDepartmentLabel, 'Normalized:', normalizedDept);
+      
+      // For Oral Medicine/Periodontics, require consent form first
+      if (normalizedDept.includes('oral') || normalizedDept === 'periodontics') {
+        console.log('[openAssignedCaseRoute] Redirecting to consent form for oral/periodontics');
+        const departmentRoute = getCaseRouteForDepartment(resolvedDepartmentLabel);
+        console.log('[openAssignedCaseRoute] Department Route:', departmentRoute);
+        const targetUrl = departmentRoute.includes('?')
+          ? `${departmentRoute}&patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName)}&department=${encodeURIComponent(resolvedDepartmentLabel)}`
+          : `${departmentRoute}?patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName)}&department=${encodeURIComponent(resolvedDepartmentLabel)}`;
+        console.log('[openAssignedCaseRoute] Target URL:', targetUrl);
+        navigate(`/consent-form?redirect=${encodeURIComponent(targetUrl)}`, { replace: true });
+        return;
+      }
+
+      const isPublicHealthDept =
+        normalizedDept.includes('publichealthdentistry') ||
+        normalizedDept.includes('publichealth') ||
+        normalizedDept.includes('communitydentistry');
+
+      let ensuredCaseId = '';
+      if (isPublicHealthDept) {
+        try {
+          ensuredCaseId = await ensurePublicHealthCaseSheetGenerated({
+            patientId: currentPatientId,
+            patientName: currentPatientName || currentPatientId,
+          });
+        } catch (caseError) {
+          showMessage(caseError?.message || 'Failed to prepare public health case sheet.', 'error');
+        }
+      }
+
+      const departmentRoute = isPublicHealthDept
+        ? (ensuredCaseId ? '/general-case-view' : '/general-case-sheet')
+        : getCaseRouteForDepartment(resolvedDepartmentLabel);
+      const separator = departmentRoute.includes('?') ? '&' : '?';
+      const caseIdParam = ensuredCaseId ? `&caseId=${encodeURIComponent(ensuredCaseId)}` : '';
+      const patientRouteUrl = `${departmentRoute}${separator}patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName || currentPatientId)}&department=${encodeURIComponent(resolvedDepartmentLabel)}${caseIdParam}`;
+      console.log('[PGDashboard] openAssignedCaseRoute ->', { currentPatientId, currentPatientName, resolvedDepartmentLabel, departmentRoute, patientRouteUrl });
+      // Try opening in a new tab; if blocked by popup blocker, navigate in the same tab as a fallback
+      const newWin = window.open(patientRouteUrl, '_blank', 'noopener,noreferrer');
+      if (!newWin) {
+        console.debug('[PGDashboard] window.open blocked, navigating in same tab');
+        window.location.href = patientRouteUrl;
+      }
+    } catch (error) {
+      console.error('[openAssignedCaseRoute] Error:', error);
+      showMessage('Error opening case sheet: ' + error.message, 'error');
     }
   };
 
@@ -2383,25 +2410,12 @@ const PGDashboard = ({ brandTitleOverride }) => {
                         type="button"
                         className="view-button"
                         onClick={() => {
-                          const pid = String(generatedUserId || '').trim();
-                          const pname = String(localStorage.getItem('CurrentpatientName') || '').trim();
-                          if (pid) {
-                            const normalizedDept = normalizeDepartment(pgDepartmentLabel || user?.department || '');
-                            const isPublicHealthDept =
-                              normalizedDept.includes('publichealthdentistry') ||
-                              normalizedDept.includes('publichealth') ||
-                              normalizedDept.includes('communitydentistry');
-                            const departmentRoute = isPublicHealthDept
-                              ? '/general-case-view'
-                              : getCaseRouteForDepartment(pgDepartmentLabel || user?.department || '');
-                            const separator = departmentRoute.includes('?') ? '&' : '?';
-                            window.open(
-                              `${departmentRoute}${separator}patientId=${encodeURIComponent(pid)}&patientName=${encodeURIComponent(pname || pid)}&department=${encodeURIComponent(pgDepartmentLabel || user?.department || '')}`,
-                              '_blank'
-                            );
+                          const caseId = String(generalCasePreview?._id || '').trim();
+                          if (caseId) {
+                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
                           }
                         }}
-                        disabled={!generatedUserId}
+                        disabled={!generalCasePreview?._id}
                       >
                         View Full General Case Sheet
                       </button>
@@ -2562,45 +2576,6 @@ const PGDashboard = ({ brandTitleOverride }) => {
                             ))}
                           </select>
                           {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
-                        </div>
-
-                        {/* HPI */}
-                        <div className="input-group">
-                          <label>History of Present Illness (HPI) - Select all that apply</label>
-                          <div className="checkbox-options">
-                            {hpiOptions.map((option) => (
-                              <label key={option} className="checkbox-option">
-                                <input type="checkbox" name="hpi" value={option} checked={hpiSelections.includes(option)} onChange={handleInputChange} disabled={hpiSelections.includes('None') && option !== 'None'} />
-                                <span>{option}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Past Medical History */}
-                        <div className="input-group">
-                          <label>Past Medical History - Select all that apply</label>
-                          <div className="checkbox-options">
-                            {pastMedicalHistoryOptions.map((option) => (
-                              <label key={option} className="checkbox-option">
-                                <input type="checkbox" name="past-medical-history" value={option} checked={pastMedicalHistory.includes(option)} onChange={handleInputChange} disabled={pastMedicalHistory.includes('None') && option !== 'None'} />
-                                <span>{option}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Personal Habits */}
-                        <div className="input-group">
-                          <label>Personal Habits - Select all that apply</label>
-                          <div className="checkbox-options">
-                            {personalHabitsOptions.map((option) => (
-                              <label key={option} className="checkbox-option">
-                                <input type="checkbox" name="personal-habits" value={option} checked={personalHabits.includes(option)} onChange={handleInputChange} disabled={personalHabits.includes('None') && option !== 'None'} />
-                                <span>{option}</span>
-                              </label>
-                            ))}
-                          </div>
                         </div>
 
                         <div className="input-group">
@@ -2840,12 +2815,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                     className="view-button"
                                     onClick={() => {
                                       if (canViewCaseSheet && caseId) {
-                                        let target = '';
-                                        if (departmentKey === 'general') {
-                                          target = `/general-case-view?patientId=${encodeURIComponent(patientId)}&patientName=${encodeURIComponent(patientName)}&caseId=${encodeURIComponent(caseId)}&department=${encodeURIComponent(pgDepartmentLabel || user?.department || departmentKey)}`;
-                                        } else {
-                                          target = `/case-sheet-view/${encodeURIComponent(caseId)}`;
-                                        }
+                                        const target = `/case-sheet-view/${encodeURIComponent(caseId)}`;
                                         const consentUrl = `/consent-form?redirect=${encodeURIComponent(target)}`;
                                         window.open(consentUrl, '_blank', 'noopener,noreferrer');
                                       }

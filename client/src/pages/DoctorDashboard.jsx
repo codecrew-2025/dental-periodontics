@@ -1888,7 +1888,7 @@ const DoctorDashboard = () => {
 
   const openFullCaseSheet = (caseItem) => {
     if (!caseItem?._id) return;
-    localStorage.setItem('viewCaseDepartment', caseItem.department);
+    localStorage.setItem('viewCaseDepartment', caseItem.department || 'general');
     window.open(`/case-sheet-view/${caseItem._id}`, '_blank');
   };
 
@@ -3911,72 +3911,6 @@ const DoctorDashboard = () => {
             {!String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') && 
              !String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('endo') && (<>
 
-            {/* HPI Checkboxes */}
-            <div className="input-group">
-              <label>
-                History of Present Illness (HPI) - Select all that apply
-              </label>
-              <div className="checkbox-options">
-                {hpiOptions.map((option) => (
-                  <label key={option} className="checkbox-option">
-                    <input
-                      type="checkbox"
-                      name="hpi"
-                      value={option}
-                      checked={hpiSelections.includes(option)}
-                      onChange={handleInputChange}
-                      disabled={hpiSelections.includes('None') && option !== 'None'}
-                    />
-                    <span>{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Past Medical History Checkboxes */}
-            <div className="input-group">
-              <label>
-                Past Medical History - Select all that apply
-              </label>
-              <div className="checkbox-options">
-                {pastMedicalHistoryOptions.map((option) => (
-                  <label key={option} className="checkbox-option">
-                    <input
-                      type="checkbox"
-                      name="past-medical-history"
-                      value={option}
-                      checked={pastMedicalHistory.includes(option)}
-                      onChange={handleInputChange}
-                      disabled={pastMedicalHistory.includes('None') && option !== 'None'}
-                    />
-                    <span>{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Personal Habits Checkboxes */}
-            <div className="input-group">
-              <label>
-                Personal Habits - Select all that apply
-              </label>
-              <div className="checkbox-options">
-                {personalHabitsOptions.map((option) => (
-                  <label key={option} className="checkbox-option">
-                    <input
-                      type="checkbox"
-                      name="personal-habits"
-                      value={option}
-                      checked={personalHabits.includes(option)}
-                      onChange={handleInputChange}
-                      disabled={personalHabits.includes('None') && option !== 'None'}
-                    />
-                    <span>{option}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
             {/* Text areas for additional information */}
             <div className="input-group">
               <h3>Medical history</h3>
@@ -4377,9 +4311,9 @@ const DoctorDashboard = () => {
                 className="chief-close-btn"
                 onClick={() => {
                   setHasOpenedDepartmentCaseSheet(true);
-                  if (caseSheetPreviewItem) openFullCaseSheet(caseSheetPreviewItem);
+                  if (caseSheetPreviewGeneralCase) openFullCaseSheet(caseSheetPreviewGeneralCase);
                 }}
-                disabled={!caseSheetPreviewItem?._id}
+                disabled={!caseSheetPreviewGeneralCase?._id}
               >
                 Department Case Sheet
               </button>

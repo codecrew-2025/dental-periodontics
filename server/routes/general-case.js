@@ -463,6 +463,7 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
       doctorName,
       generalDoctorId: doctorId,
       generalDoctorName: doctorName,
+      department: 'general',
       chiefComplaint,
       presentIllness,
       pastMedical,
@@ -612,15 +613,56 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
 router.get('/patient/:patientId', auth, async (req, res) => {
   try {
     const { patientId } = req.params;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(50, Number(req.query.limit) || 10));
+    const skip = (page - 1) * limit;
 
-    const cases = await GeneralCase.find({ patientId }).sort({ createdAt: -1 });
+    console.log('[General Case] Fetching cases for patientId:', patientId, { page, limit, skip });
+
+    if (!patientId) {
+      console.warn('[General Case] Missing patientId in request');
+      return res.status(400).json({
+        success: false,
+        message: 'Patient ID is required'
+      });
+    }
+
+    // Count total records for pagination
+    const total = await GeneralCase.countDocuments({ patientId });
+
+    // Fetch only essential fields for list view, excluding large text fields
+    const cases = await GeneralCase.find({ patientId })
+      .select([
+        '_id', 'patientId', 'patientName', 'doctorId', 'doctorName',
+        'department', 'selectedDepartments', 'referredDepartment',
+        'specialistStatus', 'assignedPgId', 'assignedPgName',
+        'specialistDoctorId', 'specialistDoctorName',
+        'createdAt', 'updatedAt', 'specialistAssignedAt', 'pgAssignedAt'
+      ])
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    console.log('[General Case] Found', cases.length, 'cases for patientId:', patientId, 'Total:', total);
 
     res.json({
       success: true,
-      data: cases
+      data: cases,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
-    console.error('Error fetching General Case Sheets:', error);
+    console.error('[General Case] Error fetching General Case Sheets:', {
+      patientId: req.params.patientId,
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack
+    });
     res.status(500).json({
       success: false,
       message: 'Server error while fetching General Case Sheets',

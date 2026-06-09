@@ -34,7 +34,7 @@ const CaseSheetViewer = () => {
 
       const mapping = {
         "/api/oral/": "oral",
-        "/api/general/": "oral"
+        "/api/general/": "general"
       };
 
       let data = null;

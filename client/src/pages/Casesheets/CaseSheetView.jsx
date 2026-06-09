@@ -65,6 +65,7 @@ const CaseSheetView = ({ caseSheet }) => {
       return <Pedodontics initialCaseData={enriched} readOnly={true} />;
 
     case 'oral':
+    case 'general':
       return <OralMedicine initialCaseData={enriched} readOnly={true} />;
 
     case 'periodontics':

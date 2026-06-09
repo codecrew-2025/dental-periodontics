@@ -173,7 +173,7 @@ const CampDashboard = () => {
   const generateUniquePatientId = async () => {
     try {
       setGeneratingPatientId(true);
-      const res = await fetch(buildApiUrl('/api/patient-details/next-id'));
+      const res = await fetch(buildApiUrl('/api/patient-details/next-id?style=camp'));
       const data = await res.json();
       if (!res.ok || !data.success || !data.patientId) throw new Error(data.message || 'Failed to generate patient ID');
       setNewPatient(prev => ({ ...prev, patientId: data.patientId }));

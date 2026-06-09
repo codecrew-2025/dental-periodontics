@@ -68,7 +68,7 @@ const GeneralCaseSheetView = () => {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const [generalRes, patientRes] = await Promise.all([
-          fetch(buildApiUrl(`/api/general/patient/${encodeURIComponent(patientId)}`), { headers }),
+          fetch(buildApiUrl(`/api/general/patient/${encodeURIComponent(patientId)}?limit=1`), { headers }),
           fetch(buildApiUrl(`/api/patient-details/by-patient-id/${encodeURIComponent(patientId)}`), { headers }),
         ]);
 
@@ -88,16 +88,34 @@ const GeneralCaseSheetView = () => {
           throw new Error(json?.message || `Failed to load General Case Sheet (${generalRes.status})`);
         }
 
-        const requestedCase = caseId
+        let selectedCase = caseId
           ? rows.find((row) => String(row?._id || '').trim() === caseId)
-          : null;
-        const latest = requestedCase || pickLatestByTimestamp(rows);
-        if (!latest) {
+          : rows[0];
+
+        if (!selectedCase) {
           throw new Error('No General Case Sheet found for this patient.');
         }
 
+        // If we only have summary fields, fetch full details
+        if (!selectedCase.chiefComplaint && !selectedCase.provisionalDiagnosis) {
+          try {
+            const fullRes = await fetch(
+              buildApiUrl(`/api/general/${encodeURIComponent(selectedCase._id)}`),
+              { headers }
+            );
+            if (fullRes.ok) {
+              const fullJson = await fullRes.json();
+              if (fullJson?.success && fullJson?.data) {
+                selectedCase = fullJson.data;
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to fetch full case details:', e);
+          }
+        }
+
         if (!cancelled) {
-          setGeneralCase(latest);
+          setGeneralCase(selectedCase);
           if (patientRes.ok && patientSuccess) {
             setPatientDetails(patientJson?.data || patientJson?.patient || null);
           }

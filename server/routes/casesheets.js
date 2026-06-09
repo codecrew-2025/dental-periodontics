@@ -6,6 +6,7 @@ import requireRole from '../middleware/role.js';
 // Import models
 import PedodonticsCase from '../models/PedodonticsCase.js';
 import OralCase from '../models/Oral-model.js';
+import GeneralCase from '../models/GeneralCase.js';
 import PeriodonticsCaseModel from '../models/PeriodonticsCaseModel.js';
 
 const router = express.Router();
@@ -165,6 +166,7 @@ router.get('/pg/history', auth, requireRole(['pg', 'ug']), async (req, res) => {
     };
 
     const sources = [
+      { model: GeneralCase, department: 'General', departmentKey: 'general' },
       { model: PedodonticsCase, department: 'Pedodontics', departmentKey: 'pedodontics' },
       { model: OralCase, department: 'Oral', departmentKey: 'oral' },
       { model: PeriodonticsCaseModel, department: 'Periodontics', departmentKey: 'periodontics' },
@@ -327,8 +329,14 @@ router.get('/:caseId', auth, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid case id' });
     }
 
+    // Try general case
+    let doc = await GeneralCase.findById(caseId);
+    if (doc) {
+      return res.json({ success: true, data: doc, department: 'general' });
+    }
+
     // Try pedodontics
-    let doc = await PedodonticsCase.findById(caseId);
+    doc = await PedodonticsCase.findById(caseId);
     if (doc) {
       return res.json({ success: true, data: doc, department: 'pedodontics' });
     }

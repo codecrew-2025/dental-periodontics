@@ -16,6 +16,17 @@ const CasePortal = () => {
     const params = new URLSearchParams(location.search);
     const dept = params.get('dept');
     const path = String(location.pathname || '').trim().toLowerCase();
+    const navState = location.state || {};
+    const consentAlreadyDone = Boolean(navState[CASE_CONSENT_NAV_STATE_KEY]);
+
+    // Auto-navigate to General Case Sheet when coming from consent form for Oral Medicine
+    if (dept === 'oral' && consentAlreadyDone) {
+      navigate('/oral-medicine', { 
+        replace: true,
+        state: { [CASE_CONSENT_NAV_STATE_KEY]: true } 
+      });
+      return;
+    }
 
     if (dept === 'periodontics' || path === '/periodontics') {
       setShowPerio(true);
@@ -25,7 +36,7 @@ const CasePortal = () => {
     if (dept === 'oral' || path === '/oral-medicine') {
       setShowOral(true);
     }
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     const navState = location.state || {};

@@ -1510,6 +1510,17 @@ const UGDashboard = () => {
       'Public Health Dentistry'
     ).trim();
     const normalizedDept = normalizeDepartment(resolvedDepartmentLabel);
+    
+    // For Oral Medicine/Periodontics, require consent form first
+    if (normalizedDept.includes('oral') || normalizedDept === 'periodontics') {
+      const departmentRoute = getCaseRouteForDepartment(resolvedDepartmentLabel);
+      const targetUrl = departmentRoute.includes('?')
+        ? `${departmentRoute}&patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName)}&department=${encodeURIComponent(resolvedDepartmentLabel)}`
+        : `${departmentRoute}?patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName)}&department=${encodeURIComponent(resolvedDepartmentLabel)}`;
+      navigate(`/consent-form?redirect=${encodeURIComponent(targetUrl)}`, { replace: true });
+      return;
+    }
+
     const isPublicHealthDept =
       normalizedDept.includes('publichealthdentistry') ||
       normalizedDept.includes('publichealth') ||
@@ -2434,15 +2445,12 @@ const UGDashboard = () => {
                         type="button"
                         className="view-button"
                         onClick={() => {
-                          const pid = String(generatedUserId || '').trim();
-                          const pname = String(localStorage.getItem('CurrentpatientName') || '').trim();
-                          if (pid) {
-                            const target = `/general-case-view?patientId=${encodeURIComponent(pid)}&patientName=${encodeURIComponent(pname)}`;
-                            const consentUrl = `/consent-form?redirect=${encodeURIComponent(target)}`;
-                            window.open(consentUrl, '_blank', 'noopener,noreferrer');
+                          const caseId = String(generalCasePreview?._id || '').trim();
+                          if (caseId) {
+                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
                           }
                         }}
-                        disabled={!generatedUserId}
+                        disabled={!generalCasePreview?._id}
                       >
                         View Full General Case Sheet
                       </button>
@@ -2681,48 +2689,8 @@ const UGDashboard = () => {
                         placeholder="e.g. Previous dental treatments, extractions..." />
                     </div>
 
-                    {/* HPI, Past Medical History, Personal Habits, Medical History
-                        — hidden for Oral Medicine department (captured in the oral case sheet) */}
+                    {/* Medical History — hidden for Oral Medicine department (captured in the oral case sheet) */}
                     {!String(ugDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') && (<>
-
-                    {/* HPI */}
-                    <div className="input-group">
-                      <label>History of Present Illness (HPI) - Select all that apply</label>
-                      <div className="checkbox-options">
-                        {hpiOptions.map((option) => (
-                          <label key={option} className="checkbox-option">
-                            <input type="checkbox" name="hpi" value={option} checked={hpiSelections.includes(option)} onChange={handleInputChange} disabled={hpiSelections.includes('None') && option !== 'None'} />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Past Medical History */}
-                    <div className="input-group">
-                      <label>Past Medical History - Select all that apply</label>
-                      <div className="checkbox-options">
-                        {pastMedicalHistoryOptions.map((option) => (
-                          <label key={option} className="checkbox-option">
-                            <input type="checkbox" name="past-medical-history" value={option} checked={pastMedicalHistory.includes(option)} onChange={handleInputChange} disabled={pastMedicalHistory.includes('None') && option !== 'None'} />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Personal Habits */}
-                    <div className="input-group">
-                      <label>Personal Habits - Select all that apply</label>
-                      <div className="checkbox-options">
-                        {personalHabitsOptions.map((option) => (
-                          <label key={option} className="checkbox-option">
-                            <input type="checkbox" name="personal-habits" value={option} checked={personalHabits.includes(option)} onChange={handleInputChange} disabled={personalHabits.includes('None') && option !== 'None'} />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
 
                     <div className="input-group">
                       <h3>Medical history</h3>
@@ -2988,12 +2956,7 @@ const UGDashboard = () => {
                                     className="view-button"
                                     onClick={() => {
                                       if (canViewCaseSheet && caseId) {
-                                        let target = '';
-                                        if (departmentKey === 'general') {
-                                          target = `/general-case-view?patientId=${encodeURIComponent(patientId)}&patientName=${encodeURIComponent(patientName)}&caseId=${encodeURIComponent(caseId)}&department=${encodeURIComponent(ugDepartmentLabel || user?.department || departmentKey)}`;
-                                        } else {
-                                          target = `/case-sheet-view/${encodeURIComponent(caseId)}`;
-                                        }
+                                        const target = `/case-sheet-view/${encodeURIComponent(caseId)}`;
                                         const consentUrl = `/consent-form?redirect=${encodeURIComponent(target)}`;
                                         window.open(consentUrl, '_blank', 'noopener,noreferrer');
                                       }

@@ -195,8 +195,6 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   }, [patientName]); // eslint-disable-line
 
   useEffect(() => {
-    if (initialCaseData) return;
-
     let isMounted = true;
     const toListString = (v) => Array.isArray(v) ? v.map(x => String(x).trim()).filter(Boolean).join(', ') : String(v || '').trim();
     const extractPatient = (r) => {
@@ -227,7 +225,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
         const patientGender = p.personalInfo?.gender;
         const hasAge = patientAge != null && String(patientAge).trim() !== '' && String(patientAge).trim() !== '0';
         const hasGender = patientGender && ['Male', 'Female', 'Other'].includes(patientGender);
-        if (hasAge || hasGender) {
+        if (!initialCaseData && (hasAge || hasGender)) {
           setForm(prev => ({
             ...prev,
             ...(hasAge ? { age: String(patientAge) } : {}),
@@ -235,17 +233,19 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
           }));
         }
 
-        // Auto-fill history fields from patient record
-        const mi = p.medicalInfo || {};
-        setForm(prev => ({
-          ...prev,
-          ...(mi.chiefComplaint               ? { chiefComplaint:          mi.chiefComplaint }               : {}),
-          ...(mi.historyOfPresentIllness       ? { historyOfPresentIllness: mi.historyOfPresentIllness }       : {}),
-          ...(mi.pastSurgicalHistory           ? { pastSurgicalHistory:     mi.pastSurgicalHistory }           : {}),
-          ...(mi.pastDentalHistory             ? { pastDentalHistory:       mi.pastDentalHistory }             : {}),
-          ...(Array.isArray(mi.pastMedicalHistory) && mi.pastMedicalHistory.length
-            ? { pastMedicalHistory: mi.pastMedicalHistory.filter(v => v !== 'None').join(', ') } : {}),
-        }));
+        // Auto-fill history fields from patient record (skip if in read-only mode)
+        if (!initialCaseData) {
+          const mi = p.medicalInfo || {};
+          setForm(prev => ({
+            ...prev,
+            ...(mi.chiefComplaint               ? { chiefComplaint:          mi.chiefComplaint }               : {}),
+            ...(mi.historyOfPresentIllness       ? { historyOfPresentIllness: mi.historyOfPresentIllness }       : {}),
+            ...(mi.pastSurgicalHistory           ? { pastSurgicalHistory:     mi.pastSurgicalHistory }           : {}),
+            ...(mi.pastDentalHistory             ? { pastDentalHistory:       mi.pastDentalHistory }             : {}),
+            ...(Array.isArray(mi.pastMedicalHistory) && mi.pastMedicalHistory.length
+              ? { pastMedicalHistory: mi.pastMedicalHistory.filter(v => v !== 'None').join(', ') } : {}),
+          }));
+        }
 
         const drug = toListString(p.vitals?.drugAllergies);
         const known = toListString(p.medicalInfo?.knownAllergies);
@@ -260,7 +260,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
     };
     load();
     return () => { isMounted = false; };
-  }, []);
+  }, [initialCaseData]);
 
   useEffect(() => {
     const pid = localStorage.getItem('CurrentpatientId') || '';
@@ -796,60 +796,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
     <div className="omr-page-content">
       <h2 className="omr-sheet-title">ORAL MEDICINE AND RADIOLOGY</h2>
 
-      {/* --- AI Recommendations Section --- */}
-      <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(165,180,252,0.4)', borderRadius: '8px', padding: '16px', marginBottom: '24px' }}>
-        <h3 style={{ margin: '0 0 12px', color: '#a5b4fc', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>🤖</span> AI Clinical Recommendations
-        </h3>
-        
-        {clinicalIssues.length > 0 ? (
-          <div style={{ display: 'grid', gap: '12px' }}>
-            <div>
-              <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Detected Issues:</strong>
-              <ul style={{ margin: '4px 0 0', paddingLeft: '20px', color: '#c7d2fe', fontSize: '0.85rem' }}>
-                {clinicalIssues.map((issue, idx) => <li key={idx}>{issue.name}</li>)}
-              </ul>
-            </div>
-            
-            {recommendedInvestigations.length > 0 && (
-              <div>
-                <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Suggested Investigations:</strong>
-                <ul style={{ margin: '4px 0 0', paddingLeft: '20px', color: '#c7d2fe', fontSize: '0.85rem' }}>
-                  {recommendedInvestigations.map((inv, idx) => <li key={idx}>{inv}</li>)}
-                </ul>
-              </div>
-            )}
 
-            {recommendedDepartments.length > 0 && (
-              <div>
-                <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Suggested Referrals:</strong>
-                <div style={{ margin: '4px 0 0', color: '#c7d2fe', fontSize: '0.85rem' }}>
-                  {recommendedDepartments.join(', ')}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Urgency Level:</strong>
-              <div style={{ margin: '4px 0 0', color: urgencyLevel.level === 'EMERGENCY' ? '#fca5a5' : urgencyLevel.level === 'URGENT' ? '#fcd34d' : '#86efac', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                {urgencyLevel.level} - {urgencyLevel.recommendation}
-              </div>
-            </div>
-
-            {patientEducation && (
-              <div>
-                <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Patient Education:</strong>
-                <p style={{ margin: '4px 0 0', color: '#c7d2fe', fontSize: '0.85rem', whiteSpace: 'pre-line' }}>
-                  {patientEducation}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p style={{ margin: 0, color: '#9ca3af', fontSize: '0.85rem', fontStyle: 'italic' }}>Fill out examination fields to generate AI recommendations.</p>
-        )}
-      </div>
-      {/* --- End AI Recommendations Section --- */}
       <p className="omr-section-title">Provisional Diagnosis:</p>{ta('provisionalDiagnosis', 3)}
       <p className="omr-section-title">Differential Diagnosis:</p>{ta('differentialDiagnosis', 3)}
       <p className="omr-section-title">Investigation:</p>
@@ -994,36 +941,38 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
         )}
       </div>
 
-      {/* Doctor info below referred department */}
-      <div style={{
-        marginTop: 16, padding: '12px 16px',
-        background: 'rgba(255,255,255,0.07)',
-        border: '1px solid rgba(165,180,252,0.3)',
-        borderRadius: 8, maxWidth: 400,
-      }}>
-        <p style={{ margin: '0 0 4px', fontSize: '0.75rem', color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-          Treating Doctor
-        </p>
-        <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: '1rem', color: '#fff' }}>
-          {doctorName || '—'}
-        </p>
-        <p style={{ margin: 0, fontSize: '0.85rem', color: '#c7d2fe' }}>
-          {user?.department || localStorage.getItem('doctorDepartment') || localStorage.getItem('ugDepartment') || localStorage.getItem('pgDepartment') || 'Oral Medicine and Radiology'}
-          {user?.role ? ` · ${String(user.role).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}` : ''}
-        </p>
-      </div>
-      <div className="form-group" style={{ marginTop: 32 }}>
-        <label className="omr-lbl">Doctor's Digital Signature: <span style={{ color: '#b91c1c' }}>*</span></label>
-        <input type="file" accept="image/png,image/jpeg" onChange={e => handleFileChange(e.target.files[0])} style={{ display: 'block', marginTop: 8 }} />
-        {signaturePreview && (
-          <div style={{ marginTop: 12 }}>
-            <img src={signaturePreview} alt="Signature preview" style={{ maxHeight: 80, border: '1px solid #ccc', borderRadius: 4 }} />
-          </div>
-        )}
-        {!form.digitalSignature && !signaturePreview && (
-          <p style={{ color: '#b91c1c', fontSize: '0.8rem', marginTop: 4 }}>Signature is required to submit.</p>
-        )}
-      </div>
+      
+      <div className="doctor-auth-section" style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+        <h2>Doctor's Authentication</h2>
+        <div className="form-group-casesheet">
+          <label htmlFor="doctorName">Doctor's Name *</label>
+          <input
+            type="text"
+            placeholder="Enter full name"
+            value={user ? user.name : localStorage.getItem('doctorName') || ''}
+            disabled
+            style={{ background: '#f0f0f0' }}
+          />
+        </div>
+        <div className="form-group-casesheet">
+          <label htmlFor="digitalSignature">Upload Digital Signature *</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => handleFileChange('digitalSignature', e.target.files[0])}
+            required
+          />
+          {signaturePreview && (
+            <div id="signaturePreview" style={{ marginTop: '10px' }}>
+              <img
+                src={signaturePreview}
+                alt="Signature Preview"
+                style={{ maxWidth: '150px', maxHeight: '100px', marginTop: '10px' }}
+              />
+            </div>
+          )}
+        </div>
+        </div>
     </div>
   );
 
@@ -1127,18 +1076,10 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
             <button type="button" className="omr-btn-submit" onClick={handleNext}>Next →</button>
           ) : !readOnly && (
             <>
-              <button type="button" className="omr-btn-submit" onClick={() => handleSubmit('dashboard')} disabled={submitting}>
-                {submitting ? 'Submitting...' : 'Submit Case Sheet ✓'}
+              <button type="button" className="omr-btn-submit" onClick={() => handleSubmit('prescription')} disabled={submitting}>
+                {submitting ? 'Submitting...' : 'Submit Case Sheet'}
               </button>
-              <button
-                type="button"
-                className="omr-btn-prev"
-                onClick={() => handleSubmit('prescription')}
-                disabled={submitting}
-                style={{ background: 'rgba(99,102,241,0.25)', border: '1.5px solid rgba(165,180,252,0.5)', color: '#c7d2fe' }}
-              >
-                📋 Prescription
-              </button>
+              
             </>
           )}
         </div>
