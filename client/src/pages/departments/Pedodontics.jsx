@@ -90,7 +90,29 @@ const Pedodontics = ({ initialCaseData, readOnly = false }) => {
   useEffect(() => {
     if (initialCaseData) {
       if (initialCaseData.digitalSignature) {
-        setSignaturePreview(initialCaseData.digitalSignature);
+        const sig = initialCaseData.digitalSignature;
+        const toDataUrl = (s) => {
+          if (!s) return null;
+          if (typeof s === 'string') return s;
+          const buf = s.data;
+          if (buf && Array.isArray(buf.data)) {
+            const bytes = new Uint8Array(buf.data);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            return `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
+          }
+          return null;
+        };
+        const src = toDataUrl(sig);
+        if (src) setSignaturePreview(src);
+      }
+      if (initialCaseData.xrayImage) {
+        const raw = String(initialCaseData.xrayImage || '').trim();
+        let src = raw;
+        if (raw && !raw.startsWith('data:') && !raw.startsWith('http') && !raw.startsWith('/')) {
+          src = `data:image/jpeg;base64,${raw}`;
+        }
+        setXrayPreview(src);
       }
       setIsDraftHydrated(true);
       return;
@@ -103,6 +125,22 @@ const Pedodontics = ({ initialCaseData, readOnly = false }) => {
       if (typeof prefill.digitalSignature === 'string' && prefill.digitalSignature.startsWith('data:')) {
         setFormData((prev) => ({ ...prev, digitalSignature: prefill.digitalSignature }));
         setSignaturePreview(prefill.digitalSignature);
+      } else if (prefill.digitalSignature && prefill.digitalSignature.data) {
+        // Buffer-style signature object — convert to data URL
+        const s = prefill.digitalSignature;
+        try {
+          const buf = s.data;
+          if (buf && Array.isArray(buf.data)) {
+            const bytes = new Uint8Array(buf.data);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            const dataUrl = `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
+            setFormData((prev) => ({ ...prev, digitalSignature: dataUrl }));
+            setSignaturePreview(dataUrl);
+          }
+        } catch {
+          // ignore
+        }
       }
       setCurrentPage(0);
       setIsDraftHydrated(true);

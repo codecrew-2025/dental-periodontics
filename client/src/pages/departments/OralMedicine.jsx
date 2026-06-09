@@ -139,7 +139,29 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
     if (initialCaseData) {
       setIsDraftHydrated(true);
       if (initialCaseData.digitalSignature) {
-        setSignaturePreview(initialCaseData.digitalSignature);
+        const sig = initialCaseData.digitalSignature;
+        const toDataUrl = (s) => {
+          if (!s) return null;
+          if (typeof s === 'string') return s;
+          const buf = s.data;
+          if (buf && Array.isArray(buf.data)) {
+            const bytes = new Uint8Array(buf.data);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            return `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
+          }
+          return null;
+        };
+        const src = toDataUrl(sig);
+        if (src) setSignaturePreview(src);
+      }
+      if (initialCaseData.xrayImage) {
+        const raw = String(initialCaseData.xrayImage || '').trim();
+        let src = raw;
+        if (raw && !raw.startsWith('data:') && !raw.startsWith('http') && !raw.startsWith('/')) {
+          src = `data:image/jpeg;base64,${raw}`;
+        }
+        setXrayPreview(src);
       }
       return;
     }
@@ -151,6 +173,21 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
       setForm(prev => ({ ...prev, ...prefill }));
       if (typeof prefill.digitalSignature === 'string' && prefill.digitalSignature.startsWith('data:')) {
         setSignaturePreview(prefill.digitalSignature);
+      } else if (prefill.digitalSignature && prefill.digitalSignature.data) {
+        try {
+          const s = prefill.digitalSignature;
+          const buf = s.data;
+          if (buf && Array.isArray(buf.data)) {
+            const bytes = new Uint8Array(buf.data);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            const dataUrl = `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
+            setSignaturePreview(dataUrl);
+            setForm(prev => ({ ...prev, digitalSignature: dataUrl }));
+          }
+        } catch {
+          // ignore
+        }
       }
       setCurrentPage(0);
       setIsDraftHydrated(true);

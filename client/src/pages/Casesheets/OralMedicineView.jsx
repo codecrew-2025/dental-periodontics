@@ -444,22 +444,39 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
               )}
             </div>
 
-            {(caseData.doctorSignature || caseData.pgSignature || caseData.digitalSignature) && (
+                {(caseData.doctorSignature || caseData.pgSignature || caseData.digitalSignature) && (
               <>
                 <h3>Signatures:</h3>
                 <div className="form-row-wide">
                   {(caseData.doctorSignature || caseData.digitalSignature) && (
                     <div className="form-group-casesheet">
                       <label>Doctor Signature:</label>
-                      {caseData.digitalSignature ? (
-                        <img
-                          src={normalizeXraySrc(caseData.digitalSignature)}
-                          alt="Doctor signature"
-                          style={{ maxHeight: 80, border: '1px solid #ccc', borderRadius: 4, marginTop: 4 }}
-                        />
-                      ) : (
-                        <div className="readonly-field">{caseData.doctorSignature}</div>
-                      )}
+                      {(() => {
+                        const sig = caseData.digitalSignature;
+                        const toDataUrl = (s) => {
+                          if (!s) return null;
+                          if (typeof s === 'string') return s;
+                          const buf = s.data || s;
+                          const arr = buf?.data || (Array.isArray(buf) ? buf : null);
+                          if (arr && Array.isArray(arr)) {
+                            const bytes = new Uint8Array(arr);
+                            let binary = '';
+                            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                            return `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
+                          }
+                          return null;
+                        };
+                        const displaySig = toDataUrl(sig) || caseData.doctorSignature || null;
+                        return displaySig ? (
+                          <img
+                            src={normalizeXraySrc(displaySig)}
+                            alt="Doctor signature"
+                            style={{ maxHeight: 80, border: '1px solid #ccc', borderRadius: 4, marginTop: 4 }}
+                          />
+                        ) : (
+                          <div className="readonly-field">{caseData.doctorSignature}</div>
+                        );
+                      })()}
                     </div>
                   )}
                   {caseData.pgSignature && field('PG Student Signature:', caseData.pgSignature)}
