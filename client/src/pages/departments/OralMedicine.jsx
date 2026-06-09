@@ -959,7 +959,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => handleFileChange('digitalSignature', e.target.files[0])}
+            onChange={(e) => handleFileChange(e.target.files[0])}
             required
           />
           {signaturePreview && (
