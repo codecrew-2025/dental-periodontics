@@ -6,6 +6,16 @@ const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const normalizeXraySrc = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('blob:')) return raw;
+  if (raw.startsWith('/')) return raw;
+  return `data:image/jpeg;base64,${raw}`;
+};
+
 const decodeSignature = (sig) => {
   if (!sig) return null;
   if (typeof sig === "string") {
@@ -280,7 +290,7 @@ function PedodonticsCaseView({ caseData }) {
               <div>
                 <label style={{ fontWeight: 600, display: "block", marginBottom: 8 }}>Digital Signature</label>
                 {sigSrc ? (
-                  <img src={sigSrc} alt="Doctor's Signature" style={{ maxWidth: "100%", maxHeight: 120, border: "1px solid #ddd", padding: 5, borderRadius: 4 }} />
+                  <img src={normalizeXraySrc(sigSrc)} alt="Doctor's Signature" style={{ maxWidth: "100%", maxHeight: 120, border: "1px solid #ddd", padding: 5, borderRadius: 4 }} />
                 ) : (
                   <div className="readonly-field">No signature provided</div>
                 )}
@@ -334,7 +344,7 @@ function OralCaseView({ caseData }) {
         <Field label="Doctor's Name" value={caseData.doctorName} />
         <label style={{ fontWeight: 600, display: "block", marginBottom: 8, marginTop: 12 }}>Digital Signature</label>
         {sigSrc ? (
-          <img src={sigSrc} alt="Doctor's Signature" style={{ maxWidth: "100%", maxHeight: 120, border: "1px solid #ddd", padding: 5, borderRadius: 4 }} />
+          <img src={normalizeXraySrc(sigSrc)} alt="Doctor's Signature" style={{ maxWidth: "100%", maxHeight: 120, border: "1px solid #ddd", padding: 5, borderRadius: 4 }} />
         ) : (
           <div className="readonly-field">No signature provided</div>
         )}
