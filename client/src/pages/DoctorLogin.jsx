@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from './context/AuthContext'; 
+import { API_BASE_URL } from '../config/api';
 import './Login.css';
 
 const DoctorLogin = () => {
@@ -39,7 +40,7 @@ const DoctorLogin = () => {
     clearMessage();
 
     try {
-      const res = await axios.post('http://localhost:5000/api/auth/login/doctorlogin', {
+      const res = await axios.post(`${API_BASE_URL}/api/auth/login/doctorlogin`, {
         identifier,
         password,
       });
@@ -97,7 +98,8 @@ const DoctorLogin = () => {
         }
       }
     } catch (err) {
-      console.error('Login error:', err.response?.data);
+      const errBody = err.response?.data || err;
+      console.error('Login error body:', errBody);
       const serverMessage = err.response?.data?.message;
       
       // Handle specific error cases with explicit messages

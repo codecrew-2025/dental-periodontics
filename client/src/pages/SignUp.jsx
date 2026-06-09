@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import './Signup.css';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -183,7 +184,7 @@ const SignUp = () => {
         requestData.phone = phone;
       }
 
-      const res = await axios.post('http://localhost:5000/api/otp/send-otp', requestData, {
+      const res = await axios.post(`${API_BASE_URL}/api/otp/send-otp`, requestData, {
         timeout: 10000,
         validateStatus: function (status) {
           return status < 500;
@@ -250,7 +251,7 @@ const SignUp = () => {
     setIsVerifyingOtp(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/otp/verify-otp', {
+      const response = await fetch(`${API_BASE_URL}/api/otp/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -326,7 +327,7 @@ const SignUp = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
