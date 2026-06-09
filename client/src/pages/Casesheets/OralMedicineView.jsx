@@ -4,6 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
 import './OralMedicineView.css';
 
+const normalizeXraySrc = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('/')) return raw;
+  return `data:image/jpeg;base64,${raw}`;
+};
+
 const OralMedicineView = ({ caseData: propCaseData }) => {
   const { caseId: paramsCaseId } = useParams();
   const navigate = useNavigate();
@@ -444,7 +453,7 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
                       <label>Doctor Signature:</label>
                       {caseData.digitalSignature ? (
                         <img
-                          src={caseData.digitalSignature}
+                          src={normalizeXraySrc(caseData.digitalSignature)}
                           alt="Doctor signature"
                           style={{ maxHeight: 80, border: '1px solid #ccc', borderRadius: 4, marginTop: 4 }}
                         />

@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import "./PedodonticsView.css";
+
+const normalizeXraySrc = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('data:')) return raw;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  if (raw.startsWith('blob:')) return raw;
+  if (raw.startsWith('/')) return raw;
+  return `data:image/jpeg;base64,${raw}`;
+};
  
 const PedodonticsView = ({ caseData: propCaseData }) => {
   const { caseId: paramsCaseId } = useParams();
@@ -251,7 +261,7 @@ const PedodonticsView = ({ caseData: propCaseData }) => {
                   <div style={{ marginTop: '10px' }}>
                     {signatureUrl ? (
                       <img 
-                        src={signatureUrl} 
+                        src={normalizeXraySrc(signatureUrl)} 
                         alt="Doctor's Signature"
                         style={{ maxWidth: '100%', maxHeight: '120px', border: '1px solid #ddd', padding: '5px', borderRadius: '4px', cursor: 'pointer' }}
                         onClick={() => setEnlargedImage(signatureUrl)}
