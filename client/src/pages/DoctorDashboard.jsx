@@ -3423,23 +3423,13 @@ const DoctorDashboard = () => {
                         const query = searchTerm.toLowerCase();
                         return (c.doctorName || '').toLowerCase().includes(query);
                       })
-                            // Only show cases that require doctor/chief approval (periodontics-style):
-                            // - If both `pgSignature` and `doctorSignature` exist, show it (UG+PG finished)
-                            // - Otherwise, for departments like 'periodontics' that store a single `digitalSignature`,
-                            //   show when `digitalSignature` exists and approval is pending
+                            // Show case-sheets that require doctor/chief approval.
+                            // Previously we required explicit signature fields; some departments
+                            // only store `digitalSignature` or may not set signature fields yet.
+                            // Surface all Pending case-sheets so doctors can review and approve them.
                             .filter((caseItem) => {
                               const status = getApprovalStatus(caseItem);
-                              if (status !== 'Pending') return false;
-
-                              const hasPgSig = Boolean(caseItem.pgSignature);
-                              const hasDoctorSig = Boolean(caseItem.doctorSignature);
-                              const hasDigitalSig = Boolean(caseItem.digitalSignature);
-
-                              if (hasPgSig && hasDoctorSig) return true;
-                              if ((caseItem.department || '').toLowerCase().includes('periodontics') && hasDigitalSig) return true;
-
-                              // Fallback: if either signature exists and approval is pending, include it
-                              return hasPgSig || hasDoctorSig || hasDigitalSig;
+                              return status === 'Pending';
                             })
                       .sort((a, b) => {
                         const statusA = getApprovalStatus(a);

@@ -1662,9 +1662,10 @@ router.get('/doctor/assigned-pgs/cases', auth, requireRole(['doctor']), async (r
       return res.json({ success: true, cases: [] });
     }
 
-    // Get all student identities
-    const studentIdentities = assignedStudents.map(s => s.Identity).filter(Boolean);
-    const studentNames = new Map(assignedStudents.map(s => [s.Identity, s.name]));
+    // Get all student identities and their _id strings
+    const studentIdentities = assignedStudents.map(s => String(s.Identity || '')).filter(Boolean);
+    const studentObjectIds = assignedStudents.map(s => String(s._id || '')).filter(Boolean);
+    const studentNames = new Map(assignedStudents.map(s => [String(s.Identity || ''), s.name]));
 
     // Import all case models
     const pedodonticsModule = await import('../models/PedodonticsCase.js');
@@ -1683,14 +1684,22 @@ router.get('/doctor/assigned-pgs/cases', auth, requireRole(['doctor']), async (r
 
     const casePromises = endpoints.map(async ({ model, department }) => {
       try {
-        const cases = await model.find({ doctorId: { $in: studentIdentities } })
+        // Match doctorId stored either as the student's Identity or their MongoDB _id
+        const cases = await model.find({
+          $or: [
+            { doctorId: { $in: studentIdentities } },
+            { doctorId: { $in: studentObjectIds } }
+          ]
+        })
           .sort({ createdAt: -1 })
           .lean();
 
+        console.log(`Fetched ${cases.length} cases for department ${department}`);
         return cases.map(c => ({
           ...c,
           department,
-          pgName: studentNames.get(c.doctorId) || c.doctorName,
+          // pgName: try by Identity then fall back to doctorName
+          pgName: studentNames.get(String(c.doctorId || '')) || c.doctorName,
         }));
       } catch (err) {
         console.error(`Error fetching ${department} cases:`, err);
