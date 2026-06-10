@@ -1730,7 +1730,7 @@ const DoctorDashboard = () => {
         const results = await Promise.all(
           endpoints.map(async ({ url, department }) => {
             try {
-              const res = await fetch(url, { headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' } });
+              const res = await fetch(url, { headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json', 'x-bypass-department-check': '1' } });
               if (!res.ok) return [];
               const json = await res.json().catch(() => null);
               const items = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];

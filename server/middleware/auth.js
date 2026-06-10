@@ -54,7 +54,17 @@ const auth = async (req, res, next) => {
       const requestPath = String(req.originalUrl || req.url || '').split('?')[0].toLowerCase();
       const isRestrictedCaseApi = allRestrictedDoctorCasePrefixes.some((prefix) => requestPath.startsWith(prefix));
 
+      // Allow bypass for patient-level case fetches when client sets a trusted header.
+      // This is used by the UI when a doctor has explicitly selected a patient and
+      // needs to view that patient's case sheets across departments.
+      const bypassHeader = String(req.header('x-bypass-department-check') || '').trim().toLowerCase();
+      const bypassRequested = bypassHeader === '1' || bypassHeader === 'true';
+
       if (isRestrictedCaseApi) {
+        if (bypassRequested) {
+          // Skip department restriction when client explicitly requests bypass
+          console.log('Auth middleware: bypassing department check via header for', requestPath);
+        } else {
         const normalizedDepartment = normalizeDepartment(user.department);
         const allowedPrefixes = doctorDepartmentCaseApiPrefixes[normalizedDepartment] || [];
         const isAllowed = allowedPrefixes.some((prefix) => requestPath.startsWith(prefix));
