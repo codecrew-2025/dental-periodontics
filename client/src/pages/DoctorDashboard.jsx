@@ -3423,6 +3423,24 @@ const DoctorDashboard = () => {
                         const query = searchTerm.toLowerCase();
                         return (c.doctorName || '').toLowerCase().includes(query);
                       })
+                            // Only show cases that require doctor/chief approval (periodontics-style):
+                            // - If both `pgSignature` and `doctorSignature` exist, show it (UG+PG finished)
+                            // - Otherwise, for departments like 'periodontics' that store a single `digitalSignature`,
+                            //   show when `digitalSignature` exists and approval is pending
+                            .filter((caseItem) => {
+                              const status = getApprovalStatus(caseItem);
+                              if (status !== 'Pending') return false;
+
+                              const hasPgSig = Boolean(caseItem.pgSignature);
+                              const hasDoctorSig = Boolean(caseItem.doctorSignature);
+                              const hasDigitalSig = Boolean(caseItem.digitalSignature);
+
+                              if (hasPgSig && hasDoctorSig) return true;
+                              if ((caseItem.department || '').toLowerCase().includes('periodontics') && hasDigitalSig) return true;
+
+                              // Fallback: if either signature exists and approval is pending, include it
+                              return hasPgSig || hasDoctorSig || hasDigitalSig;
+                            })
                       .sort((a, b) => {
                         const statusA = getApprovalStatus(a);
                         const statusB = getApprovalStatus(b);
