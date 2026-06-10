@@ -1718,21 +1718,52 @@ const DoctorDashboard = () => {
       setCasesError('');
 
       const token = localStorage.getItem('token');
-      const res = await fetch(buildApiUrl('/api/auth/doctor/assigned-pgs/cases'), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // If a patient is selected in the UI, show only that patient's case sheets
+      const currentPatientId = localStorage.getItem('CurrentpatientId') || localStorage.getItem('currentPatientId') || '';
+      if (currentPatientId && String(currentPatientId).trim()) {
+        const pid = encodeURIComponent(String(currentPatientId).trim());
+        const endpoints = [
+          { url: buildApiUrl(`/api/oral/patient/${pid}`), department: 'Oral Medicine and Radiology' },
+          { url: buildApiUrl(`/api/pedodontics/patient/${pid}`), department: 'Pedodontics' },
+        ];
 
-      if (!res.ok) {
-        console.warn(`Error fetching cases: ${res.status} - ${res.statusText}`);
-        throw new Error('Failed to fetch cases');
+        const results = await Promise.all(
+          endpoints.map(async ({ url, department }) => {
+            try {
+              const res = await fetch(url, { headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json' } });
+              if (!res.ok) return [];
+              const json = await res.json().catch(() => null);
+              const items = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+              return items.map((it) => ({ department, ...it }));
+            } catch (err) {
+              console.warn('Patient cases fetch failed for', url, err && err.message ? err.message : err);
+              return [];
+            }
+          })
+        );
+
+        const merged = [];
+        results.forEach((r) => { if (Array.isArray(r)) merged.push(...r); });
+        merged.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        setCases(merged);
+      } else {
+        // Fallback: fetch cases from assigned PGs (original behavior)
+        const res = await fetch(buildApiUrl('/api/auth/doctor/assigned-pgs/cases'), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!res.ok) {
+          console.warn(`Error fetching cases: ${res.status} - ${res.statusText}`);
+          throw new Error('Failed to fetch cases');
+        }
+
+        const json = await res.json();
+        const allCases = json.cases || [];
+        setCases(allCases);
       }
-
-      const json = await res.json();
-      const allCases = json.cases || [];
-      setCases(allCases);
     } catch (err) {
       console.error(err);
       setCasesError('Failed to fetch cases from your assigned PGs');
