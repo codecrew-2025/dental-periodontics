@@ -5,6 +5,9 @@ import requireRole from '../middleware/role.js';
 
 const router = express.Router();
 
+// Escape user input for use in RegExp
+const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Normalise the raw request body from OralMedicine.jsx into the exact
  * field names the Mongoose model expects.
@@ -124,8 +127,15 @@ router.get('/chief/all-cases', auth, requireRole(['chief_doctor', 'chief']), asy
 // ── GET BY PATIENT ID ─────────────────────────────────────────────────────
 router.get('/patient/:patientId', auth, async (req, res) => {
   try {
-    const cases = await OralCase.find({ patientId: req.params.patientId })
+    const rawId = String(req.params.patientId || '');
+    const trimmed = rawId.trim();
+    // Match exact, numeric-coerced, or whitespace-padded variants to be tolerant
+    const regex = new RegExp(`^\\s*${escapeRegex(trimmed)}\\s*$`);
+
+    const cases = await OralCase.find({ $or: [{ patientId: trimmed }, { patientId: { $regex: regex } }] })
       .sort({ createdAt: -1 });
+
+    console.log(`[ORAL-API] GET /patient/${rawId} -> found ${Array.isArray(cases) ? cases.length : 0} cases`);
     res.status(200).json({ success: true, data: cases });
   } catch (error) {
     console.error('Error fetching patient oral cases:', error);

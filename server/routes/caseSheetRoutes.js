@@ -161,18 +161,21 @@ router.post('/save', auth, requireRole(['doctor','chief','pg','ug']), upload.sin
 // Get cases for specific doctor and patient combination
 router.get('/patient/:patientId', auth, async (req, res) => {
   try {
-    const { patientId } = req.params;
+    const { patientId: rawId } = req.params;
+    const patientId = String(rawId || '').trim();
 
-    const cases = await PedodonticsCase.find({ 
-      patientId
+    // tolerant lookup: exact trimmed match or whitespace-padded variants
+    const regex = new RegExp(`^\\s*${String(patientId).replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\s*$`);
+
+    const cases = await PedodonticsCase.find({
+      $or: [{ patientId }, { patientId: { $regex: regex } }]
     })
       .select('-digitalSignature')
       .sort({ createdAt: -1 });
-    
-    res.json({ 
-      success: true, 
-      data: cases 
-    });
+
+    console.log(`[PEDO-API] GET /patient/${rawId} -> found ${Array.isArray(cases) ? cases.length : 0} cases`);
+
+    res.json({ success: true, data: cases });
   } catch (error) {
     console.error('Error fetching doctor-patient cases:', error);
     res.status(500).json({ 
