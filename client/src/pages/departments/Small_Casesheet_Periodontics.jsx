@@ -40,12 +40,13 @@ const App = ({ initialCaseData, readOnly = false }) => {
   const CASE_CONSENT_NAV_STATE_KEY = 'caseSheetConsentApproved';
   const location = useLocation();
   useEffect(() => {
+    if (readOnly) return;
     const navState = location.state || {};
     if (!navState.requestConsentAfterEntry) return;
     if (navState[CASE_CONSENT_NAV_STATE_KEY]) return;
     const redirectTarget = `${location.pathname}${location.search}`;
     navigate(`/consent-form?redirect=${encodeURIComponent(redirectTarget)}`, { replace: true });
-  }, [location, navigate]);
+  }, [location, navigate, readOnly]);
 
   // Inject saved field values into DOM inputs when in readOnly mode
   useEffect(() => {

@@ -332,7 +332,21 @@ router.get('/:caseId', auth, async (req, res) => {
     // Try general case
     let doc = await GeneralCase.findById(caseId);
     if (doc) {
-      return res.json({ success: true, data: doc, department: 'general' });
+      let responseData = doc.toObject ? doc.toObject() : JSON.parse(JSON.stringify(doc));
+      console.log(`[casesheets API] GeneralCase ${caseId} found. digitalSignature is currently: ${responseData.digitalSignature ? 'PRESENT' : 'NULL'}`);
+      
+      if (!responseData.digitalSignature) {
+        try {
+          const oralCase = await OralCase.findOne({ patientId: responseData.patientId }).sort({ createdAt: -1 }).select('digitalSignature').lean();
+          console.log(`[casesheets API] Fallback: Looked up OralCase for patient ${responseData.patientId}. Found OralCase: ${!!oralCase}. Signature: ${oralCase ? (oralCase.digitalSignature ? 'PRESENT' : 'NULL') : 'N/A'}`);
+          if (oralCase && oralCase.digitalSignature) {
+            responseData.digitalSignature = oralCase.digitalSignature;
+          }
+        } catch (err) {
+          console.warn('Could not fetch fallback oral signature:', err.message);
+        }
+      }
+      return res.json({ success: true, data: responseData, department: 'general' });
     }
 
     // Try pedodontics

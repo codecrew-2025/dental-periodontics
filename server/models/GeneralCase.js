@@ -126,7 +126,12 @@ const GeneralCaseSchema = new mongoose.Schema({
   // Approval fields for future use
   chiefApproval: String,
   approvedBy: String,
-  approvedAt: Date
+  approvedAt: Date,
+
+  // Signature fields
+  digitalSignature: String,
+  doctorSignature: String,
+  pgSignature: String
 }, {
   timestamps: true
 });

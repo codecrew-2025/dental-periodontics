@@ -2832,8 +2832,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                     onClick={() => {
                                       if (canViewCaseSheet && caseId) {
                                         const target = `/case-sheet-view/${encodeURIComponent(caseId)}`;
-                                        const consentUrl = `/consent-form?redirect=${encodeURIComponent(target)}`;
-                                        window.open(consentUrl, '_blank', 'noopener,noreferrer');
+                                        window.open(target, '_blank', 'noopener,noreferrer');
                                       }
                                     }}
                                     disabled={!canViewCaseSheet || !caseId}

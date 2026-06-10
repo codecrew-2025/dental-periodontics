@@ -368,6 +368,7 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
       selectedDepartments,
       treatmentPlan,
       xrayImage,
+      digitalSignature,
     } = req.body;
 
     const requesterRole = normalizeRole(req.user?.role);
@@ -490,7 +491,8 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
       assignedPgId: resolvedAssignedPgId,
       assignedPgName: resolvedAssignedPgName,
       pgAssignedAt: resolvedAssignedPgId ? publicHealthAssignmentTime : null,
-      chiefApproval: ''
+      chiefApproval: '',
+      digitalSignature: digitalSignature || ''
     });
 
     let assignedPg = null;
@@ -638,7 +640,7 @@ router.get('/patient/:patientId', auth, async (req, res) => {
         'specialistStatus', 'assignedPgId', 'assignedPgName',
         'specialistDoctorId', 'specialistDoctorName',
         'createdAt', 'updatedAt', 'specialistAssignedAt', 'pgAssignedAt',
-        'xrayImage'
+        'xrayImage', 'digitalSignature'
       ])
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -1138,9 +1140,24 @@ router.get('/:id', auth, async (req, res) => {
       });
     }
 
+    let responseData = caseData.toObject ? caseData.toObject() : JSON.parse(JSON.stringify(caseData));
+
+    // Fallback: If digitalSignature is missing, try to fetch from an OralCase for the same patient
+    if (!responseData.digitalSignature) {
+      try {
+        const OralCase = (await import('../models/Oral-model.js')).default;
+        const oralCase = await OralCase.findOne({ patientId: responseData.patientId }).sort({ createdAt: -1 }).select('digitalSignature').lean();
+        if (oralCase && oralCase.digitalSignature) {
+          responseData.digitalSignature = oralCase.digitalSignature;
+        }
+      } catch (err) {
+        console.warn('Could not fetch fallback oral signature:', err.message);
+      }
+    }
+
     res.json({
       success: true,
-      data: caseData
+      data: responseData
     });
   } catch (error) {
     console.error('Error fetching General Case Sheet:', error);

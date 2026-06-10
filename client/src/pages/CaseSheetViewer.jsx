@@ -143,7 +143,37 @@ const CaseSheetViewer = () => {
         if (data.patientName) {
           localStorage.setItem('CurrentpatientName', String(data.patientName).trim());
         }
+
+        // Frontend fallback: If digitalSignature is missing (often because backend hasn't restarted), fetch from oral case
+        if (!data.digitalSignature && data.patientId) {
+          try {
+            const token = localStorage.getItem('token');
+            const resOral = await fetch(`${API_BASE_URL}/api/oral/patient/${data.patientId}`, {
+              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            if (resOral.ok) {
+              const oralJson = await resOral.json();
+              const oralCases = oralJson.data || [];
+              if (oralCases.length > 0 && oralCases[0].digitalSignature) {
+                data.digitalSignature = oralCases[0].digitalSignature;
+                console.log('[CaseSheetViewer] Fallback signature fetched from oral case sheet');
+              }
+            }
+          } catch (err) {
+            console.warn('[CaseSheetViewer] Frontend fallback fetch oral signature failed:', err);
+          }
+        }
+
         setCaseMeta(data);
+        try {
+          console.log('[CaseSheetViewer] loaded caseMeta summary:', {
+            id: data._id || '(no _id)',
+            department: data.department || '(no department)',
+            keys: Object.keys(data).slice(0,40),
+            hasDigitalSignature: data.digitalSignature !== undefined && data.digitalSignature !== null,
+            digitalSignatureType: data.digitalSignature ? typeof data.digitalSignature : typeof data.digitalSignature
+          });
+        } catch (e) { /* ignore */ }
 
         // If patientName missing but patientId exists, try to fetch patient details
         if ((!data.patientName || data.patientName === '') && data.patientId) {

@@ -239,6 +239,7 @@ const Pedodontics = ({ initialCaseData, readOnly = false }) => {
   }, [formData, currentPage, signaturePreview, isDraftHydrated]);
 
   useEffect(() => {
+    if (readOnly) return;
     const navState = location.state || {};
     if (!navState.requestConsentAfterEntry) return;
     if (navState[CASE_CONSENT_NAV_STATE_KEY]) return;
@@ -251,7 +252,7 @@ const Pedodontics = ({ initialCaseData, readOnly = false }) => {
     if (shouldOpenConsent) {
       navigate(`/consent-form?redirect=${encodeURIComponent(redirectTarget)}`, { replace: true });
     }
-  }, [location.pathname, location.search, location.state, navigate]);
+  }, [location.pathname, location.search, location.state, navigate, readOnly]);
 
   useEffect(() => {
     const patientId = localStorage.getItem('CurrentpatientId') || '';

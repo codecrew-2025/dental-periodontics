@@ -21,12 +21,28 @@ const App = () => {
   const location = useLocation();
   const redirectTarget = getSafeRedirectTarget(location.search);
 
-  // Detect department from the redirect URL
+  // Detect department from the redirect URL or query parameter
   const getDepartmentLabel = () => {
+    // First, check for explicit 'department' query param
+    const params = new URLSearchParams(location.search);
+    const deptParam = params.get('department');
+    if (deptParam) {
+      const normalized = deptParam.trim().toLowerCase();
+      if (normalized.includes('oral')) return 'Oral Medicine and Radiology';
+      if (normalized.includes('pedodontic')) return 'Pedodontics';
+      if (normalized.includes('implant')) return 'Implantology';
+      if (normalized.includes('periodontics')) return 'Periodontics';
+      if (normalized.includes('fpd') || normalized.includes('fixed-partial')) return 'Fixed Partial Denture';
+      if (normalized.includes('partial')) return 'Partial Denture';
+      if (normalized.includes('complete-denture') || normalized.includes('complete_denture')) return 'Complete Denture';
+      return 'Prosthodontics';
+    }
+    // Fallback to parsing the redirect target path
     const target = redirectTarget.toLowerCase();
     if (target.includes('oral')) return 'Oral Medicine and Radiology';
     if (target.includes('pedodontic')) return 'Pedodontics';
     if (target.includes('implant')) return 'Implantology';
+    if (target.includes('periodontics')) return 'Periodontics';
     if (target.includes('fpd') || target.includes('fixed-partial')) return 'Fixed Partial Denture';
     if (target.includes('partial')) return 'Partial Denture';
     if (target.includes('complete-denture') || target.includes('complete_denture')) return 'Complete Denture';

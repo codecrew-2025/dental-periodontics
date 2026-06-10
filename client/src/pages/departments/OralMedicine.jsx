@@ -94,6 +94,8 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   const [criticalCondition, setCriticalCondition] = useState('');
   const [showCritical, setShowCritical] = useState(true);
   const [signaturePreview, setSignaturePreview] = useState('');
+  const [selectedFileName, setSelectedFileName] = useState('');
+  const sigInputRef = useRef(null);
   const [xrayPreview, setXrayPreview] = useState('');
   const [messageBox, setMessageBox] = useState({ show: false, title: '', message: '' });
   const [showConsentPrompt, setShowConsentPrompt] = useState(false);
@@ -112,6 +114,43 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   
   const draftTimerRef = useRef(null); // Unused - kept for compatibility
 
+  // Robust signature decoder: accepts data URLs, strings, Buffer-like objects,
+  // and common alternate field names (doctorSignature, signature, sig, oralSignature).
+  const decodeSignature = (s) => {
+    if (!s) return null;
+    if (typeof s === 'string') {
+      const str = s.trim();
+      if (!str) return null;
+      if (str.startsWith('data:')) return str;
+      // long strings are likely raw base64 without data: prefix
+      if (str.length > 100) return `data:image/png;base64,${str}`;
+      return null;
+    }
+    const tryBuf = (obj) => {
+      if (!obj) return null;
+      // Mongoose Buffer-like: { data: { data: [...] } } or { data: [...] }
+      const buf = obj.data && Array.isArray(obj.data) ? obj.data
+        : obj.data && obj.data.data && Array.isArray(obj.data.data) ? obj.data.data
+        : null;
+      if (buf && Array.isArray(buf)) {
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        return `data:${obj.contentType || 'image/png'};base64,${btoa(binary)}`;
+      }
+      return null;
+    };
+
+    // direct Buffer-like
+    const direct = tryBuf(s);
+    if (direct) return direct;
+
+    // try several common nested keys
+    const alt = s.digitalSignature || s.doctorSignature || s.signature || s.sig || s.oralSignature || s.oralSig || s.oralCode || s.signatureUrl || s.signaturePreview;
+    if (typeof alt === 'string' && alt.trim()) return alt;
+    return tryBuf(alt) || null;
+  };
+
   const initialPatientId = String(initialCaseData?.patientId || '').trim();
   const initialPatientName = String(initialCaseData?.patientName || '').trim();
   const patientId = initialPatientId || localStorage.getItem('CurrentpatientId') || '';
@@ -128,6 +167,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   }, [initialPatientId, initialPatientName]);
 
   useEffect(() => {
+    if (readOnly) return;
     const navState = location.state || {};
     if (navState.requestConsentAfterEntry && !navState[CASE_CONSENT_NAV_STATE_KEY]) {
       setConsentRedirectTarget(`${location.pathname}${location.search}`);
@@ -138,22 +178,12 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   useEffect(() => {
     if (initialCaseData) {
       setIsDraftHydrated(true);
-      if (initialCaseData.digitalSignature) {
-        const sig = initialCaseData.digitalSignature;
-        const toDataUrl = (s) => {
-          if (!s) return null;
-          if (typeof s === 'string') return s;
-          const buf = s.data;
-          if (buf && Array.isArray(buf.data)) {
-            const bytes = new Uint8Array(buf.data);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-            return `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
-          }
-          return null;
-        };
-        const src = toDataUrl(sig);
-        if (src) setSignaturePreview(src);
+      // Try to decode signature from multiple possible fields/formats
+      const src = decodeSignature(initialCaseData) || decodeSignature(initialCaseData.digitalSignature) || decodeSignature(initialCaseData.doctorSignature) || decodeSignature(initialCaseData.signature) || null;
+      if (src) {
+        setSignaturePreview(src);
+        // also populate form's digitalSignature so submission logic sees it
+        setForm(prev => ({ ...prev, digitalSignature: src }));
       }
       if (initialCaseData.xrayImage) {
         const raw = String(initialCaseData.xrayImage || '').trim();
@@ -171,23 +201,11 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
     const editCaseId = String(location.state?.editCaseId || (isRedoEditSession ? localStorage.getItem('redoEditCaseId') : '') || '').trim();
     if (prefill && editCaseId) {
       setForm(prev => ({ ...prev, ...prefill }));
-      if (typeof prefill.digitalSignature === 'string' && prefill.digitalSignature.startsWith('data:')) {
-        setSignaturePreview(prefill.digitalSignature);
-      } else if (prefill.digitalSignature && prefill.digitalSignature.data) {
-        try {
-          const s = prefill.digitalSignature;
-          const buf = s.data;
-          if (buf && Array.isArray(buf.data)) {
-            const bytes = new Uint8Array(buf.data);
-            let binary = '';
-            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-            const dataUrl = `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
-            setSignaturePreview(dataUrl);
-            setForm(prev => ({ ...prev, digitalSignature: dataUrl }));
-          }
-        } catch {
-          // ignore
-        }
+      // decode signature from various possible shapes
+      const pSig = decodeSignature(prefill) || decodeSignature(prefill.digitalSignature) || decodeSignature(prefill.doctorSignature) || decodeSignature(prefill.signature);
+      if (pSig) {
+        setSignaturePreview(pSig);
+        setForm(prev => ({ ...prev, digitalSignature: pSig }));
       }
       setCurrentPage(0);
       setIsDraftHydrated(true);
@@ -381,11 +399,17 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   };
 
   const handleFileChange = (file) => {
+    console.log('[OralMedicine] handleFileChange invoked:', file);
     setForm(prev => ({ ...prev, digitalSignature: file }));
     if (file) {
+      setSelectedFileName(file.name || 'selected');
       const reader = new FileReader();
       reader.onload = (e) => setSignaturePreview(e.target.result);
+      reader.onerror = (e) => console.log('[OralMedicine] FileReader error:', e);
       reader.readAsDataURL(file);
+    } else {
+      setSelectedFileName('');
+      setSignaturePreview('');
     }
   };
 
@@ -481,6 +505,14 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
       if (payload.digitalSignature instanceof File) {
         payload.digitalSignature = await fileToDataUrl(payload.digitalSignature);
       }
+      // Ensure we provide a raw base64 alias in case the server expects no data: prefix
+      try {
+        if (typeof payload.digitalSignature === 'string' && payload.digitalSignature.startsWith('data:')) {
+          const parts = payload.digitalSignature.split(',');
+          if (parts.length === 2) payload.digitalSignatureBase64 = parts[1];
+        }
+      } catch (err) { /* ignore */ }
+      console.log('[OralMedicine] Submitting signature:', { type: typeof payload.digitalSignature, hasBase64Alias: !!payload.digitalSignatureBase64, length: payload.digitalSignature ? String(payload.digitalSignature).length : 0 });
       if (isRedoEdit) {
         const res = await fetch(buildApiUrl(`/api/casesheets/${encodeURIComponent(redoEditCaseId)}`), {
           method: 'PUT',
@@ -500,6 +532,17 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
         return;
       }
       console.log('[OralMedicine] About to submit to /api/oral with payload:', { patientId, doctorId, referralDepartments: referralDepartments.length });
+      // Debug: show digitalSignature presence and basic info
+      try {
+        const sig = payload.digitalSignature;
+        if (!sig) console.log('[OralMedicine] debug: payload.digitalSignature is MISSING');
+        else {
+          const t = typeof sig;
+          const len = t === 'string' ? sig.length : (sig.size || (sig.length || 0));
+          const prefix = (t === 'string' && sig.slice(0, 30)) || (sig.name || '');
+          console.log('[OralMedicine] debug: payload.digitalSignature ->', { type: t, length: len, prefix });
+        }
+      } catch (e) { console.log('[OralMedicine] debug: error reading digitalSignature', e); }
       const res = await fetch(buildApiUrl('/api/oral'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -992,33 +1035,58 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
           />
         </div>
         <div className="form-group-casesheet">
-          <label htmlFor="digitalSignature">Upload Digital Signature *</label>
-          <input
-            id="digitalSignature"
-            type="file"
-            accept="image/*"
-            onChange={(e) => handleFileChange(e.target.files[0])}
-            required
-            style={{
-              display: 'block',
-              marginTop: '8px',
-              padding: '8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              backgroundColor: '#f9f9f9',
-              width: '100%',
-              boxSizing: 'border-box'
-            }}
-          />
-          {signaturePreview && (
-            <div id="signaturePreview" style={{ marginTop: '10px' }}>
-              <img
-                src={signaturePreview}
-                alt="Signature Preview"
-                style={{ maxWidth: '150px', maxHeight: '100px', marginTop: '10px', border: '1px solid #ddd', padding: '4px', borderRadius: '4px' }}
+          {readOnly ? (
+            signaturePreview ? (
+              <>
+                <label>Digital Signature</label>
+                <div id="signaturePreview" style={{ marginTop: '10px' }}>
+                  <img
+                    src={signaturePreview}
+                    alt="Signature Preview"
+                    style={{ maxWidth: '150px', maxHeight: '100px', border: '1px solid #ddd', padding: '4px', borderRadius: '4px' }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <label>Digital Signature</label>
+                <p style={{ color: '#c7d2fe', fontSize: '0.95rem' }}>Signature not available</p>
+              </>
+            )
+          ) : (
+            <>
+              <label htmlFor="digitalSignature">Upload Digital Signature *</label>
+              <input
+                id="digitalSignature"
+                ref={sigInputRef}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleFileChange(e.target.files[0])}
+                required
+                style={{
+                  display: 'none'
+                }}
               />
-            </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                <label
+                  htmlFor="digitalSignature"
+                  className="omr-btn-submit"
+                  style={{ padding: '8px 12px', cursor: 'pointer', display: 'inline-block' }}
+                >
+                  Choose Signature
+                </label>
+                <span style={{ color: '#c7d2fe', fontSize: '0.95rem' }}>{selectedFileName ? selectedFileName : (signaturePreview ? 'File selected' : 'No file selected')}</span>
+              </div>
+              {signaturePreview && (
+                <div id="signaturePreview" style={{ marginTop: '10px' }}>
+                  <img
+                    src={signaturePreview}
+                    alt="Signature Preview"
+                    style={{ maxWidth: '150px', maxHeight: '100px', marginTop: '10px', border: '1px solid #ddd', padding: '4px', borderRadius: '4px' }}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
         </div>

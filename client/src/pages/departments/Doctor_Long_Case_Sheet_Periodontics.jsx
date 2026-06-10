@@ -565,16 +565,17 @@ function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewS
 // forward to the consent form and return after approval.
 const CASE_CONSENT_NAV_STATE_KEY = 'caseSheetConsentApproved';
 
-function useConsentRedirect() {
+function useConsentRedirect(readOnly) {
   const location = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
+    if (readOnly) return;
     const navState = location.state || {};
     if (!navState.requestConsentAfterEntry) return;
     if (navState[CASE_CONSENT_NAV_STATE_KEY]) return;
     const redirectTarget = `${location.pathname}${location.search}`;
     navigate(`/consent-form?redirect=${encodeURIComponent(redirectTarget)}`, { replace: true });
-  }, [location, navigate]);
+  }, [location, navigate, readOnly]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -584,7 +585,7 @@ function useConsentRedirect() {
 const TOTAL_PAGES = 11;
 
 export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData, readOnly = false }) {
-  useConsentRedirect();
+  useConsentRedirect(readOnly);
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(0);
   const [doctorName, setDoctorName] = useState(() => {
