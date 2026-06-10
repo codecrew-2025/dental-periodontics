@@ -1,4 +1,5 @@
 // server/routes/Auth.js
+import mongoose from 'mongoose';
 import { User } from '../models/User.js';
 import fs from 'fs';
 import generateNextPatientId from '../utils/patientIdGenerator.js';
@@ -1170,7 +1171,10 @@ router.get('/doctor/assigned-pgs/overview', auth, requireRole(['doctor']), async
     const pgQueryKeys = Array.from(
       new Set(
         assignedPGs
-          .map((pg) => (pg.Identity ? String(pg.Identity).trim() : null))
+          .flatMap((pg) => [
+            pg.Identity ? String(pg.Identity).trim() : null,
+            pg._id ? String(pg._id).trim() : null,
+          ])
           .filter(Boolean)
       )
     );
@@ -1273,9 +1277,13 @@ router.get('/doctor/assigned-pgs/overview', auth, requireRole(['doctor']), async
     );
 
     const pgLookup = new Map(assignedPGs.map((pg) => [String(pg._id), pg]));
-    const pgIdentityToCanonical = new Map(
-      assignedPGs.map((pg) => [String(pg.Identity || '').trim(), String(pg._id)])
-    );
+    const pgIdentityToCanonical = new Map();
+    assignedPGs.forEach((pg) => {
+      const pgId = String(pg._id || '').trim();
+      const pgIdentity = String(pg.Identity || '').trim();
+      if (pgIdentity) pgIdentityToCanonical.set(pgIdentity, pgId);
+      if (pgId) pgIdentityToCanonical.set(pgId, pgId);
+    });
     const scheduledByPG = new Map();
     const patientVisitCountsByPG = new Map();
     const uniquePatientIds = new Set();
@@ -1427,18 +1435,21 @@ router.get('/doctor/assigned-pgs/overview', auth, requireRole(['doctor']), async
     const actualAppointments = await Appointment.find({
       $or: [
         { doctorId: { $in: pgQueryKeys } },
+        { assignedPgUgId: { $in: pgQueryKeys } },
         { assigned_pg_ug_id: { $in: pgQueryKeys } },
         { pgDoctorId: { $in: pgQueryKeys } },
       ],
-      status: { $in: ['assigned', 'in_progress', 'rescheduled'] },
+      status: { $in: ['pending', 'confirmed', 'assigned', 'in_progress', 'rescheduled'] },
     })
       .sort({ appointmentDate: 1, appointmentTime: 1 })
       .lean();
 
     // Merge appointment bookings with case referrals
     actualAppointments.forEach((appt) => {
-      const pgIdentity = appt.assigned_pg_ug_id || appt.pgDoctorId || appt.doctorId;
-      const pg = assignedPGs.find(p => String(p.Identity).trim() === String(pgIdentity).trim());
+      const pgIdentity = appt.assignedPgUgId || appt.assigned_pg_ug_id || appt.pgDoctorId || appt.doctorId;
+      const pg = assignedPGs.find(
+        (p) => String(p.Identity).trim() === String(pgIdentity).trim() || String(p._id).trim() === String(pgIdentity).trim()
+      );
       
       if (pg) {
         // Check if this appointment is already in enrichedAppointments (from referral)
@@ -1682,6 +1693,21 @@ router.get('/doctor/assigned-pgs/cases', auth, requireRole(['doctor']), async (r
       { model: PeriodonticsCase, department: 'Periodontics' },
     ];
 
+    const caseProjection = {
+      patientId: 1,
+      patientName: 1,
+      doctorId: 1,
+      doctorName: 1,
+      chiefApproval: 1,
+      approvedBy: 1,
+      approvedAt: 1,
+      referredDepartment: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    console.log('Mongo readyState:', mongoose.connection.readyState);
+
     const casePromises = endpoints.map(async ({ model, department }) => {
       try {
         // Match doctorId stored either as the student's Identity or their MongoDB _id
@@ -1690,30 +1716,39 @@ router.get('/doctor/assigned-pgs/cases', auth, requireRole(['doctor']), async (r
             { doctorId: { $in: studentIdentities } },
             { doctorId: { $in: studentObjectIds } }
           ]
-        })
+        }, caseProjection)
           .sort({ createdAt: -1 })
           .lean();
 
         console.log(`Fetched ${cases.length} cases for department ${department}`);
-        return cases.map(c => ({
-          ...c,
+        return {
           department,
-          // pgName: try by Identity then fall back to doctorName
-          pgName: studentNames.get(String(c.doctorId || '')) || c.doctorName,
-        }));
+          cases: cases.map(c => ({
+            ...c,
+            department,
+            pgName: studentNames.get(String(c.doctorId || '')) || c.doctorName,
+          })),
+        };
       } catch (err) {
         console.error(`Error fetching ${department} cases:`, err);
-        return [];
+        return {
+          department,
+          cases: [],
+          error: String(err.message || err),
+        };
       }
     });
 
     const results = await Promise.all(casePromises);
-    const allCases = results.flat();
+    const allCases = results.flatMap((result) => result.cases || []);
+    const errors = results
+      .filter((result) => result.error)
+      .map((result) => ({ department: result.department, message: result.error }));
 
     // Sort by creation date
     allCases.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    res.json({ success: true, cases: allCases });
+    res.json({ success: true, cases: allCases, errors });
   } catch (err) {
     console.error('Error fetching PG cases:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch cases from assigned PGs' });
@@ -1742,6 +1777,8 @@ router.patch('/doctor/assigned-pgs/cases/:caseId/approve', auth, requireRole(['d
     const modelMap = {
       Pedodontics: '../models/PedodonticsCase.js',
       Oral: '../models/Oral-model.js',
+      'Oral Medicine and Radiology': '../models/Oral-model.js',
+      'Oral Medicine': '../models/Oral-model.js',
       Periodontics: '../models/PeriodonticsCaseModel.js',
     };
 

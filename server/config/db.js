@@ -33,15 +33,39 @@ const getConnectOptions = () => {
   const maxPoolSize = Number(process.env.MONGO_MAX_POOL_SIZE || 10);
   const minPoolSize = Number(process.env.MONGO_MIN_POOL_SIZE || 1);
   const serverSelectionTimeoutMS = Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 8000);
+  const connectTimeoutMS = Number(process.env.MONGO_CONNECT_TIMEOUT_MS || 10000);
   const socketTimeoutMS = Number(process.env.MONGO_SOCKET_TIMEOUT_MS || 45000);
 
   return {
     maxPoolSize,
     minPoolSize,
     serverSelectionTimeoutMS,
+    connectTimeoutMS,
     socketTimeoutMS,
     family: 4,
+    retryWrites: true,
+    retryReads: true,
   };
+};
+
+const isTemporaryNetworkError = (error) => {
+  if (!error) return false;
+  if (error.name === 'MongoNetworkTimeoutError') return true;
+  if (typeof error.message === 'string' && error.message.toLowerCase().includes('timed out')) return true;
+  return false;
+};
+
+const resetMongoConnection = async () => {
+  try {
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+    }
+  } catch (err) {
+    console.warn('⚠️ Failed to disconnect stale MongoDB connection before retry:', err.message || err);
+  } finally {
+    mongoCache.connectionPromise = null;
+    mongoCache.connection = null;
+  }
 };
 
 const connectOnce = async () => {
@@ -104,6 +128,18 @@ const connectDB = async () => {
           throw retryError;
         }
       }
+    }
+
+    if (isTemporaryNetworkError(error)) {
+      console.warn(`⚠️ MongoDB transient network error during connect: ${error.message}. Retrying once...`);
+      await resetMongoConnection();
+      const { reused } = await connectOnce();
+      if (reused) {
+        console.log("✅ MongoDB connection reused after transient network retry");
+      } else {
+        console.log("✅ MongoDB connected after transient network retry");
+      }
+      return;
     }
 
     console.error("❌ MongoDB connection failed:", error.message);

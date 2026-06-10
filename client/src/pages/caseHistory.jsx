@@ -44,10 +44,15 @@ const CaseHistory = () => {
         endpoints.push({ url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: "Pedodontics" });
       }
 
+      if (normalizedDepartment.includes('periodontic')) {
+        endpoints.push({ url: buildApiUrl(`/api/casesheets/periodontics/patient/${encodeURIComponent(patientId)}`), department: "Periodontics" });
+      }
+
       if (!endpoints.length && !isDoctorOrPG) {
         endpoints.push(
           { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: "Oral Medicine and Radiology" },
-          { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: "Pedodontics" }
+          { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: "Pedodontics" },
+          { url: buildApiUrl(`/api/casesheets/periodontics/patient/${encodeURIComponent(patientId)}`), department: "Periodontics" }
         );
       }
 

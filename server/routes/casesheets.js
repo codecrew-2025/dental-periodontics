@@ -212,6 +212,37 @@ router.get('/pg/history', auth, requireRole(['pg', 'ug']), async (req, res) => {
   }
 });
 
+// GET /api/casesheets/periodontics/patient/:patientId
+// Returns all Periodontics cases for a patient
+router.get('/periodontics/patient/:patientId', auth, async (req, res) => {
+  try {
+    const { patientId: rawId } = req.params;
+    const patientId = String(rawId || '').trim();
+
+    const regex = new RegExp(`^\\s*${String(patientId).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`);
+
+    const cases = await PeriodonticsCaseModel.find({
+      $or: [{ patientId }, { patientId: { $regex: regex } }]
+    })
+      .select('-digitalSignature')
+      .sort({ createdAt: -1 });
+
+    if (req.user.role === 'patient' && String(req.user.Identity || '').trim() !== patientId) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    console.log(`[PERIO-API] GET /periodontics/patient/${rawId} -> found ${Array.isArray(cases) ? cases.length : 0} cases`);
+
+    res.json({ success: true, data: cases });
+  } catch (error) {
+    console.error('Error fetching periodontics doctor-patient cases:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching cases'
+    });
+  }
+});
+
 // POST /api/casesheets/periodontics/save
 // Save a Periodontics case sheet
 router.post('/periodontics/save', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (req, res) => {

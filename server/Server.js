@@ -133,6 +133,9 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
+// Allow custom bypass header for selected-patient fetches used by the UI
+corsOptions.allowedHeaders.push('x-bypass-department-check');
+
 app.use(cors(corsOptions));
 // Ensure preflight (OPTIONS) requests are handled consistently.
 // Express 5 (path-to-regexp v6+) does not accept "*" as a route pattern.

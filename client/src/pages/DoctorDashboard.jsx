@@ -1718,21 +1718,25 @@ const DoctorDashboard = () => {
       setCasesError('');
 
       const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      console.log('[DoctorDashboard] fetchCases starting, token present:', !!token);
       // If a patient is selected in the UI, show only that patient's case sheets
       const currentPatientId = localStorage.getItem('CurrentpatientId') || localStorage.getItem('currentPatientId') || '';
       if (currentPatientId && String(currentPatientId).trim()) {
         const pid = encodeURIComponent(String(currentPatientId).trim());
         const endpoints = [
-          { url: buildApiUrl(`/api/oral/patient/${pid}`), department: 'Oral Medicine and Radiology' },
+          { url: buildApiUrl(`/api/oral/patient/${pid}`), department: 'Oral' },
           { url: buildApiUrl(`/api/pedodontics/patient/${pid}`), department: 'Pedodontics' },
         ];
 
         const results = await Promise.all(
           endpoints.map(async ({ url, department }) => {
             try {
-              const res = await fetch(url, { headers: { Authorization: token ? `Bearer ${token}` : '', 'Content-Type': 'application/json', 'x-bypass-department-check': '1' } });
+              const res = await fetch(url, { headers: { ...headers, 'x-bypass-department-check': '1' } });
               if (!res.ok) return [];
               const json = await res.json().catch(() => null);
+              console.log('[DoctorDashboard] patient cases fetch', url, 'status', res.status, 'items', Array.isArray(json?.data) ? json.data.length : 0);
               const items = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
               return items.map((it) => ({ department, ...it }));
             } catch (err) {
@@ -1748,20 +1752,21 @@ const DoctorDashboard = () => {
         setCases(merged);
       } else {
         // Fallback: fetch cases from assigned PGs (original behavior)
-        const res = await fetch(buildApiUrl('/api/auth/doctor/assigned-pgs/cases'), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        const assignedUrl = buildApiUrl('/api/auth/doctor/assigned-pgs/cases');
+        const res = await fetch(assignedUrl, { headers });
+        const text = await res.text().catch(() => '');
+        let parsed = null;
+        try { parsed = JSON.parse(text); } catch { parsed = text; }
+        console.log('[DoctorDashboard] assigned-pgs/cases', assignedUrl, 'status', res.status, 'body:', parsed);
 
         if (!res.ok) {
-          console.warn(`Error fetching cases: ${res.status} - ${res.statusText}`);
-          throw new Error('Failed to fetch cases');
+          const msg = (parsed && typeof parsed === 'object' && parsed.message) ? parsed.message : `Status ${res.status}`;
+          console.warn('Error fetching cases:', msg);
+          throw new Error(msg || 'Failed to fetch cases');
         }
 
-        const json = await res.json();
-        const allCases = json.cases || [];
+        const json = typeof parsed === 'object' ? parsed : null;
+        const allCases = (json && (json.cases || json.data)) || [];
         setCases(allCases);
       }
     } catch (err) {
@@ -3427,10 +3432,9 @@ const DoctorDashboard = () => {
                             // Previously we required explicit signature fields; some departments
                             // only store `digitalSignature` or may not set signature fields yet.
                             // Surface all Pending case-sheets so doctors can review and approve them.
-                            .filter((caseItem) => {
-                              const status = getApprovalStatus(caseItem);
-                              return status === 'Pending';
-                            })
+                            // Show all case-sheets (not only 'Pending') so doctors can view oral cases too
+                            // Previously this filtered to only Pending items which hid Approved/Resent cases
+                            .filter(() => true)
                       .sort((a, b) => {
                         const statusA = getApprovalStatus(a);
                         const statusB = getApprovalStatus(b);
