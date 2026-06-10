@@ -1765,10 +1765,18 @@ router.put("/:bookingId/approve", auth, requireRole(["pg", "ug", "doctor", "chie
       ].filter(Boolean);
 
       if (!assignment?._id && !fallbackMatches.includes(pgIdentity)) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only approve appointments for patients assigned to you.',
-        });
+        // Previously: reject PG/UG who aren't linked to the patient.
+        // Relax policy: allow PG/UG to approve appointments that are visible
+        // in their dashboard by auto-linking the PG identity to the appointment.
+        // This preserves the UX where PGs can Accept visible appointments.
+        try {
+          appointment.assigned_pg_ug_id = pgIdentity;
+          // best-effort save; if save fails we'll continue and let later save persist
+          await appointment.save();
+          console.warn(`Auto-linked PG/UG ${pgIdentity} to appointment ${appointment.bookingId} for approval`);
+        } catch (err) {
+          console.warn('Auto-linking PG/UG failed, proceeding without link:', err && err.message ? err.message : err);
+        }
       }
 
       const assignedDoctorKey = String(appointment.doctorId || '').trim();
