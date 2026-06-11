@@ -2418,55 +2418,7 @@ const UGDashboard = () => {
                   </div>
                 )}
 
-                {/* General Case Sheet Preview — not shown for PHD doctors */}
-                {showUserIdDisplay && !isPublicHealthDentistry && (
-                  <div className="general-case-preview-section" style={{ margin: '16px 0', padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>General Case Sheet Preview</div>
-                    {generalCasePreviewLoading ? (
-                      <div className="chief-inline-loading">Loading preview...</div>
-                    ) : generalCasePreviewError ? (
-                      <div className="error-message">{generalCasePreviewError}</div>
-                    ) : generalCasePreview ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12 }}>
-                        <div>
-                          <div style={{ marginBottom: 4 }}><strong>Chief Complaint:</strong> {generalCasePreview.chiefComplaint || '—'}</div>
-                          <div style={{ marginBottom: 4 }}><strong>Present Illness:</strong> {generalCasePreview.presentIllness || '—'}</div>
-                          <div style={{ marginBottom: 4 }}><strong>Clinical Findings:</strong> {generalCasePreview.clinicalFindings || '—'}</div>
-                          <div><strong>Final Diagnosis:</strong> {generalCasePreview.finalDiagnosis || generalCasePreview.provisionalDiagnosis || '—'}</div>
-                        </div>
-                        <div style={{ textAlign: 'center', minWidth: 80 }}>
-                          <div style={{ fontSize: 12, marginBottom: 4, color: '#64748b' }}>X-ray</div>
-                          {String(generalCasePreview.xrayImage || '').trim() ? (
-                            <img
-                              src={normalizeXraySrc(generalCasePreview.xrayImage)}
-                              alt="X-ray"
-                              style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, border: '1px solid #cbd5e1' }}
-                            />
-                          ) : (
-                            <div style={{ fontSize: 11, color: '#94a3b8' }}>No X-ray</div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ color: '#64748b', fontSize: 13 }}>No General Case Sheet found for this patient.</div>
-                    )}
-                    <div style={{ marginTop: 10 }}>
-                      <button
-                        type="button"
-                        className="view-button"
-                        onClick={() => {
-                          const caseId = String(generalCasePreview?._id || '').trim();
-                          if (caseId) {
-                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
-                          }
-                        }}
-                        disabled={!generalCasePreview?._id}
-                      >
-                        View Full General Case Sheet
-                      </button>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Form Section */}
                 {showForm && (
@@ -2776,6 +2728,21 @@ const UGDashboard = () => {
                       >
                         Go to Department Case Sheet
                       </button>
+                      {!ugDepartmentKey.includes('oral') && (
+                      <button
+                        type="button"
+                        className="case-files-btn"
+                        onClick={() => {
+                          const caseId = String(generalCasePreview?._id || '').trim();
+                          if (caseId) {
+                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
+                          }
+                        }}
+                        disabled={!generalCasePreview?._id}
+                      >
+                        View Full General Case Sheet
+                      </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -3137,7 +3104,7 @@ const UGDashboard = () => {
                                         opacity: isSubmitting || !canRescheduleAppointment ? 0.6 : 1,
                                       }}
                                     >
-                                      {hasPendingReschedule ? 'Reschedule Pending' : 'Reschedule'}
+                                      Reschedule
                                     </button>
 
                                     {!['confirmed','assigned','in_progress','rescheduled'].includes(appointmentStatus) && appointmentStatus !== 'pending' && (

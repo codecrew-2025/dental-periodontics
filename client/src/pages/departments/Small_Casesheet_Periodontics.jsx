@@ -2,6 +2,18 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { API_BASE_URL } from "../../config/api";
 
+const ALLOWED_APPOINTMENT_TIMES = [
+  "9:00 AM",
+  "9:30 AM",
+  "10:00 AM",
+  "10:30 AM",
+  "11:30 AM",
+  "12:00 PM",
+  "12:30 PM",
+  "2:00 PM",
+  "2:30 PM",
+];
+
 const App = ({ initialCaseData, readOnly = false }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [doctorName, setDoctorName] = useState(() => {
@@ -28,6 +40,11 @@ const App = ({ initialCaseData, readOnly = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allergyMessage, setAllergyMessage] = useState('Loading allergies...');
   const [showAllergy, setShowAllergy] = useState(true);
+  const [appointmentDate, setAppointmentDate] = useState(getTodayIso());
+  const [appointmentTime, setAppointmentTime] = useState('');
+  const [patientEmail, setPatientEmail] = useState('');
+
+  const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
   const navigate = useNavigate();
   const signatureInputRef = useRef(null);
@@ -132,8 +149,9 @@ const App = ({ initialCaseData, readOnly = false }) => {
     };
 
     loadAllergy();
+    if (patientId) fetchPatientEmail();
     return () => { isMounted = false; };
-  }, []);
+  }, [patientId]);
 
   const checkRequiredFields = (nameVal, fileVal) => {
     const n = nameVal !== undefined ? nameVal : doctorName;
@@ -161,6 +179,19 @@ const App = ({ initialCaseData, readOnly = false }) => {
     }
   };
 
+  const fetchPatientEmail = async () => {
+    if (!patientId) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/email-retrieve/${encodeURIComponent(patientId)}`);
+      const json = await response.json();
+      if (response.ok && json.success && json.email) {
+        setPatientEmail(String(json.email || '').trim());
+      }
+    } catch (error) {
+      console.warn('Unable to fetch patient email for appointment booking:', error);
+    }
+  };
+
   const formatAllergyTicker = (raw) => {
     const text = (raw || '').trim();
     if (!text) return 'Drug Allergies: None';
@@ -185,6 +216,24 @@ const App = ({ initialCaseData, readOnly = false }) => {
     if (isValid) {
       setIsSubmitting(true);
       
+      if ((appointmentDate && !appointmentTime) || (!appointmentDate && appointmentTime)) {
+        alert('Please select both appointment date and time, or leave both blank.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (appointmentDate && appointmentDate < getTodayIso()) {
+        alert('Appointment date cannot be in the past.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (appointmentTime && !ALLOWED_APPOINTMENT_TIMES.includes(appointmentTime)) {
+        alert('Please choose a valid appointment time from the available options.');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Prepare form data to send to backend
       const doctorId = localStorage.getItem('pgId') || localStorage.getItem('ugId') || localStorage.getItem('doctorId') || '';
       const token = localStorage.getItem('token');
@@ -218,6 +267,31 @@ const App = ({ initialCaseData, readOnly = false }) => {
           throw new Error(json.message || 'Failed to submit Periodontics case');
         }
 
+        if (appointmentDate && appointmentTime) {
+          try {
+            const bookingResponse = await fetch(`${API_BASE_URL}/api/appointment/appointments`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                patientId,
+                patientEmail: patientEmail || `${patientId}@temp.com`,
+                department: 'Periodontics',
+                chiefComplaint: 'Periodontics follow-up',
+                appointmentDate,
+                appointmentTime,
+              }),
+            });
+            const bookingJson = await bookingResponse.json();
+            if (!bookingResponse.ok || bookingJson.success === false) {
+              console.warn('Appointment booking failed:', bookingJson.message || 'unknown error');
+            }
+          } catch (bookingError) {
+            console.warn('Appointment booking error:', bookingError);
+          }
+        }
+
         const confirmBox = document.createElement('div');
         confirmBox.style.cssText = `
           position: fixed;
@@ -243,6 +317,8 @@ const App = ({ initialCaseData, readOnly = false }) => {
           setDoctorName("");
           setSignatureFile(null);
           setSignaturePreviewSrc("");
+          setAppointmentDate(getTodayIso());
+          setAppointmentTime('');
           setSubmitDisabled(true);
           setCurrentPage(0);
           setIsSubmitting(false);
@@ -851,6 +927,47 @@ const App = ({ initialCaseData, readOnly = false }) => {
                   </div>
                 </div>
               </div>
+
+              {!readOnly && (
+                <div style={{ marginTop: '24px', padding: '18px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '10px', background: 'rgba(255,255,255,0.05)' }}>
+                  <h2 style={{ marginTop: 0 }}>Optional Follow-up Appointment</h2>
+                  <p style={{ marginBottom: '14px', color: '#d1d5db' }}>
+                    Schedule a patient appointment when you finish the case sheet. Leave blank to skip booking.
+                  </p>
+                  <div className="form-group">
+                    <label htmlFor="appointmentDate">Appointment Date:</label>
+                    <input
+                      type="date"
+                      id="appointmentDate"
+                      value={appointmentDate}
+                      min={getTodayIso()}
+                      onChange={(e) => setAppointmentDate(e.target.value)}
+                      disabled={readOnly}
+                      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="appointmentTime">Appointment Time:</label>
+                    <select
+                      id="appointmentTime"
+                      value={appointmentTime}
+                      onChange={(e) => setAppointmentTime(e.target.value)}
+                      disabled={readOnly}
+                      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
+                    >
+                      <option value="">Select time</option>
+                      {ALLOWED_APPOINTMENT_TIMES.map((time) => (
+                        <option key={time} value={time}>{time}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {patientEmail ? (
+                    <p style={{ marginTop: '10px', color: '#cbd5e1' }}><strong>Patient email:</strong> {patientEmail}</p>
+                  ) : (
+                    <p style={{ marginTop: '10px', color: '#fbbf24' }}>Patient email not available. Appointment booking will use a fallback address.</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
           </fieldset>

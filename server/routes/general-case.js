@@ -804,6 +804,27 @@ router.patch('/referred-patients/:id/approve', auth, requireRole(['doctor']), as
 
     await caseItem.save();
 
+    // 🔥 FIX: Update the Appointment so the PG can see it!
+    try {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const appt = await Appointment.findOne({
+        patientId: caseItem.patientId,
+        appointmentDate: { $gte: todayStr },
+        status: { $in: ['pending', 'assigned', 'rescheduled'] }
+      }).sort({ appointmentDate: 1, createdAt: -1 });
+
+      if (appt) {
+        appt.assignedPgUgId = assignedPg.Identity || '';
+        appt.assigned_pg_ug_id = assignedPg.Identity || '';
+        appt.pgDoctorId = assignedPg.Identity || '';
+        appt.status = 'assigned';
+        await appt.save();
+        console.log(`[APPROVE] Updated appointment ${appt.bookingId} with assigned PG: ${assignedPg.Identity}`);
+      }
+    } catch (apptErr) {
+      console.error('[APPROVE] Failed to update appointment for PG:', apptErr.message);
+    }
+
     res.json({
       success: true,
       message: `Referral approved and assigned to ${assignedPg.name || assignedPg.Identity}.`,

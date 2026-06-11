@@ -69,6 +69,9 @@ const appointmentSchema = new mongoose.Schema(
         "revisit_pending_approval",
         "revisit_approved",
         "closed",
+        "patient_reschedule_requested",
+        "pg_counter_reschedule_pending_doc",
+        "pg_counter_reschedule_approved_doc",
       ],
       default: "pending",
     },
@@ -141,8 +144,13 @@ const appointmentSchema = new mongoose.Schema(
 
     // Reschedule request fields (for PG-initiated reschedules) - match audit spec
     rescheduleRequest: {
+      initiatorRole: {
+        type: String,
+        enum: ["patient", "pg"],
+        default: null,
+      },
       requestedBy: {
-        type: String, // PG Identity
+        type: String, // PG Identity or Patient Identity
         default: null,
       },
       requestedByName: {

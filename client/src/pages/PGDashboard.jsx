@@ -496,7 +496,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
   };
 
   const approveAppointment = async (appointment) => {
-    const bookingId = String(appointment?.bookingId || '').trim();
+    const bookingId = String(appointment?._id || appointment?.bookingId || '').trim();
     if (!bookingId) {
       showMessage('Booking ID not found for this appointment.', 'error');
       return;
@@ -504,12 +504,25 @@ const PGDashboard = ({ brandTitleOverride }) => {
 
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(buildApiUrl(`/api/appointment/${encodeURIComponent(bookingId)}/approve`), {
-        method: 'PUT',
+      const rescheduleReqStatus = String(appointment?.rescheduleRequest?.requestStatus || 'none').trim().toLowerCase();
+      
+      let url = buildApiUrl(`/api/appointment/${encodeURIComponent(appointment.bookingId || bookingId)}/approve`);
+      let method = 'PUT';
+      let body = undefined;
+
+      if (rescheduleReqStatus === 'pending') {
+        url = buildApiUrl('/api/appointment/pg-reschedule-action');
+        method = 'POST';
+        body = JSON.stringify({ appointmentId: bookingId, action: 'accept' });
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body,
       });
 
       if (res.status === 401) {
@@ -718,13 +731,32 @@ const PGDashboard = ({ brandTitleOverride }) => {
     try {
       setRescheduleSubmittingBookingId(resolvedBookingId);
       const token = localStorage.getItem('token');
-      const res = await fetch(buildApiUrl(`/api/appointment/${encodeURIComponent(resolvedBookingId)}/reschedule`), {
-        method: 'PUT',
+      
+      const appointment = activeRescheduleAppointment;
+      const rescheduleReqStatus = String(appointment?.rescheduleRequest?.requestStatus || 'none').trim().toLowerCase();
+      
+      let url = buildApiUrl(`/api/appointment/${encodeURIComponent(resolvedBookingId)}/reschedule`);
+      let method = 'PUT';
+      let body = JSON.stringify({ appointmentDate, appointmentTime });
+
+      if (rescheduleReqStatus === 'pending') {
+        url = buildApiUrl('/api/appointment/pg-reschedule-action');
+        method = 'POST';
+        body = JSON.stringify({
+          appointmentId: appointment?._id || resolvedBookingId,
+          action: 'counter',
+          proposedDate: appointmentDate,
+          proposedTime: appointmentTime,
+        });
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ appointmentDate, appointmentTime }),
+        body,
       });
 
       if (res.status === 401) {
@@ -2389,55 +2421,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                   </div>
                 )}
 
-                {/* General Case Sheet Preview */}
-                {showUserIdDisplay && !isPublicHealthDentistry && (
-                  <div className="general-case-preview-section" style={{ margin: '16px 0', padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>General Case Sheet Preview</div>
-                    {generalCasePreviewLoading ? (
-                      <div className="chief-inline-loading">Loading preview...</div>
-                    ) : generalCasePreviewError ? (
-                      <div className="error-message">{generalCasePreviewError}</div>
-                    ) : generalCasePreview ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12 }}>
-                        <div>
-                          <div style={{ marginBottom: 4 }}><strong>Chief Complaint:</strong> {generalCasePreview.chiefComplaint || '-'}</div>
-                          <div style={{ marginBottom: 4 }}><strong>Present Illness:</strong> {generalCasePreview.presentIllness || '-'}</div>
-                          <div style={{ marginBottom: 4 }}><strong>Clinical Findings:</strong> {generalCasePreview.clinicalFindings || '-'}</div>
-                          <div><strong>Final Diagnosis:</strong> {generalCasePreview.finalDiagnosis || generalCasePreview.provisionalDiagnosis || '-'}</div>
-                        </div>
-                        <div style={{ textAlign: 'center', minWidth: 80 }}>
-                          <div style={{ fontSize: 12, marginBottom: 4, color: '#64748b' }}>X-ray</div>
-                          {String(generalCasePreview.xrayImage || '').trim() ? (
-                            <img
-                              src={normalizeXraySrc(generalCasePreview.xrayImage)}
-                              alt="X-ray"
-                              style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, border: '1px solid #cbd5e1' }}
-                            />
-                          ) : (
-                            <div style={{ fontSize: 11, color: '#94a3b8' }}>No X-ray</div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ color: '#64748b', fontSize: 13 }}>No General Case Sheet found for this patient.</div>
-                    )}
-                    <div style={{ marginTop: 10 }}>
-                      <button
-                        type="button"
-                        className="view-button"
-                        onClick={() => {
-                          const caseId = String(generalCasePreview?._id || '').trim();
-                          if (caseId) {
-                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
-                          }
-                        }}
-                        disabled={!generalCasePreview?._id}
-                      >
-                        View Full General Case Sheet
-                      </button>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Form Section */}
                 {showForm && (
@@ -2662,6 +2646,21 @@ const PGDashboard = ({ brandTitleOverride }) => {
                       >
                         Go to Department Case Sheet
                       </button>
+                      {!pgDepartmentKey.includes('oral') && (
+                      <button
+                        type="button"
+                        className="case-files-btn"
+                        onClick={() => {
+                          const caseId = String(generalCasePreview?._id || '').trim();
+                          if (caseId) {
+                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
+                          }
+                        }}
+                        disabled={!generalCasePreview?._id}
+                      >
+                        View Full General Case Sheet
+                      </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -2911,7 +2910,8 @@ const PGDashboard = ({ brandTitleOverride }) => {
                           const hasApprovedReschedule = rescheduleReqStatus === 'approved';
                           const actionableStatuses = ['pending', 'assigned', 'confirmed', 'in_progress', 'rescheduled'];
                           const isActionable = actionableStatuses.includes(appointmentStatus);
-                          const canApproveAppointment = ['pending', 'assigned', 'confirmed', 'in_progress', 'rescheduled'].includes(appointmentStatus);
+                          const isAccepted = ['assigned', 'confirmed', 'in_progress'].includes(appointmentStatus);
+                          const canApproveAppointment = ['pending', 'rescheduled'].includes(appointmentStatus);
                           const canRescheduleAppointment = !['rejected', 'cancelled', 'completed', 'closed'].includes(appointmentStatus);
 
                           return (
@@ -2963,7 +2963,19 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                   </span>
                                 ) : (
                                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-                                    {canApproveAppointment && (
+                                    {isAccepted ? (
+                                      <span style={{ 
+                                        background: '#2f855a', 
+                                        color: '#fff', 
+                                        borderRadius: '12px', 
+                                        padding: '6px 12px', 
+                                        fontSize: '0.8em', 
+                                        fontWeight: 600,
+                                        display: 'inline-block'
+                                      }}>
+                                        ✓ Accepted
+                                      </span>
+                                    ) : canApproveAppointment ? (
                                       <button
                                         type="button"
                                         className="view-button"
@@ -2983,7 +2995,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                       >
                                         Accept
                                       </button>
-                                    )}
+                                    ) : null}
 
                                     <button
                                       type="button"
@@ -3003,7 +3015,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                         opacity: isSubmitting || !canRescheduleAppointment ? 0.6 : 1,
                                       }}
                                     >
-                                      {hasPendingReschedule ? 'Reschedule Pending' : 'Reschedule'}
+                                      Reschedule
                                     </button>
 
                                     {!['confirmed','assigned','in_progress','rescheduled'].includes(appointmentStatus) && appointmentStatus !== 'pending' && (

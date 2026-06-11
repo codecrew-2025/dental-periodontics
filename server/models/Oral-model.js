@@ -193,6 +193,7 @@ const OralCaseSchema = new mongoose.Schema(
 OralCaseSchema.index({ patientId: 1, createdAt: -1 });
 OralCaseSchema.index({ doctorId:  1, createdAt: -1 });
 OralCaseSchema.index({ chiefApproval: 1, createdAt: -1 });
+OralCaseSchema.index({ createdAt: -1 });
 
 const OralCase = mongoose.model('OralCase', OralCaseSchema);
 

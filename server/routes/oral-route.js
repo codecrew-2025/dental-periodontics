@@ -1,10 +1,32 @@
 import express from 'express';
 import OralCase from '../models/Oral-model.js';
+import Appointment from '../models/AppoitmentBooked.js';
+import { User } from '../models/User.js';
 import auth from '../middleware/auth.js';
 import requireRole from '../middleware/role.js';
 
 const router = express.Router();
 
+// ── Helper: normalize a department label to a canonical lowercase key ────────
+const normalizeDept = (d) =>
+  String(d || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+
+// Get all alias keys for a given department label (mirrors appointment.js)
+const getDeptAliases = (label) => {
+  const n = normalizeDept(label);
+  if (n.startsWith('prostho') || n.startsWith('protho') || n.startsWith('prosthon'))
+    return ['prosthodontics', 'prothodontics', 'prosthondontics'];
+  if (n === 'pedodontics') return ['pedodontics'];
+  if (n === 'periodontics' || n === 'periodontology') return ['periodontics', 'periodontology'];
+  if (n.includes('conservative') || n.includes('endodontic')) return ['conservativedentistryandendodontics', 'conservativedentistry', 'endodontics'];
+  return [n];
+};
+
+/**
+ * When an Oral Medicine case sheet refers a patient to a specialist department,
+ * update the patient's upcoming appointment so that the specialist doctor's
+ * identifiers are on it.  This makes the appointment visible in the specialist
+ * doctor's "My Appointments" / "All Appointments" views.
 // Escape user input for use in RegExp
 const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -84,7 +106,9 @@ router.post('/', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (req,
     } else {
       console.log(`[ORAL-API] POST - Saved case WITHOUT digitalSignature`);
     }
-    
+
+    // The frontend also calls /api/general/save to handle referral logic & PG assignments
+
     res.status(201).json({
       success: true,
       message: 'Oral case created successfully',
@@ -116,11 +140,37 @@ router.get('/doctor/:doctorId', auth, async (req, res) => {
 // ── GET ALL FOR CHIEF ─────────────────────────────────────────────────────
 router.get('/chief/all-cases', auth, requireRole(['chief_doctor', 'chief']), async (req, res) => {
   try {
-    const cases = await OralCase.find().sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: cases });
+    console.log('[ORAL-API] GET /chief/all-cases by', {
+      userId: req.user?._id,
+      role: req.user?.role,
+      department: req.user?.department,
+      email: req.user?.email,
+    });
+
+    const cases = await OralCase.find()
+      .select('-digitalSignature')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const data = cases.map((c) => ({
+      ...c,
+      _id: String(c._id || ''),
+      patientId: String(c.patientId || '').trim(),
+      patientName: String(c.patientName || '').trim(),
+      doctorId: String(c.doctorId || '').trim(),
+      doctorName: String(c.doctorName || '').trim(),
+      chiefApproval: String(c.chiefApproval || ''),
+      approvedBy: String(c.approvedBy || ''),
+      approvedAt: c.approvedAt || null,
+      createdAt: c.createdAt || null,
+      updatedAt: c.updatedAt || null,
+    }));
+
+    console.log(`[ORAL-API] /chief/all-cases returned ${data.length} cases`);
+    res.status(200).json({ success: true, data });
   } catch (error) {
-    console.error('Error fetching all oral cases:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch oral cases', error: error.message });
+    console.error('Error fetching all oral cases:', error?.stack || error);
+    res.status(500).json({ success: false, message: 'Failed to fetch oral cases', error: String(error?.message || error) });
   }
 });
 
@@ -192,6 +242,8 @@ router.put('/:id', auth, requireRole(['doctor', 'chief', 'pg', 'ug']), async (re
     } else {
       console.log(`[ORAL-API] PUT - Updated case WITHOUT digitalSignature`);
     }
+
+    // The frontend also calls /api/general/save to handle referral logic & PG assignments
     
     res.status(200).json({ success: true, message: 'Oral case updated successfully', data: updatedCase });
   } catch (error) {

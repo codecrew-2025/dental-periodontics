@@ -364,21 +364,38 @@ const SlotBooking = () => {
       abortControllerRef.current = new AbortController();
 
       try {
-        // API call to save appointment to backend
-        const response = await fetch(buildApiUrl('/api/appointment/appointments'), {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            patientId,
-            patientEmail,
-            chiefComplaint: finalComplaint,
-            appointmentDate: selectedSlot.date,
-            appointmentTime: selectedSlot.time,
-          }),
-          signal: abortControllerRef.current.signal,
-        });
+        let response;
+        const token = localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        if (isRescheduleFlow) {
+          response = await fetch(buildApiUrl('/api/appointment/patient-reschedule'), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              appointmentId: rescheduleState.oldAppointmentId,
+              proposedDate: selectedSlot.date,
+              proposedTime: selectedSlot.time,
+              reason: finalComplaint,
+            }),
+            signal: abortControllerRef.current.signal,
+          });
+        } else {
+          // API call to save appointment to backend
+          response = await fetch(buildApiUrl('/api/appointment/appointments'), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              patientId,
+              patientEmail,
+              chiefComplaint: finalComplaint,
+              appointmentDate: selectedSlot.date,
+              appointmentTime: selectedSlot.time,
+            }),
+            signal: abortControllerRef.current.signal,
+          });
+        }
 
         let data = null;
         try {
@@ -402,27 +419,10 @@ const SlotBooking = () => {
           setBookingId(
             (data.appointment && data.appointment.bookingId) ||
               data.bookingId ||
+              rescheduleState?.oldAppointmentId ||
               ''
           );
           setErrorMessage('');
-
-          // If this booking was initiated as a reschedule, cancel the old booking
-          if (rescheduleState?.reschedule && rescheduleState?.oldAppointmentId) {
-            try {
-              await fetch(
-                buildApiUrl(`/api/appointment/${rescheduleState.oldAppointmentId}/cancel`),
-                {
-                  method: 'PUT',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({ patientId }),
-                }
-              );
-            } catch (cancelErr) {
-              console.warn('Failed to cancel old appointment during reschedule', cancelErr);
-            }
-          }
         } else {
           const detailedMessage =
             (data && data.error && (data.error.message || data.error)) ||

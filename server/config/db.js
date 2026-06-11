@@ -17,6 +17,18 @@ const isSrvDnsError = (error) => {
   return error?.syscall === "querySrv" && SRV_DNS_ERROR_CODES.has(error?.code);
 };
 
+const isSrvLookupError = (error) => {
+  if (!error) return false;
+  const isSrvUri = process.env.MONGO_URI?.startsWith("mongodb+srv://");
+  if (!isSrvUri) return false;
+
+  return (
+    (error?.syscall === "querySrv" && SRV_DNS_ERROR_CODES.has(error?.code)) ||
+    (error?.syscall === "getaddrinfo" && error?.code === "ENOTFOUND") ||
+    (typeof error?.message === "string" && error.message.includes("getaddrinfo ENOTFOUND"))
+  );
+};
+
 const getDnsServers = () => {
   const configured = process.env.MONGO_DNS_SERVERS;
   if (!configured) {
@@ -104,14 +116,14 @@ const connectDB = async () => {
     return;
   } catch (error) {
     // Some ISPs/firewalls block SRV lookups used by mongodb+srv URIs.
-    if (process.env.MONGO_URI?.startsWith("mongodb+srv://") && isSrvDnsError(error)) {
+    if (process.env.MONGO_URI?.startsWith("mongodb+srv://") && isSrvLookupError(error)) {
       const dnsServers = getDnsServers();
 
       if (dnsServers.length > 0) {
         try {
           dns.setServers(dnsServers);
           console.warn(
-            `⚠️ MongoDB SRV lookup failed (${error.code}). Retrying with DNS servers: ${dnsServers.join(", ")}`
+            `⚠️ MongoDB SRV lookup or ENOTFOUND failure occurred (${error.code || error.message}). Retrying with DNS servers: ${dnsServers.join(", ")}`
           );
 
           // Reset promise so retry can establish a fresh connection attempt.

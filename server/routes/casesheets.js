@@ -350,6 +350,35 @@ router.get('/periodontics/chief/all-cases', auth, requireRole(['doctor', 'chief'
   }
 });
 
+// PATCH /api/casesheets/periodontics/:caseId/approve
+// Approve or request redo for a Periodontics case
+router.patch('/periodontics/:caseId/approve', auth, requireRole(['doctor', 'chief']), async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    const { chiefApproval, approvedBy } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(caseId)) {
+      return res.status(400).json({ success: false, message: 'Invalid case id' });
+    }
+
+    const caseData = await PeriodonticsCaseModel.findById(caseId);
+    if (!caseData) {
+      return res.status(404).json({ success: false, message: 'Case not found' });
+    }
+
+    caseData.chiefApproval = chiefApproval || 'Approved';
+    caseData.approvedBy = approvedBy || req.user?.name || '';
+    caseData.approvedAt = new Date();
+
+    await caseData.save();
+
+    return res.json({ success: true, message: 'Case approved successfully', data: caseData });
+  } catch (error) {
+    console.error('Error approving Periodontics case:', error);
+    return res.status(500).json({ success: false, message: 'Server error while approving case' });
+  }
+});
+
 // GET /api/casesheets/:caseId
 // Searches known case collections for the given ID and returns the case and department
 router.get('/:caseId', auth, async (req, res) => {

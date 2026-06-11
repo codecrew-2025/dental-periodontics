@@ -169,7 +169,11 @@ const ChiefDoctorDashboard = () => {
     });
 
   const normalizeDepartment = (value) =>
-    String(value || "").trim().toLowerCase().replace(/[_\s]+/g, "");
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, '');
 
   const buildApiUrl = (path) =>
     `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
@@ -435,14 +439,17 @@ const ChiefDoctorDashboard = () => {
           });
 
           if (!res.ok) {
-            console.warn(`[${ep.department}] ${res.status} - ${res.statusText}`);
+            const body = await res.text().catch(() => 'Unable to read error body');
+            console.warn(`[${ep.department}] ${res.status} - ${res.statusText}`, body);
             return [];
           }
 
-          const json = await res.json();
-          return (json.data || []).map((c) => ({
-            ...c,
-            department: ep.department,
+          const data = await res.json();
+          const cases = Array.isArray(data?.data) ? data.data : [];
+          return cases.map((item) => ({
+            ...item,
+            department: item.department || ep.department,
+            departmentKey: item.departmentKey || ep.departmentKey,
           }));
         } catch (e) {
           console.error(`[${ep.department}] Error:`, e.message);
@@ -611,10 +618,15 @@ const ChiefDoctorDashboard = () => {
         "Implant Patient Surgery": "ImplantPatient",
         "Partial Denture": "partial",
         Oral: "oral",
-        Periodontics: "periodontics",
+        Periodontics: "casesheets/periodontics",
+        General: "general/referred-patients",
       };
 
       const base = apiMap[caseItem.department];
+
+      if (!base) {
+        throw new Error(`Unsupported department for approval: ${caseItem.department || 'unknown'}`);
+      }
 
       const response = await fetch(
         buildApiUrl(`/api/${base}/${caseItem._id}/approve`),
@@ -689,7 +701,8 @@ const ChiefDoctorDashboard = () => {
         "Implant Patient Surgery": "ImplantPatient",
         "Partial Denture": "partial",
         Oral: "oral",
-        Periodontics: "periodontics",
+        Periodontics: "casesheets/periodontics",
+        General: "general/referred-patients",
       };
 
       const base = apiMap[selectedCase.department];
@@ -1747,7 +1760,7 @@ const ChiefDoctorDashboard = () => {
                 onClick={closeCaseSheetPreview}
                 aria-label="Close"
                 title="Close"
-              >\n                      &times;\n                    </button>
+              >&times;</button>
 
               <h2>General Case Sheet Preview</h2>
 
@@ -1829,7 +1842,7 @@ const ChiefDoctorDashboard = () => {
                     onClick={closeMessageBox}
                     aria-label="Close"
                     title="Close"
-                  >\n                      &times;\n                    </button>
+                  >&times;</button>
                   <p>{message}</p>
                 </>
               ) : (
@@ -1840,7 +1853,7 @@ const ChiefDoctorDashboard = () => {
                     onClick={closeMessageBox}
                     aria-label="Close"
                     title="Close"
-                  >\n                      &times;\n                    </button>
+                  >&times;</button>
                   <h2>{messageTitle}</h2>
                   <p>{message}</p>
                   <button onClick={closeMessageBox}>OK</button>

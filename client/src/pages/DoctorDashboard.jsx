@@ -556,6 +556,11 @@ const DoctorDashboard = () => {
       .join(' ');
   };
 
+  const resolveCaseDepartment = (caseItem) => {
+    const rawDept = caseItem?.department || caseItem?.referredDepartment || caseItem?.departmentName || '';
+    return formatDepartmentLabel(rawDept);
+  };
+
   const doctorDepartmentKey = normalizeDepartment(
     localStorage.getItem('doctorDepartment') || user?.department || ''
   );
@@ -1472,33 +1477,45 @@ const DoctorDashboard = () => {
         return;
       }
 
-      const res = await fetch(buildApiUrl('/api/auth/doctor/assigned-pgs/overview'), {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const [res, apptRes] = await Promise.all([
+        fetch(buildApiUrl('/api/auth/doctor/assigned-pgs'), {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch(buildApiUrl('/api/appointment/pg-appointments'), {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        })
+      ]);
 
       if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || `Failed to load assigned PG overview (${res.status})`);
+        const errJson = await safeReadJson(res);
+        const msg = errJson?.message || (await res.text());
+        throw new Error(msg || `Failed to load assigned PGs (${res.status})`);
       }
 
       const json = await res.json();
-      // Defensive client-side filter: ensure department doctors see only PG/UG they supervise
       const rawPgs = Array.isArray(json.pgs) ? json.pgs : [];
-      const rawAppointments = Array.isArray(json.appointments) ? json.appointments : [];
-      const rawAnalytics = Array.isArray(json.analytics) ? json.analytics : [];
+      setAssignedPGs(rawPgs);
 
-      if (currentRoleKey === 'doctor' && user && user._id) {
-        const supervised = rawPgs.filter(p => String(p.createdBy || '') === String(user._id));
-        setAssignedPGs(supervised);
-      } else {
-        setAssignedPGs(rawPgs);
+      let pgAppts = [];
+      if (apptRes.ok) {
+        const apptJson = await safeReadJson(apptRes);
+        if (apptJson && Array.isArray(apptJson.appointments)) {
+          pgAppts = apptJson.appointments.map(appt => ({
+            ...appt,
+            pgIdentity: appt.assignedPgId || appt.doctorId,
+            pgName: appt.assignedPgName || appt.doctorName,
+            assignedAt: appt.assignedAt || appt.createdAt
+          }));
+        }
       }
-
-      setAssignedAppointments(rawAppointments);
-      setPGAnalytics(rawAnalytics);
+      setAssignedAppointments(pgAppts);
+      setPGAnalytics([]);
     } catch (err) {
       setPGError(err.message || 'Unable to load assigned PG data');
       setAssignedPGs([]);
@@ -1807,7 +1824,7 @@ const DoctorDashboard = () => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            department: caseItem.department,
+            department: resolveCaseDepartment(caseItem),
             chiefApproval: 'Approved',
             approvedBy: user?.name || 'Doctor',
           }),
@@ -1871,7 +1888,7 @@ const DoctorDashboard = () => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            department: selectedCase.department,
+            department: resolveCaseDepartment(selectedCase),
             chiefApproval: `Resend: ${redoReason}`,
             approvedBy: user?.name || 'Doctor',
           }),

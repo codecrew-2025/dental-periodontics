@@ -262,7 +262,7 @@ const isValidObjectIdString = (value) => typeof value === "string" && /^[a-f\d]{
 
 const getAssignableDoctors = async () => {
   const doctors = await User.find(
-    { role: "doctor" },
+    { role: { $in: ["doctor", "chief-doctor", "chief"] } },
     { _id: 1, name: 1, Identity: 1, role: 1, department: 1 }
   ).lean();
 
@@ -279,6 +279,38 @@ const getAssignableDoctors = async () => {
   });
 
   return generalDoctors;
+};
+
+const getAssignableDoctorsForDepartment = async (departmentLabel) => {
+  if (!departmentLabel) {
+    return getAssignableDoctors();
+  }
+
+  const normalizedDept = normalizeDepartment(departmentLabel);
+  if (GENERAL_DOCTOR_DEPARTMENT_KEYS.has(normalizedDept)) {
+    return getAssignableDoctors();
+  }
+
+  const aliases = getDepartmentAliases(departmentLabel);
+  const doctors = await User.find(
+    { role: { $in: ["doctor", "chief-doctor", "chief"] } },
+    { _id: 1, name: 1, Identity: 1, role: 1, department: 1 }
+  ).lean();
+
+  const departmentDoctors = doctors.filter((doctor) => {
+    const nd = normalizeDepartment(doctor.department);
+    return aliases.includes(nd);
+  });
+
+  departmentDoctors.sort((a, b) => {
+    const aId = (a.Identity || "").toString();
+    const bId = (b.Identity || "").toString();
+    const byIdentity = aId.localeCompare(bId, "en", { numeric: true, sensitivity: "base" });
+    if (byIdentity !== 0) return byIdentity;
+    return String(a._id).localeCompare(String(b._id));
+  });
+
+  return departmentDoctors;
 };
 
 const getNextRoundRobinStartIndex = async (doctorsLength) => {
@@ -303,19 +335,25 @@ const getNextRoundRobinStartIndex = async (doctorsLength) => {
   return ((startCounter % doctorsLength) + doctorsLength) % doctorsLength;
 };
 
-const pickDoctorForSlot = async ({ appointmentDate, appointmentTime }) => {
-  const doctors = await getAssignableDoctors();
+const pickDoctorForSlot = async ({ appointmentDate, appointmentTime, department }) => {
+  const doctors = department
+    ? await getAssignableDoctorsForDepartment(department)
+    : await getAssignableDoctors();
+
   if (!doctors.length) {
     return { ok: false, status: 503, message: "No doctors available to assign right now." };
   }
 
   const normalizedAppointmentTime = normalizeAppointmentTime(appointmentTime);
 
+  const candidateDoctorKeys = doctors.map((doctor) => String(doctor._id));
+
   const existingAtSlot = await Appointment.find(
     {
       appointmentDate,
       appointmentTime: normalizedAppointmentTime,
       status: { $ne: "cancelled" },
+      doctorId: { $in: candidateDoctorKeys },
     },
     { doctorId: 1 }
   ).lean();
@@ -496,6 +534,7 @@ router.post(["/", "/appointments"], async (req, res) => {
     const {
       patientId,
       patientEmail,
+      department,
       chiefComplaint,
       appointmentDate,
       appointmentTime,
@@ -504,6 +543,7 @@ router.post(["/", "/appointments"], async (req, res) => {
     console.log("📥 Create appointment request:", {
       patientId,
       patientEmail,
+      department,
       chiefComplaint,
       appointmentDate,
       appointmentTime,
@@ -514,6 +554,7 @@ router.post(["/", "/appointments"], async (req, res) => {
       console.warn("⚠️ Missing required fields for appointment", {
         patientId,
         patientEmail,
+        department,
         chiefComplaint,
         appointmentDate,
         appointmentTime,
@@ -536,7 +577,7 @@ router.post(["/", "/appointments"], async (req, res) => {
       });
     }
 
-    const assignment = await pickDoctorForSlot({ appointmentDate, appointmentTime });
+    const assignment = await pickDoctorForSlot({ appointmentDate, appointmentTime, department });
     if (!assignment.ok) {
       return res.status(assignment.status).json({
         success: false,
@@ -546,6 +587,7 @@ router.post(["/", "/appointments"], async (req, res) => {
 
     const normalizedAppointmentTime = assignment.normalizedAppointmentTime;
     const assignedDoctorId = String(assignment.doctor._id);
+    const assignedDoctorIdentity = String(assignment.doctor.Identity || assignedDoctorId);
     const resolvedPatientEmail = await resolvePatientEmail(patientId, patientEmail);
 
     if (!resolvedPatientEmail) {
@@ -559,8 +601,9 @@ router.post(["/", "/appointments"], async (req, res) => {
 
     // bookingId is unique; retry a couple times in the (rare) event of a collision.
     let appointment = null;
+    let bookingId = null;
     for (let attempt = 0; attempt < 3; attempt++) {
-      const bookingId = generateBookingId();
+      bookingId = generateBookingId();
       try {
         // 🔥 Appointments start as PENDING when patient books
         // General doctor auto-accepts by viewing them (no explicit approval button)
@@ -572,6 +615,9 @@ router.post(["/", "/appointments"], async (req, res) => {
           appointmentDate,
           appointmentTime: normalizedAppointmentTime,
           doctorId: assignedDoctorId,
+          supervisingDeptDoctorId: assignedDoctorIdentity,
+          supervising_dept_doctor_id: assignedDoctorIdentity,
+          deptDoctorId: assignedDoctorIdentity,
           status: "pending", // PENDING - general doctor sees and accepts implicitly
           needsGeneralApproval: false,
           needsPgApproval: false,
@@ -585,6 +631,46 @@ router.post(["/", "/appointments"], async (req, res) => {
 
     if (!appointment) {
       throw new Error("Failed to create appointment after retries");
+    }
+
+    // Audit the appointment booking for follow-up and portal sync tracking.
+    try {
+      let auditActor = null;
+      const authHeader = String(req.headers.authorization || '');
+      if (authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defaultsecret');
+          auditActor = {
+            userId: String(decoded.userId || ''),
+            role: String(decoded.role || ''),
+          };
+        } catch (e) {
+          // ignore invalid token for public booking routes
+        }
+      }
+
+      await AuditLog.create({
+        bookingId,
+        action: 'book',
+        actor: auditActor,
+        chosenDoctor: {
+          id: assignedDoctorId,
+          identity: String(assignment.doctor?.Identity || ''),
+          name: String(assignment.doctor?.name || ''),
+        },
+        previousStatus: null,
+        newStatus: appointment.status,
+        meta: {
+          patientId,
+          patientEmail: resolvedPatientEmail,
+          appointmentDate,
+          appointmentTime: normalizedAppointmentTime,
+          chiefComplaint: normalizedComplaint,
+        },
+      });
+    } catch (auditErr) {
+      console.warn('AuditLog.create failed for appointment booking:', auditErr && auditErr.message ? auditErr.message : auditErr);
     }
 
     const bookingEmailResult = await sendEmail(
@@ -656,7 +742,7 @@ router.get('/department-queue/:deptKey', auth, requireRole(['doctor','chief-doct
     const deptKey = String(req.params.deptKey || '').trim().toLowerCase();
     if (!deptKey) return res.status(400).json({ success: false, message: 'Department required' });
 
-    const doctors = await User.find({ role: 'doctor' }, { _id: 1, Identity: 1, department: 1 }).lean();
+    const doctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief', 'pg', 'ug'] } }, { _id: 1, Identity: 1, department: 1 }).lean();
     const aliases = getDepartmentAliases(deptKey);
     const matching = doctors.filter(d => {
       const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
@@ -669,11 +755,46 @@ router.get('/department-queue/:deptKey', auth, requireRole(['doctor','chief-doct
     const todayStr = new Date().toISOString().split('T')[0];
     const activeStatuses = ['pending','assigned','rescheduled','in_progress'];
 
+    let assignedPatientIds = [];
+    try {
+      const GeneralCase = (await import('../models/GeneralCase.js')).default;
+      const assignedCases = await GeneralCase.find(
+        { assignedPgId: { $in: keys }, specialistStatus: 'approved' },
+        { patientId: 1 }
+      ).maxTimeMS(5000).lean();
+      assignedPatientIds = assignedCases.map(c => String(c.patientId || '')).filter(Boolean);
+    } catch (gcErr) {
+      console.warn('[dept-queue] GeneralCase lookup timed out or failed:', gcErr.message);
+    }
+
+    // Include patients referred via Oral Case Sheets to this department (fault-tolerant)
+    let oralReferredPatientIds = [];
+    try {
+      const OralCase = (await import('../models/Oral-model.js')).default;
+      const deptAliasLabels = aliases.map(a => a.replace(/[^a-z0-9]/gi, '').toLowerCase());
+      const allOralCases = await OralCase.find(
+        { referredDepartment: { $ne: '' } },
+        { patientId: 1, referredDepartment: 1 }
+      ).maxTimeMS(5000).lean();
+      oralReferredPatientIds = allOralCases
+        .filter(c => {
+          const rd = String(c.referredDepartment || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+          return deptAliasLabels.includes(rd);
+        })
+        .map(c => String(c.patientId || '').trim())
+        .filter(Boolean);
+    } catch (oralErr) {
+      console.warn('[dept-queue] OralCase lookup timed out or failed, skipping oral referrals:', oralErr.message);
+    }
+
+    const allReferredPatientIds = Array.from(new Set([...assignedPatientIds, ...oralReferredPatientIds]));
+
     const appointments = await Appointment.find({
       $or: [
         { doctorId: { $in: keys } },
         { supervisingDeptDoctorId: { $in: keys } },
-        { deptDoctorId: { $in: keys } }
+        { deptDoctorId: { $in: keys } },
+        { patientId: { $in: allReferredPatientIds } }
       ],
       status: { $in: activeStatuses },
       appointmentDate: { $gte: todayStr }
@@ -694,7 +815,7 @@ router.get('/department-queue-public/:deptKey', async (req, res) => {
     const deptKey = String(req.params.deptKey || '').trim().toLowerCase();
     if (!deptKey) return res.status(400).json({ success: false, message: 'Department required' });
 
-    const doctors = await User.find({ role: 'doctor' }, { _id: 1, Identity: 1, department: 1 }).lean();
+    const doctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief', 'pg', 'ug'] } }, { _id: 1, Identity: 1, department: 1 }).lean();
     const aliases = getDepartmentAliases(deptKey);
     const matching = doctors.filter(d => {
       const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
@@ -748,20 +869,21 @@ router.get("/my-appointments", auth, requireRole(["doctor", "chief-doctor"]), as
 
     // Compare as ISO date string (YYYY-MM-DD)
     const todayStr = new Date().toISOString().split("T")[0];
+    const excludedStatuses = ["cancelled", "completed", "closed"];
 
     let appointments;
     
     if (isGeneralDoctor) {
-      // 🔥 FIX: General doctors see ALL pending and assigned appointments (not just assigned to them)
+      // General doctors see all upcoming active appointments, including revisits.
       appointments = await Appointment.find({
-        status: { $in: ["pending", "assigned", "rescheduled"] },
+        status: { $nin: excludedStatuses },
         appointmentDate: { $gte: todayStr },
         isProcessed: { $ne: true },
       }).sort({ appointmentDate: 1, appointmentTime: 1 });
     } else {
-      // Specialist doctors see appointments assigned to ANY doctor in their department
+      // Specialist doctors see appointments assigned to ANY doctor in their department.
       const aliases = getDepartmentAliases(userDepartment);
-      const deptDoctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief'] } }, { _id: 1, Identity: 1, department: 1 }).lean();
+      const deptDoctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief', 'pg', 'ug'] } }, { _id: 1, Identity: 1, department: 1 }).lean();
       const matchingDeptDoctors = deptDoctors.filter(d => {
         const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
         return aliases.includes(nd);
@@ -771,13 +893,50 @@ router.get("/my-appointments", auth, requireRole(["doctor", "chief-doctor"]), as
         matchingDeptDoctors.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))
       ));
 
+      let assignedPatientIds = [];
+      try {
+        const GeneralCase = (await import('../models/GeneralCase.js')).default;
+        const assignedCases = await GeneralCase.find(
+          { assignedPgId: { $in: deptDoctorKeys }, specialistStatus: 'approved' },
+          { patientId: 1 }
+        ).maxTimeMS(5000).lean();
+        assignedPatientIds = assignedCases.map(c => String(c.patientId || '')).filter(Boolean);
+      } catch (gcErr) {
+        console.warn('[my-appointments] GeneralCase lookup timed out or failed:', gcErr.message);
+      }
+
+      // Also include patients referred via Oral Case Sheets to this department (fault-tolerant)
+      let oralReferredPatientIds = [];
+      try {
+        const OralCase = (await import('../models/Oral-model.js')).default;
+        const deptAliasLabels = aliases.map(a =>
+          a.replace(/[^a-z0-9]/gi, '').toLowerCase()
+        );
+        const allOralCases = await OralCase.find(
+          { referredDepartment: { $ne: '' } },
+          { patientId: 1, referredDepartment: 1 }
+        ).maxTimeMS(5000).lean();
+        oralReferredPatientIds = allOralCases
+          .filter(c => {
+            const rd = String(c.referredDepartment || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+            return deptAliasLabels.includes(rd);
+          })
+          .map(c => String(c.patientId || '').trim())
+          .filter(Boolean);
+      } catch (oralErr) {
+        console.warn('[my-appointments] OralCase lookup timed out or failed, skipping oral referrals:', oralErr.message);
+      }
+
+      const allReferredPatientIds = Array.from(new Set([...assignedPatientIds, ...oralReferredPatientIds]));
+
       appointments = await Appointment.find({
         $or: [
           { doctorId: { $in: deptDoctorKeys } },
           { supervisingDeptDoctorId: { $in: deptDoctorKeys } },
-          { deptDoctorId: { $in: deptDoctorKeys } }
+          { deptDoctorId: { $in: deptDoctorKeys } },
+          { patientId: { $in: allReferredPatientIds } }
         ],
-        status: { $in: ["pending", "assigned", "in_progress", "rescheduled"] },
+        status: { $nin: excludedStatuses },
         appointmentDate: { $gte: todayStr },
       }).sort({ appointmentDate: 1, appointmentTime: 1 });
     }
@@ -816,11 +975,16 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
       }
 
       // Get all patient IDs assigned to these PG/UG students
-      const GeneralCase = (await import('../models/GeneralCase.js')).default;
-      const assignedCases = await GeneralCase.find(
-        { assignedPgId: { $in: pgIdentities }, specialistStatus: 'approved' },
-        { patientId: 1, assignedPgId: 1 }
-      ).lean();
+      let assignedCases = [];
+      try {
+        const GeneralCase = (await import('../models/GeneralCase.js')).default;
+        assignedCases = await GeneralCase.find(
+          { assignedPgId: { $in: pgIdentities }, specialistStatus: 'approved' },
+          { patientId: 1, assignedPgId: 1 }
+        ).maxTimeMS(5000).lean();
+      } catch (gcErr) {
+        console.warn('[pg-appointments] GeneralCase lookup timed out or failed:', gcErr.message);
+      }
 
       const patientIdToPgMap = new Map();
       assignedCases.forEach(c => {
@@ -877,15 +1041,16 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
       
       let appointments;
       
+      const excludedStatuses = ['cancelled', 'completed', 'closed'];
       if (isGeneralDoctor) {
-        // General/Oral department PGs see ALL pending and assigned appointments (like general doctors)
+        // General/Oral department PGs see all upcoming active appointments (like general doctors).
         appointments = await Appointment.find({
-          status: { $in: ["pending", "assigned", "rescheduled"] },
+          status: { $nin: excludedStatuses },
           appointmentDate: { $gte: todayStr },
           isProcessed: { $ne: true },
         }).sort({ appointmentDate: 1, appointmentTime: 1 });
       } else {
-        // Specialist PGs see appointments assigned to ANY doctor in their department (like specialist doctors)
+        // Specialist PGs see appointments assigned to ANY doctor in their department (like specialist doctors).
         const aliases = getDepartmentAliases(pgDepartment);
         const deptDoctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief'] } }, { _id: 1, Identity: 1, department: 1 }).lean();
         const matchingDeptDoctors = deptDoctors.filter(d => {
@@ -903,7 +1068,7 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
             { supervisingDeptDoctorId: { $in: deptDoctorKeys } },
             { deptDoctorId: { $in: deptDoctorKeys } }
           ],
-          status: { $in: ["pending", "assigned", "in_progress", "rescheduled"] },
+          status: { $nin: excludedStatuses },
           appointmentDate: { $gte: todayStr },
         }).sort({ appointmentDate: 1, appointmentTime: 1 });
       }
@@ -930,7 +1095,7 @@ router.get('/department/:deptKey', auth, requireRole(['doctor','chief-doctor','c
     if (!deptKey) return res.status(400).json({ success: false, message: 'Department required' });
 
     // Find doctors belonging to this department
-    const doctors = await User.find({ role: 'doctor' }, { _id: 1, Identity: 1, department: 1 }).lean();
+    const doctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief', 'pg', 'ug'] } }, { _id: 1, Identity: 1, department: 1 }).lean();
     const aliases = getDepartmentAliases(deptKey);
     const matching = doctors.filter(d => {
       const nd = String(d.department || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
@@ -942,15 +1107,23 @@ router.get('/department/:deptKey', auth, requireRole(['doctor','chief-doctor','c
     const keys = Array.from(new Set(matching.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))));
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const activeStatuses = ['pending','assigned','rescheduled','in_progress'];
+    const excludedStatuses = ['cancelled', 'completed', 'closed'];
+
+    const GeneralCase = (await import('../models/GeneralCase.js')).default;
+    const assignedCases = await GeneralCase.find(
+      { assignedPgId: { $in: keys }, specialistStatus: 'approved' },
+      { patientId: 1 }
+    ).lean();
+    const assignedPatientIds = assignedCases.map(c => String(c.patientId || '')).filter(Boolean);
 
     const appointments = await Appointment.find({
       $or: [
         { doctorId: { $in: keys } },
         { supervisingDeptDoctorId: { $in: keys } },
-        { deptDoctorId: { $in: keys } }
+        { deptDoctorId: { $in: keys } },
+        { patientId: { $in: assignedPatientIds } }
       ],
-      status: { $in: activeStatuses },
+      status: { $nin: excludedStatuses },
       appointmentDate: { $gte: todayStr }
     }).sort({ appointmentDate: 1, appointmentTime: 1 }).lean();
 
@@ -3026,6 +3199,190 @@ router.put("/:bookingId/consultation/complete", auth, requireRole(["pg", "ug"]),
   } catch (err) {
     console.error("Complete consultation error:", err);
     res.status(500).json({ success: false, message: "Failed to complete consultation" });
+  }
+});
+
+/* ================= NEW RESCHEDULE WORKFLOW ================= */
+
+// Helper: build a safe $or query that only includes _id when it looks like an ObjectId
+const safeFindAppointment = (appointmentId) => {
+  const isObjId = /^[a-f\d]{24}$/i.test(String(appointmentId || ''));
+  const orClause = [{ bookingId: appointmentId }];
+  if (isObjId) orClause.unshift({ _id: appointmentId });
+  return Appointment.findOne({ $or: orClause });
+};
+
+// 1. Patient requests a reschedule
+router.post('/patient-reschedule', auth, async (req, res) => {
+  try {
+    const { appointmentId, proposedDate, proposedTime, reason } = req.body;
+    if (!appointmentId) return res.status(400).json({ success: false, message: 'appointmentId required' });
+    const appointment = await safeFindAppointment(appointmentId);
+    if (!appointment) return res.status(404).json({ success: false, message: 'Appointment not found' });
+
+    // Update status and reschedule request
+    appointment.status = 'patient_reschedule_requested';
+    appointment.rescheduleRequest = {
+      initiatorRole: 'patient',
+      requestedBy: req.user?.Identity || req.user?.name || '',
+      requestedByName: req.user?.name || '',
+      proposedDate,
+      proposedTime,
+      reason: reason || '',
+      requestStatus: 'pending',
+      requestedAt: new Date()
+    };
+    await appointment.save();
+    res.json({ success: true, message: 'Reschedule requested' });
+  } catch (error) {
+    console.error('patient-reschedule error:', error?.stack || error);
+    res.status(500).json({ success: false, message: 'Failed to submit reschedule request' });
+  }
+});
+
+// 2. PG/UG takes action on patient's request (Accept or Counter-Reschedule)
+router.post('/pg-reschedule-action', auth, requireRole(['pg', 'ug']), async (req, res) => {
+  try {
+    const { appointmentId, action, proposedDate, proposedTime, reason } = req.body;
+    if (!appointmentId) return res.status(400).json({ success: false, message: 'appointmentId required' });
+    const appointment = await safeFindAppointment(appointmentId);
+    if (!appointment) return res.status(404).json({ success: false, message: 'Appointment not found' });
+
+    if (action === 'accept') {
+      // PG accepts patient's request — apply proposed date/time
+      appointment.appointmentDate = appointment.rescheduleRequest?.proposedDate || appointment.appointmentDate;
+      appointment.appointmentTime = appointment.rescheduleRequest?.proposedTime || appointment.appointmentTime;
+      appointment.status = 'assigned';
+      appointment.rescheduleRequest.requestStatus = 'approved';
+      appointment.rescheduleRequest.reviewedBy = req.user?.Identity || '';
+      appointment.rescheduleRequest.reviewedAt = new Date();
+    } else if (action === 'counter') {
+      // PG proposes a different time — must go to Doctor for confirmation
+      appointment.status = 'pg_counter_reschedule_pending_doc';
+      appointment.rescheduleRequest = {
+        initiatorRole: 'pg',
+        requestedBy: req.user?.Identity || '',
+        requestedByName: req.user?.name || '',
+        proposedDate: proposedDate || '',
+        proposedTime: proposedTime || '',
+        reason: reason || '',
+        requestStatus: 'pending',
+        requestedAt: new Date()
+      };
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid action. Use "accept" or "counter"' });
+    }
+
+    await appointment.save();
+    res.json({ success: true, message: 'Action processed' });
+  } catch (error) {
+    console.error('pg-reschedule-action error:', error?.stack || error);
+    res.status(500).json({ success: false, message: 'Failed to process reschedule action' });
+  }
+});
+
+// 3. Supervising Doctor confirms PG's counter-proposal
+router.post('/doc-confirm-reschedule', auth, requireRole(['doctor', 'chief-doctor', 'chief']), async (req, res) => {
+  try {
+    const { appointmentId, action } = req.body; // action: 'approve' or 'reject'
+    if (!appointmentId) return res.status(400).json({ success: false, message: 'appointmentId required' });
+    const appointment = await safeFindAppointment(appointmentId);
+    if (!appointment) return res.status(404).json({ success: false, message: 'Appointment not found' });
+
+    if (action === 'approve') {
+      appointment.status = 'pg_counter_reschedule_approved_doc';
+      if (appointment.rescheduleRequest) {
+        appointment.rescheduleRequest.requestStatus = 'approved';
+        appointment.rescheduleRequest.reviewedBy = req.user?.Identity || '';
+        appointment.rescheduleRequest.reviewedAt = new Date();
+      }
+    } else if (action === 'reject') {
+      appointment.status = 'assigned'; // Back to assigned state
+      if (appointment.rescheduleRequest) {
+        appointment.rescheduleRequest.requestStatus = 'rejected';
+        appointment.rescheduleRequest.reviewedBy = req.user?.Identity || '';
+        appointment.rescheduleRequest.reviewedAt = new Date();
+      }
+    } else {
+      return res.status(400).json({ success: false, message: 'Invalid action. Use "approve" or "reject"' });
+    }
+
+    await appointment.save();
+    res.json({ success: true, message: 'Doctor confirmation processed' });
+  } catch (error) {
+    console.error('doc-confirm-reschedule error:', error?.stack || error);
+    res.status(500).json({ success: false, message: 'Failed to process doctor confirmation' });
+  }
+});
+
+// 4. Patient accepts the doctor-approved counter-proposal
+router.post('/patient-accept-counter', auth, async (req, res) => {
+  try {
+    const { appointmentId } = req.body;
+    if (!appointmentId) return res.status(400).json({ success: false, message: 'appointmentId required' });
+    const appointment = await safeFindAppointment(appointmentId);
+    if (!appointment) return res.status(404).json({ success: false, message: 'Appointment not found' });
+
+    if (!appointment.rescheduleRequest?.proposedDate) {
+      return res.status(400).json({ success: false, message: 'No proposed date/time found on this appointment' });
+    }
+
+    appointment.appointmentDate = appointment.rescheduleRequest.proposedDate;
+    appointment.appointmentTime = appointment.rescheduleRequest.proposedTime;
+    appointment.status = 'confirmed';
+    appointment.rescheduleRequest.requestStatus = 'approved';
+
+    await appointment.save();
+    res.json({ success: true, message: 'Counter-proposal accepted. Appointment confirmed!' });
+  } catch (error) {
+    console.error('patient-accept-counter error:', error?.stack || error);
+    res.status(500).json({ success: false, message: 'Failed to accept counter-proposal' });
+  }
+});
+
+// 5. Patient confirms (accepts) the appointment as-is (no change to date/time)
+router.post('/patient-confirm', auth, async (req, res) => {
+  try {
+    const { appointmentId } = req.body;
+    if (!appointmentId) return res.status(400).json({ success: false, message: 'appointmentId required' });
+
+    const appointment = await safeFindAppointment(appointmentId);
+    if (!appointment) return res.status(404).json({ success: false, message: 'Appointment not found' });
+
+    // Confirmable statuses — includes the doctor-approved counter as well
+    const confirmableStatuses = [
+      'pending', 'assigned', 'rescheduled', 'in_progress',
+      'pg_counter_reschedule_approved_doc'
+    ];
+    if (!confirmableStatuses.includes(appointment.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot confirm appointment in its current status: ${appointment.status}`
+      });
+    }
+
+    const previousStatus = appointment.status;
+    appointment.status = 'confirmed';
+    await appointment.save();
+
+    // Audit log — wrap so it never breaks the success response
+    try {
+      await AuditLog.create({
+        bookingId: appointment.bookingId,
+        action: 'patient_confirm',
+        actor: { userId: String(req.user?._id || ''), role: String(req.user?.role || '') },
+        previousStatus,
+        newStatus: 'confirmed',
+        meta: { patientId: appointment.patientId },
+      });
+    } catch (auditErr) {
+      console.warn('AuditLog for patient_confirm failed:', auditErr?.message);
+    }
+
+    res.json({ success: true, message: 'Appointment confirmed successfully' });
+  } catch (error) {
+    console.error('patient-confirm error:', error?.stack || error);
+    res.status(500).json({ success: false, message: 'Failed to confirm appointment' });
   }
 });
 

@@ -3,6 +3,18 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { API_BASE_URL } from "../../config/api";
 import "./Digital_Doctor_Case_Sheet_Periodontics.css";
 
+const ALLOWED_APPOINTMENT_TIMES = [
+  "9:00 AM",
+  "9:30 AM",
+  "10:00 AM",
+  "10:30 AM",
+  "11:30 AM",
+  "12:00 PM",
+  "12:30 PM",
+  "2:00 PM",
+  "2:30 PM",
+];
+
 // ─── Tiny text-input helper ───────────────────────────────────────────────────
 function TI({ id }) {
   return <input type="text" id={id} name={id} />;
@@ -474,7 +486,7 @@ function Page10() {
   );
 }
 
-function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewSrc, setSignaturePreviewSrc, readOnly }) {
+function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewSrc, setSignaturePreviewSrc, readOnly, appointmentDate, appointmentTime, setAppointmentDate, setAppointmentTime, patientEmail, appointmentMessage }) {
   function handleSignatureChange(e) {
     const file = e.target.files[0];
     if (file) {
@@ -556,6 +568,49 @@ function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewS
             )}
           </div>
         </div>
+
+        <div className="appointment-section" style={{ marginTop: '24px', padding: '18px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '10px', background: 'rgba(255,255,255,0.05)' }}>
+          <h2 style={{ marginTop: 0 }}>Optional Follow-up Appointment</h2>
+          <p style={{ marginBottom: '14px', color: '#d1d5db' }}>
+            Schedule a patient appointment when you finish the case sheet. Leave blank to skip booking.
+          </p>
+          <div className="form-group">
+            <label htmlFor="appointmentDate">Appointment Date:</label>
+            <input
+              type="date"
+              id="appointmentDate"
+              value={appointmentDate}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={(e) => setAppointmentDate(e.target.value)}
+              disabled={readOnly}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="appointmentTime">Appointment Time:</label>
+            <select
+              id="appointmentTime"
+              value={appointmentTime}
+              onChange={(e) => setAppointmentTime(e.target.value)}
+              disabled={readOnly}
+              style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'white', color: '#111827' }}
+            >
+              <option value="">Select time</option>
+              {ALLOWED_APPOINTMENT_TIMES.map((time) => (
+                <option key={time} value={time}>{time}</option>
+              ))}
+            </select>
+          </div>
+          {patientEmail ? (
+            <p style={{ marginTop: '10px', color: '#cbd5e1' }}><strong>Patient email:</strong> {patientEmail}</p>
+          ) : (
+            <p style={{ marginTop: '10px', color: '#fbbf24' }}>Patient email not available. Appointment booking will use a fallback address.</p>
+          )}
+          {appointmentMessage && (
+            <p style={{ marginTop: '12px', color: appointmentMessage.startsWith('Appointment scheduled') ? '#a3e635' : '#fb923c' }}>
+              {appointmentMessage}
+            </p>
+          )}
+        </div>
       </div>
     </>
   );
@@ -587,6 +642,10 @@ const TOTAL_PAGES = 11;
 export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData, readOnly = false }) {
   useConsentRedirect(readOnly);
   const navigate = useNavigate();
+  const getTodayIso = () => new Date().toISOString().slice(0, 10);
+  const patientId = localStorage.getItem('CurrentpatientId') || '';
+  const patientName = localStorage.getItem('CurrentpatientName') || '';
+
   const [currentPage, setCurrentPage] = useState(0);
   const [doctorName, setDoctorName] = useState(() => {
     if (initialCaseData?.doctorName) return initialCaseData.doctorName;
@@ -611,8 +670,25 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
   const [allergyMessage, setAllergyMessage] = useState('Loading allergies...');
   const [showAllergy, setShowAllergy] = useState(true);
   const [criticalCondition, setCriticalCondition] = useState('');
+  const [appointmentDate, setAppointmentDate] = useState(getTodayIso());
+  const [appointmentTime, setAppointmentTime] = useState('');
+  const [patientEmail, setPatientEmail] = useState('');
+  const [appointmentMessage, setAppointmentMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formRef = useRef(null);
+
+  const fetchPatientEmail = async () => {
+    if (!patientId) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/email-retrieve/${encodeURIComponent(patientId)}`);
+      const json = await response.json();
+      if (response.ok && json.success && json.email) {
+        setPatientEmail(String(json.email || '').trim());
+      }
+    } catch (error) {
+      console.warn('Unable to fetch patient email for appointment booking:', error);
+    }
+  };
 
   // Inject saved field values into DOM inputs when in readOnly mode
   useEffect(() => {
@@ -630,9 +706,6 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
     }, 50);
     return () => clearTimeout(timer);
   }, [readOnly, initialCaseData, currentPage]);
-
-  const patientId = localStorage.getItem('CurrentpatientId') || '';
-  const patientName = localStorage.getItem('CurrentpatientName') || '';
 
   const isFirstPage = currentPage === 0;
   const isLastPage  = currentPage === TOTAL_PAGES - 1;
@@ -708,8 +781,9 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
     };
 
     loadAllergy();
+    if (patientId) fetchPatientEmail();
     return () => { isMounted = false; };
-  }, []);
+  }, [patientId]);
 
   const formatAllergyTicker = (raw) => {
     const text = (raw || '').trim();
@@ -759,6 +833,24 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
         });
       }
 
+      if ((appointmentDate && !appointmentTime) || (!appointmentDate && appointmentTime)) {
+        alert('Please select both appointment date and time, or leave both blank.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (appointmentDate && appointmentDate < getTodayIso()) {
+        alert('Appointment date cannot be in the past.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (appointmentTime && !ALLOWED_APPOINTMENT_TIMES.includes(appointmentTime)) {
+        alert('Please choose a valid appointment time from the available options.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const caseData = {
         patientId,
         patientName,
@@ -770,7 +862,7 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
         finalDiagnosis: formFields.final_diagnosis || formFields.provisional_diagnosis || '',
         digitalSignature: signaturePreviewSrc,
         caseType: 'long',
-        // Include all collected form fields as additional data
+        // Appointment scheduling fields are handled separately below
         ...formFields,
       };
 
@@ -787,6 +879,42 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
 
       if (!response.ok || json.success === false) {
         throw new Error(json.message || 'Failed to submit Periodontics case');
+      }
+
+      let appointmentInfo = null;
+      if (appointmentDate && appointmentTime) {
+        try {
+          const bookingResponse = await fetch(`${API_BASE_URL}/api/appointment/appointments`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              patientId,
+              patientEmail: patientEmail || `${patientId}@temp.com`,
+              department: 'Periodontics',
+              chiefComplaint: formFields.provisional_diagnosis || formFields.final_diagnosis || 'Periodontics follow-up',
+              appointmentDate,
+              appointmentTime,
+            }),
+          });
+          const bookingJson = await bookingResponse.json();
+          if (bookingResponse.ok && bookingJson.success) {
+            appointmentInfo = {
+              bookingId: bookingJson.appointment?.bookingId,
+              appointmentDate,
+              appointmentTime,
+            };
+            setAppointmentMessage(`Appointment scheduled for ${appointmentDate} at ${appointmentTime}.`);
+          } else {
+            const errorMessage = bookingJson.message || 'Appointment booking failed';
+            console.warn('Appointment booking failed:', errorMessage);
+            setAppointmentMessage(`Case saved, but appointment booking failed: ${errorMessage}`);
+          }
+        } catch (bookingError) {
+          console.warn('Appointment booking error:', bookingError);
+          setAppointmentMessage('Case saved, but appointment booking failed due to a network error.');
+        }
       }
 
       // Show success and navigate
@@ -836,6 +964,12 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
       signaturePreviewSrc={signaturePreviewSrc}
       setSignaturePreviewSrc={setSignaturePreviewSrc}
       readOnly={readOnly}
+      appointmentDate={appointmentDate}
+      appointmentTime={appointmentTime}
+      setAppointmentDate={setAppointmentDate}
+      setAppointmentTime={setAppointmentTime}
+      patientEmail={patientEmail}
+      appointmentMessage={appointmentMessage}
     />,
   ];
 
