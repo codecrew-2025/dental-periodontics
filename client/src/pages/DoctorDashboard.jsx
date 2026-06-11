@@ -659,24 +659,32 @@ const DoctorDashboard = () => {
       setCaseStatusError('');
 
       const token = localStorage.getItem('token');
-      const normalizedDepartment = String(user?.department || '').trim().toLowerCase();
-      const normalizedRole = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
-      const isDoctorOrPG = normalizedRole === 'doctor' || normalizedRole === 'pg';
-      const endpoints = [];
+      const normalizedDepartment = String(
+        user?.department ||
+        localStorage.getItem('doctorDepartment') ||
+        localStorage.getItem('pgDepartment') ||
+        localStorage.getItem('ugDepartment') ||
+        ''
+      ).trim().toLowerCase();
 
-      if (normalizedDepartment.includes('oral') || normalizedDepartment.includes('general') || normalizedDepartment.includes('dentistry')) {
-        endpoints.push({ url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: 'Oral Medicine and Radiology' });
-      }
+      // Always fetch from all relevant endpoints to avoid missing cases
+      // due to department string mismatch
+      const allEndpoints = [
+        { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: 'Oral Medicine and Radiology' },
+        { url: buildApiUrl(`/api/casesheets/periodontics/patient/${encodeURIComponent(patientId)}`), department: 'Periodontics' },
+        { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' },
+      ];
 
-      if (normalizedDepartment.includes('pedodont')) {
-        endpoints.push({ url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' });
-      }
-
-      if (!endpoints.length && !isDoctorOrPG) {
-        endpoints.push(
-          { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: 'Oral Medicine and Radiology' },
-          { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: 'Pedodontics' }
-        );
+      // If we can identify the department, only query relevant endpoint(s);
+      // otherwise query all so nothing is missed.
+      let endpoints;
+      if (normalizedDepartment.includes('periodontic')) {
+        endpoints = [allEndpoints[1]];
+      } else if (normalizedDepartment.includes('pedodont')) {
+        endpoints = [allEndpoints[2]];
+      } else {
+        // oral / general / dentistry / unknown → query all
+        endpoints = allEndpoints;
       }
 
       const results = await Promise.all(

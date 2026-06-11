@@ -77,19 +77,16 @@ const ChiefDoctorReportsPage = () => {
       setLoading(true);
       setError("");
       
-      // Calculate number of days in the date range
-      const daysDifference = Math.ceil((to - from) / (1000 * 60 * 60 * 24));
-      
-      // Fetch enough weeks to cover the date range (with some buffer)
-      const weeksToFetch = Math.min(Math.ceil(daysDifference / 7) + 2, 52);
-
-      // Use the same endpoint as weekly/monthly reports
-      const res = await fetch(`${API_BASE_URL}/api/reports/weekly?weeks=${weeksToFetch}`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+      // Use the proper chief department analytics endpoint with date range
+      const res = await fetch(
+        `${API_BASE_URL}/api/reports/chief/department-analytics?from=${fromDate}&to=${toDate}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          }
         }
-      });
+      );
 
       if (!res.ok) {
         const msg = await res.text();
@@ -101,12 +98,30 @@ const ChiefDoctorReportsPage = () => {
         throw new Error(json.message || "Failed to load report");
       }
 
-      const weeks = Array.isArray(json.weeks) ? json.weeks : (Array.isArray(json) ? json : [json]);
+      // Map the API response to the format the component expects
+      const mappedData = {
+        windowStart: json.windowStart,
+        windowEnd: json.windowEnd,
+        totalPatientsVisited: json.uniqueSeenCount || 0,
+        malePatients: json.malePatients || 0,
+        femalePatients: json.femalePatients || 0,
+        newPatientsVisited: json.newPatientsVisited || 0,
+        oldPatientsVisited: json.oldPatientsVisited || 0,
+        totalCaseSheets: json.totalCaseSheets || 0,
+        caseSheetCounts: json.caseSheetCounts || {},
+        departmentBreakdown: (json.departmentBreakdown || []).map(dept => ({
+          key: dept.key,
+          department: dept.department,
+          totalPatientsVisited: dept.totalPatients || 0,
+          malePatients: dept.malePatients || 0,
+          femalePatients: dept.femalePatients || 0,
+          newPatients: dept.newPatients || 0,
+          oldPatients: dept.oldPatients || 0,
+          totalCaseSheets: dept.totalCaseSheets || 0,
+        })).filter(dept => dept.totalCaseSheets > 0),
+      };
       
-      // Aggregate the weeks data based on date range
-      const aggregatedData = aggregateWeeksDataByDateRange(weeks, from, to);
-      
-      setReportData(aggregatedData);
+      setReportData(mappedData);
     } catch (err) {
       setError(err.message || "Unable to load report");
       setReportData(null);
@@ -114,6 +129,7 @@ const ChiefDoctorReportsPage = () => {
       setLoading(false);
     }
   };
+
 
   // Helper function to aggregate weekly data based on date range
   const aggregateWeeksDataByDateRange = (weeks, fromDate, toDate) => {

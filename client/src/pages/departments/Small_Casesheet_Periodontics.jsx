@@ -40,7 +40,7 @@ const App = ({ initialCaseData, readOnly = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allergyMessage, setAllergyMessage] = useState('Loading allergies...');
   const [showAllergy, setShowAllergy] = useState(true);
-  const [appointmentDate, setAppointmentDate] = useState(getTodayIso());
+  const [appointmentDate, setAppointmentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [appointmentTime, setAppointmentTime] = useState('');
   const [patientEmail, setPatientEmail] = useState('');
 

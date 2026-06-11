@@ -10,16 +10,7 @@ const Periodontics = () => {
   const isShort = pathname.endsWith('/short');
   const sheetType = isLong ? 'Long Case Sheet' : isShort ? 'Short Case Sheet' : 'Periodontics';
 
-  // If this route was entered with a request to obtain consent first,
-  // redirect to the consent form and come back after consent completion.
-  React.useEffect(() => {
-    const navState = location.state || {};
-    if (!navState.requestConsentAfterEntry) return;
-    if (navState[CASE_CONSENT_NAV_STATE_KEY]) return;
-
-    const redirectTarget = `${location.pathname}${location.search}`;
-    navigate(`/consent-form?redirect=${encodeURIComponent(redirectTarget)}`, { replace: true });
-  }, [location, navigate]);
+  // Consent redirect removed for Periodontics case sheet view
 
   return (
     <div className="periodontics-page" style={{ minHeight: '100vh', padding: 24, color: '#fff' }}>

@@ -997,16 +997,21 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
 
       const assignedPatientIds = Array.from(patientIdToPgMap.keys());
 
-      if (!assignedPatientIds.length) {
-        return res.json({ success: true, appointments: [] });
-      }
-
-      // Fetch appointments for these patients
+      // Fetch appointments for these patients or directly assigned to the PGs
       const appointments = await Appointment.find({
-        patientId: { $in: assignedPatientIds },
+        $or: [
+          { patientId: { $in: assignedPatientIds.length > 0 ? assignedPatientIds : ['__dummy__'] } },
+          { assignedPgUgId: { $in: pgIdentities } },
+          { assigned_pg_ug_id: { $in: pgIdentities } },
+          { pgDoctorId: { $in: pgIdentities } }
+        ],
         status: { $nin: excludedStatuses },
         appointmentDate: { $gte: todayStr },
       }).sort({ appointmentDate: 1, appointmentTime: 1 });
+
+      if (!appointments.length) {
+        return res.json({ success: true, appointments: [] });
+      }
 
       // Enrich with patient names and PG info
       const enriched = await attachPatientName(appointments);
@@ -1014,7 +1019,13 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
       // Add PG information to each appointment
       const studentMap = new Map(students.map(s => [String(s.Identity).trim(), s]));
       const enrichedWithPg = enriched.map(appt => {
-        const pgId = patientIdToPgMap.get(String(appt.patientId));
+        let pgId = patientIdToPgMap.get(String(appt.patientId));
+        
+        // If not assigned via GeneralCase, check if it's assigned directly on the appointment
+        if (!pgId && appt.assignedPgUgId) pgId = String(appt.assignedPgUgId);
+        if (!pgId && appt.assigned_pg_ug_id) pgId = String(appt.assigned_pg_ug_id);
+        if (!pgId && appt.pgDoctorId) pgId = String(appt.pgDoctorId);
+
         const student = pgId ? studentMap.get(pgId) : null;
         return {
           ...appt,

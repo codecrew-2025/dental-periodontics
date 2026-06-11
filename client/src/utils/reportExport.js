@@ -16,7 +16,7 @@ const csvEscape = (value) => {
   return str;
 };
 
-const formatDate = (value) => {
+export const formatDate = (value) => {
   if (!value) return '';
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '';

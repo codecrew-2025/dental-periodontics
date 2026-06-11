@@ -22,13 +22,15 @@ const getDeptAliases = (label) => {
   return [n];
 };
 
+// Escape user input for use in RegExp
+const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * When an Oral Medicine case sheet refers a patient to a specialist department,
  * update the patient's upcoming appointment so that the specialist doctor's
  * identifiers are on it.  This makes the appointment visible in the specialist
  * doctor's "My Appointments" / "All Appointments" views.
-// Escape user input for use in RegExp
-const escapeRegex = (s) => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+ */
 
 /**
  * Normalise the raw request body from OralMedicine.jsx into the exact
