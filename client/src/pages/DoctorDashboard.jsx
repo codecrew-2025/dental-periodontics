@@ -683,8 +683,8 @@ const DoctorDashboard = () => {
       } else if (normalizedDepartment.includes('pedodont')) {
         endpoints = [allEndpoints[2]];
       } else {
-        // oral / general / dentistry / unknown → query all
-        endpoints = allEndpoints;
+        // oral / general / dentistry / unknown → query only oral endpoint to avoid 503 errors on unrelated endpoints
+        endpoints = [allEndpoints[0]];
       }
 
       const results = await Promise.all(
