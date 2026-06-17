@@ -866,8 +866,15 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
         ...formFields,
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/casesheets/periodontics/save`, {
-        method: 'POST',
+      const editCaseId = localStorage.getItem('redoEditCaseId');
+      const isRedoEdit = !!editCaseId;
+      const endpoint = isRedoEdit
+        ? `${API_BASE_URL}/api/casesheets/${encodeURIComponent(editCaseId)}`
+        : `${API_BASE_URL}/api/casesheets/periodontics/save`;
+      const method = isRedoEdit ? 'PUT' : 'POST';
+
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: token ? `Bearer ${token}` : '',
@@ -939,13 +946,16 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
       document.getElementById('closeLongCaseModal').onclick = () => {
         document.body.removeChild(confirmBox);
         if (formRef.current) formRef.current.reset();
+        const wasRedoEdit = isRedoEdit;
+        localStorage.removeItem('redoEditCaseId');
+        localStorage.removeItem('redoEditDepartmentKey');
         setDoctorName("");
         setSignatureFile(null);
         setSignaturePreviewSrc(null);
         setCurrentPage(0);
         setIsSubmitting(false);
         window.scrollTo(0, 0);
-        window.location.href = '/prescriptions';
+        window.location.href = wasRedoEdit ? '/pg-dashboard' : '/prescriptions';
       };
     } catch (error) {
       alert(`Error submitting case: ${error.message}`);

@@ -293,7 +293,7 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  min-width: 1160px;
+  min-width: 1300px;
 }
 
 .pg-assigned-appointment-line {
@@ -462,11 +462,17 @@
 }
 
 .pg-assigned-action-buttons {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
+  white-space: nowrap;
 }
+
+.pg-assigned-action-buttons button {
+  flex-shrink: 0;
+}
+
 
 /* Patients table column sizing (PG dashboard)
    Columns: S.No, Patient Name, Patient ID, Slot Time, Chief Complaint, General, Action */
@@ -520,7 +526,7 @@
    Columns: S.No, Date, Patient Name, Patient ID, Department, Status, Redo Message, Action */
 .pg-assigned-cases .pg-history-table th:nth-child(1),
 .pg-assigned-cases .pg-history-table td:nth-child(1) {
-  width: 6%;
+  width: 5%;
   text-align: center;
 }
 
@@ -541,7 +547,7 @@
 
 .pg-assigned-cases .pg-history-table th:nth-child(5),
 .pg-assigned-cases .pg-history-table td:nth-child(5) {
-  width: 20%;
+  width: 10%;
 }
 
 .pg-assigned-cases .pg-history-table th:nth-child(6),
@@ -551,12 +557,23 @@
 
 .pg-assigned-cases .pg-history-table th:nth-child(7),
 .pg-assigned-cases .pg-history-table td:nth-child(7) {
-  width: 23%;
+  width: 10%;
 }
 
 .pg-assigned-cases .pg-history-table th:nth-child(8),
 .pg-assigned-cases .pg-history-table td:nth-child(8) {
-  width: 13%;
+  width: 15%;
+}
+
+.pg-assigned-cases .pg-history-table th:nth-child(9),
+.pg-assigned-cases .pg-history-table td:nth-child(9) {
+  width: 15%;
+}
+
+.pg-assigned-cases .pg-history-table th:last-child,
+.pg-assigned-cases .pg-history-table td:last-child {
+  width: 20%;
+  min-width: 210px;
   text-align: center;
 }
 

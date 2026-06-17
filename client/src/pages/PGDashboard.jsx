@@ -31,12 +31,15 @@ const PGDashboard = ({ brandTitleOverride }) => {
   const departmentKeyToRoute = {
     pedodontics: '/pedodontics',
     periodontics: '/periodontics',
-    oral: '/casePortal?dept=oral',
+    oral: '/oral-medicine',
     complete_denture: '/complete_denture',
     fpd: '/Fpd',
     implant: '/Implant',
     implant_patient: '/ImplantPatient',
     partial_denture: '/partial_denture',
+    general: '/general-case-sheet',
+    generaldentistry: '/general-case-sheet',
+    publichealthdentistry: '/general-case-sheet',
   };
 
   // Multi-criteria patient search (ID / phone / name)
@@ -936,7 +939,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
     if (departmentKey.includes('publichealthdentistry') || departmentKey.includes('publichealth') || departmentKey.includes('communitydentistry')) return '/general-case-sheet';
     if (departmentKey === 'pedodontics') return '/pedodontics';
     if (departmentKey === 'periodontics') return '/periodontics';
-    if (departmentKey.includes('oral') || departmentKey.includes('maxillofacial')) return '/casePortal?dept=oral';
+    if (departmentKey.includes('oral') || departmentKey.includes('maxillofacial')) return '/oral-medicine';
     if (departmentKey === 'general' || departmentKey === 'generaldentistry') return '/general-case-sheet';
     return '/casePortal';
   };
@@ -1381,7 +1384,17 @@ const PGDashboard = ({ brandTitleOverride }) => {
       if (patientId) localStorage.setItem('CurrentpatientId', patientId);
       if (patientName) localStorage.setItem('CurrentpatientName', patientName);
 
-      navigate(routePath, {
+      let finalRoutePath = routePath;
+      if (departmentKey === 'periodontics') {
+        const cType = String(payload.caseType || '').toLowerCase();
+        if (cType === 'short') {
+          finalRoutePath = '/periodontics/short';
+        } else {
+          finalRoutePath = '/periodontics/long';
+        }
+      }
+
+      navigate(finalRoutePath, {
         state: {
           redoEdit: true,
           editCaseId: caseId,
@@ -1493,6 +1506,70 @@ const PGDashboard = ({ brandTitleOverride }) => {
     if (storedPgEmail) setPgEmail(storedPgEmail);
   }, [user]);
 
+  const viewPrescription = (caseItem) => {
+    (async () => {
+      try {
+        if (caseItem?.patientId) {
+          setStoredPatientId(caseItem.patientId);
+          localStorage.setItem('CurrentpatientName', caseItem.patientName || '');
+        }
+
+        if (caseItem?._id) {
+          localStorage.setItem('linkedCaseId', caseItem._id);
+          localStorage.setItem('linkedCaseDepartment', caseItem.department);
+        }
+
+        const token = localStorage.getItem('token');
+        const patientId = caseItem?.patientId;
+        const caseId = caseItem?._id;
+
+        if (!patientId) {
+          window.open('/prescriptions', '_blank');
+          return;
+        }
+
+        if (caseId) {
+          const resByCase = await fetch(buildApiUrl(`/api/prescriptions/case/${caseId}?page=1&limit=1`), {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          });
+
+          if (resByCase.ok) {
+            const json = await resByCase.json();
+            const prescriptions = json.data || [];
+            if (prescriptions.length > 0) {
+              const prescId = prescriptions[0]._id;
+              window.open(`/prescription-view?id=${prescId}&format=pdf`, '_blank');
+              return;
+            }
+          }
+        }
+
+        const res = await fetch(buildApiUrl(`/api/prescriptions/patient/${patientId}`), {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const prescriptions = json.data || [];
+          if (prescriptions.length > 0) {
+            const prescId = prescriptions[0]._id;
+            window.open(`/prescription-view?id=${prescId}&format=pdf`, '_blank');
+            return;
+          }
+        }
+
+        localStorage.setItem('linkedCaseId', caseItem._id || '');
+        localStorage.setItem('linkedCaseDepartment', caseItem.department || '');
+        window.open('/prescriptions', '_blank');
+      } catch (err) {
+        console.error('Error opening prescription view:', err);
+        localStorage.setItem('linkedCaseId', caseItem?._id || '');
+        localStorage.setItem('linkedCaseDepartment', caseItem?.department || '');
+        window.open('/prescriptions', '_blank');
+      }
+    })();
+  };
+
   const openAssignedCaseRoute = async (patientIdOverride = '') => {
     console.log('[openAssignedCaseRoute] Starting...');
     const overrideId = typeof patientIdOverride === 'string' ? patientIdOverride : '';
@@ -1533,19 +1610,6 @@ const PGDashboard = ({ brandTitleOverride }) => {
       const normalizedDept = normalizeDepartment(resolvedDepartmentLabel);
       
       console.log('[openAssignedCaseRoute] Department:', resolvedDepartmentLabel, 'Normalized:', normalizedDept);
-      
-      // For Oral Medicine/Periodontics, require consent form first
-      if (normalizedDept.includes('oral') || normalizedDept === 'periodontics') {
-        console.log('[openAssignedCaseRoute] Redirecting to consent form for oral/periodontics');
-        const departmentRoute = getCaseRouteForDepartment(resolvedDepartmentLabel);
-        console.log('[openAssignedCaseRoute] Department Route:', departmentRoute);
-        const targetUrl = departmentRoute.includes('?')
-          ? `${departmentRoute}&patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName)}&department=${encodeURIComponent(resolvedDepartmentLabel)}`
-          : `${departmentRoute}?patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName)}&department=${encodeURIComponent(resolvedDepartmentLabel)}`;
-        console.log('[openAssignedCaseRoute] Target URL:', targetUrl);
-        navigate(`/consent-form?redirect=${encodeURIComponent(targetUrl)}`, { replace: true });
-        return;
-      }
 
       const isPublicHealthDept =
         normalizedDept.includes('publichealthdentistry') ||
@@ -2855,6 +2919,20 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                       Edit
                                     </button>
                                   )}
+
+                                  <button
+                                    type="button"
+                                    className="view-button"
+                                    onClick={() => viewPrescription({
+                                      patientId: patientId,
+                                      _id: caseId,
+                                      patientName: patientName,
+                                      department: department
+                                    })}
+                                    disabled={!patientId}
+                                  >
+                                    Prescription
+                                  </button>
                                 </div>
                               </td>
                             </tr>

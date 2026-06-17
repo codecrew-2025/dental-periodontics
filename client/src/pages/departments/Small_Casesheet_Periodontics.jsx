@@ -251,9 +251,16 @@ const App = ({ initialCaseData, readOnly = false }) => {
         doctorName
       };
 
+      const editCaseId = localStorage.getItem('redoEditCaseId');
+      const isRedoEdit = !!editCaseId;
+      const endpoint = isRedoEdit
+        ? `${API_BASE_URL}/api/casesheets/${encodeURIComponent(editCaseId)}`
+        : `${API_BASE_URL}/api/casesheets/periodontics/save`;
+      const method = isRedoEdit ? 'PUT' : 'POST';
+
       try {
-        const response = await fetch(`${API_BASE_URL}/api/casesheets/periodontics/save`, {
-          method: 'POST',
+        const response = await fetch(endpoint, {
+          method,
           headers: {
             'Content-Type': 'application/json',
             Authorization: token ? `Bearer ${token}` : ''
@@ -314,6 +321,9 @@ const App = ({ initialCaseData, readOnly = false }) => {
           document.body.removeChild(confirmBox);
           const form = document.getElementById("periodonticsForm");
           if (form) form.reset();
+          const wasRedoEdit = isRedoEdit;
+          localStorage.removeItem('redoEditCaseId');
+          localStorage.removeItem('redoEditDepartmentKey');
           setDoctorName("");
           setSignatureFile(null);
           setSignaturePreviewSrc("");
@@ -322,7 +332,7 @@ const App = ({ initialCaseData, readOnly = false }) => {
           setSubmitDisabled(true);
           setCurrentPage(0);
           setIsSubmitting(false);
-          window.location.href = '/prescriptions';
+          window.location.href = wasRedoEdit ? '/pg-dashboard' : '/prescriptions';
         };
       } catch (error) {
         alert(`Error submitting case: ${error.message}`);
