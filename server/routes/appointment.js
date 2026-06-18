@@ -965,12 +965,13 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
       // 🔥 FIX: Doctors see appointments for patients assigned to their PG/UG students
       const students = await User.find(
         { createdBy: req.user._id, role: { $in: ['pg', 'ug'] } },
-        { Identity: 1, name: 1 }
+        { Identity: 1, name: 1, _id: 1 }
       ).lean();
       
       const pgIdentities = students.map(s => String(s.Identity || '').trim()).filter(Boolean);
+      const pgObjectIds = students.map(s => String(s._id || '')).filter(Boolean);
       
-      if (!pgIdentities.length) {
+      if (!pgIdentities.length && !pgObjectIds.length) {
         return res.json({ success: true, appointments: [] });
       }
 
@@ -984,6 +985,51 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
         ).maxTimeMS(5000).lean();
       } catch (gcErr) {
         console.warn('[pg-appointments] GeneralCase lookup timed out or failed:', gcErr.message);
+      }
+
+      // 🔥 FIX: Also check OralCase for Oral Medicine department assignments
+      try {
+        const OralCase = (await import('../models/Oral-model.js')).default;
+        const oralCases = await OralCase.find(
+          { doctorId: { $in: pgIdentities }, chiefApproval: { $regex: /^approved$/i } },
+          { patientId: 1, doctorId: 1 }
+        ).maxTimeMS(5000).lean();
+        
+        oralCases.forEach(oc => {
+          assignedCases.push({ patientId: oc.patientId, assignedPgId: oc.doctorId });
+        });
+      } catch (ocErr) {
+        console.warn('[pg-appointments] OralCase lookup timed out or failed:', ocErr.message);
+      }
+
+      // 🔥 FIX: Check PedodonticsCase for Pedodontics department assignments
+      try {
+        const PedodonticsCase = (await import('../models/PedodonticsCase.js')).default;
+        const pedoCases = await PedodonticsCase.find(
+          { doctorId: { $in: pgIdentities }, chiefApproval: { $regex: /^approved$/i } },
+          { patientId: 1, doctorId: 1 }
+        ).maxTimeMS(5000).lean();
+        
+        pedoCases.forEach(pc => {
+          assignedCases.push({ patientId: pc.patientId, assignedPgId: pc.doctorId });
+        });
+      } catch (pcErr) {
+        console.warn('[pg-appointments] PedodonticsCase lookup timed out or failed:', pcErr.message);
+      }
+
+      // 🔥 FIX: Check PeriodonticsCaseModel for Periodontics department assignments
+      try {
+        const PeriodonticsCaseModel = (await import('../models/PeriodonticsCaseModel.js')).default;
+        const perioCases = await PeriodonticsCaseModel.find(
+          { doctorId: { $in: pgIdentities }, chiefApproval: { $regex: /^approved$/i } },
+          { patientId: 1, doctorId: 1 }
+        ).maxTimeMS(5000).lean();
+        
+        perioCases.forEach(pc => {
+          assignedCases.push({ patientId: pc.patientId, assignedPgId: pc.doctorId });
+        });
+      } catch (pcErr) {
+        console.warn('[pg-appointments] PeriodonticsCaseModel lookup timed out or failed:', pcErr.message);
       }
 
       const patientIdToPgMap = new Map();
@@ -1003,7 +1049,9 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
           { patientId: { $in: assignedPatientIds.length > 0 ? assignedPatientIds : ['__dummy__'] } },
           { assignedPgUgId: { $in: pgIdentities } },
           { assigned_pg_ug_id: { $in: pgIdentities } },
-          { pgDoctorId: { $in: pgIdentities } }
+          { pgDoctorId: { $in: pgIdentities } },
+          { doctorId: { $in: pgIdentities } },
+          { doctorId: { $in: pgObjectIds } }
         ],
         status: { $nin: excludedStatuses },
         appointmentDate: { $gte: todayStr },
@@ -1018,6 +1066,7 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
       
       // Add PG information to each appointment
       const studentMap = new Map(students.map(s => [String(s.Identity).trim(), s]));
+      const studentMapById = new Map(students.map(s => [String(s._id), s]));
       const enrichedWithPg = enriched.map(appt => {
         let pgId = patientIdToPgMap.get(String(appt.patientId));
         
@@ -1025,8 +1074,10 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
         if (!pgId && appt.assignedPgUgId) pgId = String(appt.assignedPgUgId);
         if (!pgId && appt.assigned_pg_ug_id) pgId = String(appt.assigned_pg_ug_id);
         if (!pgId && appt.pgDoctorId) pgId = String(appt.pgDoctorId);
+        if (!pgId && pgIdentities.includes(String(appt.doctorId))) pgId = String(appt.doctorId);
+        if (!pgId && pgObjectIds.includes(String(appt.doctorId))) pgId = String(appt.doctorId); // Fallback to ObjectId string
 
-        const student = pgId ? studentMap.get(pgId) : null;
+        const student = pgId ? (studentMap.get(pgId) || studentMapById.get(pgId)) : null;
         return {
           ...appt,
           assignedPgId: pgId || null,
