@@ -1145,26 +1145,11 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
 
   return (
     <>
-      {/* Critical Condition — red banner, shown above allergy */}
-      {showCritical && criticalCondition && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, width: '100vw', zIndex: 100000,
-          background: '#fee2e2', borderBottom: '2px solid #ef4444',
-          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 24px',
-          boxSizing: 'border-box', boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
-        }}>
-          <span style={{ fontSize: 18, flexShrink: 0 }}>🚨</span>
-          <span style={{ flex: 1, fontWeight: 700, fontSize: '0.9rem', color: '#991b1b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            CRITICAL CONDITION: {criticalCondition}
-          </span>
-          <button onClick={() => setShowCritical(false)} aria-label="Dismiss"
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', fontSize: 20, color: '#991b1b', cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: '0 4px' }}>×</button>
-        </div>
-      )}
+
 
       {/* Allergy banner — pushed down if critical banner is showing */}
       {showAllergy && (
-        <div className="allergy-alert" id="patientAllergyAlert" style={{ top: showCritical && criticalCondition ? 44 : 0 }}>
+        <div className="allergy-alert" id="patientAllergyAlert" style={{ top: 0 }}>
           <span className="alert-icon">⚠️</span>
           <div className="allergy-flow-window">
             <span id="allergyMessage">{formatAllergyTicker(allergyMessage)}</span>

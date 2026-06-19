@@ -43,6 +43,7 @@ const App = ({ initialCaseData, readOnly = false }) => {
   const [appointmentDate, setAppointmentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [appointmentTime, setAppointmentTime] = useState('');
   const [patientEmail, setPatientEmail] = useState('');
+  const [criticalCondition, setCriticalCondition] = useState('');
 
   const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -138,11 +139,14 @@ const App = ({ initialCaseData, readOnly = false }) => {
         const drug = toListString(patient.vitals?.drugAllergies);
         const known = toListString(patient.medicalInfo?.knownAllergies);
         const diet = toListString(patient.vitals?.dietAllergies);
+        const critical = String(patient.vitals?.criticalCondition || '').trim();
 
         if (drug) setAllergyMessage(`Drug Allergies: ${drug}`);
         else if (known) setAllergyMessage(`Known Allergies: ${known}`);
         else if (diet) setAllergyMessage(`Diet Allergies: ${diet}`);
         else setAllergyMessage('No known allergies');
+
+        if (critical) setCriticalCondition(critical);
       } catch {
         if (isMounted) setAllergyMessage('No known allergies');
       }
@@ -548,33 +552,11 @@ const App = ({ initialCaseData, readOnly = false }) => {
         </span>
       </div>
 
-      {criticalCondition && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          width: '100vw',
-          background: '#ef4444',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '8px 20px',
-          boxShadow: '0 3px 12px rgba(0,0,0,0.16)',
-          zIndex: 10000,
-          fontWeight: 'bold',
-          letterSpacing: '1px'
-        }}>
-          <span style={{ marginRight: '8px' }}>⚠️</span>
-          <span>CRITICAL CONDITION: {criticalCondition}</span>
-        </div>
-      )}
 
       {showAllergy && (
         <div style={{
           position: 'fixed',
-          top: criticalCondition ? 44 : 0,
+          top: 0,
           left: 0,
           right: 0,
           width: '100vw',
