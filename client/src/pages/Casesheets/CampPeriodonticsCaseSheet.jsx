@@ -506,50 +506,7 @@ const CampPeriodonticsCaseSheet = ({ initialCaseData, readOnly = false }) => {
             </div>
           </div>
 
-          <div className="print-cut-line" style={{ borderTop: '2px dashed #999', margin: '30px 0', position: 'relative' }}>
-            <span style={{ position: 'absolute', left: '-15px', top: '-12px', fontSize: '18px', background: 'white', padding: '0 5px' }}>✂</span>
-          </div>
 
-          {/* Bottom Half (Tamil Consent) */}
-          <div className="print-section" style={{ paddingTop: '10px' }}>
-            <div className="print-consent-header" style={{ position: 'relative', textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ position: 'absolute', left: 0, top: '5px', fontSize: '16px', fontWeight: 'bold' }}>
-                Sl.No.: C <span style={{ fontSize: '20px' }}>{formData.campSerialNo}</span>
-              </div>
-              <h2 style={{ fontSize: '24px', margin: 0, color: '#1a4e8a' }}>ஒப்புதல் படிவம்</h2>
-            </div>
-            <div className="print-consent-body" style={{ fontSize: '16px', lineHeight: '2' }}>
-              <p style={{ margin: '0 0 20px 0', textIndent: '40px', textAlign: 'justify' }}>
-                <span style={{ display: 'inline-block', width: '250px', borderBottom: '1px dotted #000', margin: '0 10px' }}></span>
-                ஆகிய நான் எனக்கு அளிக்க இருக்கும்
-                <span style={{ display: 'inline-block', width: '250px', borderBottom: '1px dotted #000', margin: '0 10px' }}></span>
-                பல் சிகிச்சை / சிகிச்சைகளை பற்றி முழுமையாக தெரிந்து கொண்டேன். எனக்கு அளிக்க இருக்கும்
-                மேற்கண்ட சிகிச்சை / சிகிச்சைகளுக்கு முழுமனதுடன் ஒப்புதல் அளிக்கிறேன்.
-              </p>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40px' }}>
-                <div style={{ flex: 1, display: 'flex' }}>
-                  <span style={{ fontWeight: 'bold' }}>முகவரி :</span>
-                  <span style={{ flex: 1, borderBottom: '1px dotted #000', margin: '0 10px' }}></span>
-                </div>
-                <div style={{ width: '300px', display: 'flex' }}>
-                  <span style={{ fontWeight: 'bold' }}>தொலைபேசி :</span>
-                  <span style={{ flex: 1, borderBottom: '1px dotted #000', margin: '0 10px' }}></span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '80px' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <span style={{ fontWeight: 'bold' }}>பெற்றோர் / பாதுகாவலர் கையொப்பம்</span><br/>
-                  <span>(18 வயதிற்குட்பட்டவர்களுக்கு மட்டும்)</span>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <span style={{ fontWeight: 'bold' }}>கையொப்பம்</span><br/>
-                  <span style={{ display: 'block', textAlign: 'right', marginTop: '10px' }}>(PTO)</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Print styles */}
