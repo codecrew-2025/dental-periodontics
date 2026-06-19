@@ -315,12 +315,20 @@ const AdminDashboard = () => {
   };
 
   // Filter patients based on search term
-  const filteredPatients = patients.filter(patient =>
-    patient.patientId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.personalInfo?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.personalInfo?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.personalInfo?.phone?.includes(searchTerm)
-  );
+  const filteredPatients = patients.filter(patient => {
+    // If the admin logged in with a Camp ID (starts with 'c'), only show camp patients
+    const isCampAdmin = adminId.toLowerCase().startsWith('c');
+    const isCampPatient = patient.patientId?.toLowerCase().startsWith('c');
+
+    if (isCampAdmin && !isCampPatient) {
+      return false;
+    }
+
+    return patient.patientId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.personalInfo?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.personalInfo?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.personalInfo?.phone?.includes(searchTerm);
+  });
 
   // Handle search and auto-populate if patient exists
   const handleSearchChange = (e) => {

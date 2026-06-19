@@ -8,23 +8,34 @@ export const generateNextPatientId = async () => {
   const startingNumber = 1000;
 
   // Find latest IDs from both User (Identity) and PatientDetails (patientId)
-  const [lastUser, lastPatient] = await Promise.all([
-    User.findOne({ 
-      Identity: { $regex: `^${prefix}\\d+$` }, 
-      role: 'patient' 
-    })
-      .sort({ Identity: -1 })
-      .lean(),
-    PatientDetails.findOne({ 
-      patientId: { $regex: `^${prefix}\\d+$` } 
-    })
-      .sort({ patientId: -1 })
-      .lean(),
+  // using aggregation to correctly sort by numeric part rather than string sort
+  const [userAgg, patientAgg] = await Promise.all([
+    User.aggregate([
+      { $match: { Identity: { $regex: `^${prefix}\\d+$` }, role: 'patient' } },
+      { $project: { 
+          Identity: 1, 
+          numId: { $toDouble: { $substr: ["$Identity", prefix.length, -1] } } 
+      } },
+      { $sort: { numId: -1 } },
+      { $limit: 1 }
+    ]),
+    PatientDetails.aggregate([
+      { $match: { patientId: { $regex: `^${prefix}\\d+$` } } },
+      { $project: { 
+          patientId: 1, 
+          numId: { $toDouble: { $substr: ["$patientId", prefix.length, -1] } } 
+      } },
+      { $sort: { numId: -1 } },
+      { $limit: 1 }
+    ])
   ]);
+
+  const lastUser = userAgg[0] || null;
+  const lastPatient = patientAgg[0] || null;
 
   let lastId = null;
   if (lastUser) lastId = lastUser.Identity;
-  if (lastPatient && (!lastId || lastPatient.patientId > lastId)) {
+  if (lastPatient && (!lastId || lastPatient.numId > (lastUser?.numId || 0))) {
     lastId = lastPatient.patientId;
   }
 

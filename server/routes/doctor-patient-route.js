@@ -93,7 +93,7 @@ router.get('/check-id/:patientId', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { patientId, ...patientData } = req.body;
-     console.log('Received data:', req.body);
+    console.log('[doctor-patient POST] patientId:', patientId);
 
     if (!patientId || String(patientId).trim() === '') {
       return res.status(400).json({
@@ -108,49 +108,71 @@ router.post('/', async (req, res) => {
       if (!status || String(status).trim() === '') {
         patientData.medicalInfo.pregnancyStatus = 'N/A';
       }
+      // Remove null/empty date fields to avoid cast errors
+      if (!patientData.medicalInfo.lastDentalVisit) {
+        delete patientData.medicalInfo.lastDentalVisit;
+      }
     }
-    // Check if patient already exists
-    let patient = await PatientDetails.findOne({ patientId });
-    
-    if (patient) {
-  // UPDATE EXISTING PATIENT
-  patient = await PatientDetails.findOneAndUpdate(
-    { patientId },
-    { 
-      ...patientData,
-      updatedAt: new Date()
-    },
-    { new: true, runValidators: true }
-  );
 
-  res.json({
-    success: true,
-    message: 'Patient updated successfully',
-    patientId: patient.patientId,
-    patientName: `${patient.personalInfo.firstName} ${patient.personalInfo.lastName}`,
-  });
-} else {
-  // CREATE NEW PATIENT
-  patient = new PatientDetails({
-    patientId,
-    userId: new mongoose.Types.ObjectId(),
-    ...patientData
-  });
+    // Remove null/empty date fields from personalInfo
+    if (patientData?.personalInfo) {
+      if (!patientData.personalInfo.dateOfBirth) {
+        delete patientData.personalInfo.dateOfBirth;
+      }
+    }
 
-  await patient.save();
+    // Remove null/empty date fields from institutionInfo
+    if (patientData?.institutionInfo) {
+      if (!patientData.institutionInfo.campDate) {
+        delete patientData.institutionInfo.campDate;
+      }
+    }
 
-  res.status(201).json({
-    success: true,
-    message: 'Patient created successfully',
-    patientId: patient.patientId,
-    patientName: `${patient.personalInfo.firstName} ${patient.personalInfo.lastName}`,
-    age: patient.personalInfo.age
-  });
-}
+    // Ensure bloodGroup is a valid enum value (empty string if not provided)
+    if (patientData?.vitals) {
+      const validBloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', ''];
+      if (!validBloodGroups.includes(patientData.vitals.bloodGroup)) {
+        patientData.vitals.bloodGroup = '';
+      }
+    }
+
+    // Atomic upsert — avoids race condition from concurrent saves
+    const patient = await PatientDetails.findOneAndUpdate(
+      { patientId },
+      {
+        $set: { ...patientData, updatedAt: new Date() },
+        $setOnInsert: { patientId, userId: new mongoose.Types.ObjectId() }
+      },
+      { new: true, upsert: true, runValidators: false }
+    );
+
+    console.log('[doctor-patient POST] SUCCESS for patientId:', patientId);
+    return res.json({
+      success: true,
+      message: 'Patient saved successfully',
+      patientId: patient.patientId,
+      patientName: `${patient.personalInfo?.firstName || ''} ${patient.personalInfo?.lastName || ''}`.trim(),
+      age: patient.personalInfo?.age
+    });
   } catch (error) {
-    res.status(400).json({ 
+    console.error('[doctor-patient POST] FULL ERROR:', error);
+    console.error('[doctor-patient POST] Error name:', error.name);
+    console.error('[doctor-patient POST] Error message:', error.message);
+    console.error('[doctor-patient POST] Error code:', error.code);
+    if (error.errors) {
+      console.error('[doctor-patient POST] Validation errors:', JSON.stringify(error.errors, null, 2));
+    }
+    // Handle duplicate key gracefully
+    if (error.code === 11000) {
+      return res.status(500).json({
+        success: false,
+        message: 'A save conflict occurred. Please try again.'
+      });
+    }
+    return res.status(400).json({ 
       success: false, 
-      message: error.message 
+      message: error.message,
+      details: error?.errors ? Object.keys(error.errors).map(k => `${k}: ${error.errors[k].message}`) : undefined
     });
   }
 });

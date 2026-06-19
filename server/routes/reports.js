@@ -1097,12 +1097,7 @@ router.get('/today', auth, requireRole(['admin', 'chief', 'chief-doctor', 'docto
       newPatientsVisited,
       oldPatientsVisited,
       caseSheetCounts: {
-        pedodontics: pedCount,
-        completeDenture: completeDentureCount,
-        fpd: fpdCount,
-        implant: implantCount,
-        implantPatient: implantPatientCount,
-        partial: partialCount
+        pedodontics: pedCount
       }
     });
   } catch (error) {

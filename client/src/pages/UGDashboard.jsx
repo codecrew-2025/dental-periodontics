@@ -1599,9 +1599,15 @@ const UGDashboard = () => {
     const normalizedDept = normalizeDepartment(resolvedDepartmentLabel);
 
     const isPublicHealthDept =
+      currentPatientId.toLowerCase().startsWith('c') ||
       normalizedDept.includes('publichealthdentistry') ||
       normalizedDept.includes('publichealth') ||
       normalizedDept.includes('communitydentistry');
+
+    if (currentPatientId.toLowerCase().startsWith('c') && normalizedDept === 'periodontics') {
+      window.open(`/camp-periodontics-case-sheet?patientId=${encodeURIComponent(currentPatientId)}&new=true`, '_blank', 'noopener,noreferrer');
+      return;
+    }
 
     let ensuredCaseId = '';
     if (isPublicHealthDept) {
@@ -1621,11 +1627,20 @@ const UGDashboard = () => {
     const separator = departmentRoute.includes('?') ? '&' : '?';
     const caseIdParam = ensuredCaseId ? `&caseId=${encodeURIComponent(ensuredCaseId)}` : '';
     const patientRouteUrl = `${departmentRoute}${separator}patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName || currentPatientId)}&department=${encodeURIComponent(resolvedDepartmentLabel)}${caseIdParam}`;
+    
     console.debug('[UGDashboard] openAssignedCaseRoute ->', { currentPatientId, currentPatientName, resolvedDepartmentLabel, departmentRoute, patientRouteUrl });
-    const newWin = window.open(patientRouteUrl, '_blank', 'noopener,noreferrer');
+    
+    // If the department is Oral (or any other department that requires consent), route to consent form first
+    let finalUrl = patientRouteUrl;
+    const isOralDept = normalizedDept.includes('oral');
+    if (isOralDept) {
+      finalUrl = `/consent-form?department=${encodeURIComponent(resolvedDepartmentLabel)}&redirect=${encodeURIComponent(patientRouteUrl)}`;
+    }
+
+    const newWin = window.open(finalUrl, '_blank', 'noopener,noreferrer');
     if (!newWin) {
       console.debug('[UGDashboard] window.open blocked, navigating in same tab');
-      window.location.href = patientRouteUrl;
+      window.location.href = finalUrl;
     }
   };
 
@@ -2795,7 +2810,23 @@ const UGDashboard = () => {
                       >
                         Go to Department Case Sheet
                       </button>
-                      {!ugDepartmentKey.includes('oral') && (
+                      {(ugDepartmentKey.includes('oral') || ugDepartmentKey.includes('periodont')) && (
+                        <button
+                          type="button"
+                          className="case-files-btn"
+                          onClick={() => {
+                            if (formData.uniqueId) {
+                              localStorage.setItem('CurrentpatientId', formData.uniqueId);
+                              localStorage.setItem('CurrentpatientName', `${formData.firstName} ${formData.lastName}`.trim());
+                              window.open('/case-history', '_blank');
+                            }
+                          }}
+                          disabled={!canNavigateCases}
+                        >
+                          Case History
+                        </button>
+                      )}
+                      {!ugDepartmentKey.includes('oral') && !(formData.uniqueId || '').toLowerCase().startsWith('c') && (
                       <button
                         type="button"
                         className="case-files-btn"

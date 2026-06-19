@@ -134,7 +134,8 @@ const PGDashboard = ({ brandTitleOverride }) => {
     lastDentalVisit: '',
     bloodGroup: '',
     drugAllergies: '',
-    dietAllergies: ''
+    dietAllergies: '',
+    criticalCondition: ''
   });
 
   const [showForm, setShowForm] = useState(false);
@@ -440,9 +441,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
       setPgAppointmentsLoading(true);
       setPgAppointmentsError('');
       const token = localStorage.getItem('token');
-      
+
       const url = buildApiUrl('/api/appointment/pg-appointments');
-      
+
       const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -508,7 +509,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
     try {
       const token = localStorage.getItem('token');
       const rescheduleReqStatus = String(appointment?.rescheduleRequest?.requestStatus || 'none').trim().toLowerCase();
-      
+
       let url = buildApiUrl(`/api/appointment/${encodeURIComponent(appointment.bookingId || bookingId)}/approve`);
       let method = 'PUT';
       let body = undefined;
@@ -721,7 +722,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
   const submitRescheduleForBooking = async (bookingId) => {
     const resolvedBookingId = String(bookingId || '').trim();
     if (!resolvedBookingId) return;
-    
+
     // Use calendar-based selection
     const appointmentDate = rescheduleSelectedDate;
     const appointmentTime = String(rescheduleDrafts[resolvedBookingId]?.appointmentTime || '').trim();
@@ -734,10 +735,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
     try {
       setRescheduleSubmittingBookingId(resolvedBookingId);
       const token = localStorage.getItem('token');
-      
+
       const appointment = activeRescheduleAppointment;
       const rescheduleReqStatus = String(appointment?.rescheduleRequest?.requestStatus || 'none').trim().toLowerCase();
-      
+
       let url = buildApiUrl(`/api/appointment/${encodeURIComponent(resolvedBookingId)}/reschedule`);
       let method = 'PUT';
       let body = JSON.stringify({ appointmentDate, appointmentTime });
@@ -945,7 +946,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
   };
 
   const handleLogout = () => {
-    logout(); 
+    logout();
   };
 
   const toggleLogoutDropdown = () => {
@@ -1027,9 +1028,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
             const res = await fetch(url, {
               headers: token
                 ? {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  }
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                }
                 : { 'Content-Type': 'application/json' },
             });
 
@@ -1138,9 +1139,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
         const patientRes = await fetch(buildApiUrl('/api/patient-details'), {
           headers: token
             ? {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              }
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            }
             : { 'Content-Type': 'application/json' },
         });
 
@@ -1259,7 +1260,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
       console.debug('[PGDashboard] /api/casesheets/pg/history response:', { status: res.status, ok: res.ok, json });
       // Debug: log raw rows for troubleshooting department filtering
       try {
-        console.debug('[PGDashboard:DEBUG] raw rows sample:', Array.isArray(json?.data) ? json.data.slice(0,5) : json?.data);
+        console.debug('[PGDashboard:DEBUG] raw rows sample:', Array.isArray(json?.data) ? json.data.slice(0, 5) : json?.data);
       } catch (e) {
         console.debug('[PGDashboard:DEBUG] failed to log rows', e);
       }
@@ -1608,13 +1609,19 @@ const PGDashboard = ({ brandTitleOverride }) => {
         'Public Health Dentistry'
       ).trim();
       const normalizedDept = normalizeDepartment(resolvedDepartmentLabel);
-      
+
       console.log('[openAssignedCaseRoute] Department:', resolvedDepartmentLabel, 'Normalized:', normalizedDept);
 
       const isPublicHealthDept =
+        currentPatientId.toLowerCase().startsWith('c') ||
         normalizedDept.includes('publichealthdentistry') ||
         normalizedDept.includes('publichealth') ||
         normalizedDept.includes('communitydentistry');
+
+      if (currentPatientId.toLowerCase().startsWith('c') && normalizedDept === 'periodontics') {
+        window.open(`/camp-periodontics-case-sheet?patientId=${encodeURIComponent(currentPatientId)}&new=true`, '_blank', 'noopener,noreferrer');
+        return;
+      }
 
       let ensuredCaseId = '';
       if (isPublicHealthDept) {
@@ -1634,17 +1641,26 @@ const PGDashboard = ({ brandTitleOverride }) => {
       const separator = departmentRoute.includes('?') ? '&' : '?';
       const caseIdParam = ensuredCaseId ? `&caseId=${encodeURIComponent(ensuredCaseId)}` : '';
       const patientRouteUrl = `${departmentRoute}${separator}patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName || currentPatientId)}&department=${encodeURIComponent(resolvedDepartmentLabel)}${caseIdParam}`;
+
       console.log('[PGDashboard] openAssignedCaseRoute ->', { currentPatientId, currentPatientName, resolvedDepartmentLabel, departmentRoute, patientRouteUrl });
+
+      // If the department is Oral (or any other department that requires consent), route to consent form first
+      let finalUrl = patientRouteUrl;
+      const isOralDept = normalizedDept.includes('oral');
+      if (isOralDept) {
+        finalUrl = `/consent-form?department=${encodeURIComponent(resolvedDepartmentLabel)}&redirect=${encodeURIComponent(patientRouteUrl)}`;
+      }
+
       // Try opening in a new tab; if blocked by popup blocker, navigate in the same tab as a fallback
       // Try opening in a new tab; if blocked by popup blocker, navigate using SPA router
-      const newWin = window.open(patientRouteUrl, '_blank', 'noopener,noreferrer');
+      const newWin = window.open(finalUrl, '_blank', 'noopener,noreferrer');
       if (!newWin) {
         console.debug('[PGDashboard] window.open blocked, navigating via router');
         try {
-          navigate(patientRouteUrl, { replace: false });
+          navigate(finalUrl, { replace: false });
         } catch (navErr) {
           console.debug('[PGDashboard] router navigate failed, falling back to location.href', navErr);
-          window.location.href = patientRouteUrl;
+          window.location.href = finalUrl;
         }
       }
     } catch (error) {
@@ -1837,6 +1853,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
         bloodGroup: patientData.vitals?.bloodGroup || patientData.bloodGroup || prev.bloodGroup || '',
         drugAllergies: patientData.vitals?.drugAllergies?.join(', ') || patientData.drugAllergies || prev.drugAllergies || '',
         dietAllergies: patientData.vitals?.dietAllergies?.join(', ') || patientData.dietAllergies || prev.dietAllergies || '',
+        criticalCondition: patientData.vitals?.criticalCondition || prev.criticalCondition || '',
       };
     });
 
@@ -1849,22 +1866,22 @@ const PGDashboard = ({ brandTitleOverride }) => {
     const errors = {};
     const requiredFields = isPublicHealthDentistry
       ? {
-          firstName: 'First Name',
-          dob: 'Date of Birth',
-          gender: 'Gender',
-          diagnosis: 'Diagnosis',
-          treatmentPlan: 'Treatment Plan',
-        }
+        firstName: 'First Name',
+        dob: 'Date of Birth',
+        gender: 'Gender',
+        diagnosis: 'Diagnosis',
+        treatmentPlan: 'Treatment Plan',
+      }
       : {
-          firstName: 'First Name',
-          lastName: 'Last Name',
-          dob: 'Date of Birth',
-          gender: 'Gender',
-          maritalStatus: 'Marital Status',
-          preferredLanguage: 'Preferred Language',
-          chiefComplaint: 'Chief Complaint',
-          bloodGroup: 'Blood Group'
-        };
+        firstName: 'First Name',
+        lastName: 'Last Name',
+        dob: 'Date of Birth',
+        gender: 'Gender',
+        maritalStatus: 'Marital Status',
+        preferredLanguage: 'Preferred Language',
+        chiefComplaint: 'Chief Complaint',
+        bloodGroup: 'Blood Group'
+      };
 
     // Check required fields
     for (const [field, label] of Object.entries(requiredFields)) {
@@ -2002,7 +2019,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (type === 'checkbox') {
       if (name === 'hpi') {
         if (checked && value === 'None') {
@@ -2010,7 +2027,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
         } else if (!checked && value === 'None') {
           setHpiSelections([]);
         } else if (checked) {
-          setHpiSelections(prev => 
+          setHpiSelections(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -2022,7 +2039,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
         } else if (!checked && value === 'None') {
           setPastMedicalHistory([]);
         } else if (checked) {
-          setPastMedicalHistory(prev => 
+          setPastMedicalHistory(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -2034,7 +2051,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
         } else if (!checked && value === 'None') {
           setPersonalHabits([]);
         } else if (checked) {
-          setPersonalHabits(prev => 
+          setPersonalHabits(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -2047,31 +2064,31 @@ const PGDashboard = ({ brandTitleOverride }) => {
           ...prev,
           [name]: value
         };
-        
+
         // Auto-calculate age when DOB changes
         if (name === 'dob') {
           const age = calculateAge(value);
           newData.age = age;
         }
-        
+
         // Handle pregnancy status logic
         if (name === 'gender' || name === 'maritalStatus') {
-          const showPregnancyStatus = (name === 'gender' ? value : newData.gender) === 'Female' && 
-                                    (name === 'maritalStatus' ? value : newData.maritalStatus) === 'Married';
+          const showPregnancyStatus = (name === 'gender' ? value : newData.gender) === 'Female' &&
+            (name === 'maritalStatus' ? value : newData.maritalStatus) === 'Married';
           if (!showPregnancyStatus) {
             // Must be a valid enum value in the backend schema when not applicable
             newData.pregnancyStatus = 'N/A';
           }
         }
-        
+
         // Handle preferred language logic
         if (name === 'preferredLanguage' && value !== 'Other') {
           newData.otherLanguage = '';
         }
-        
+
         return newData;
       });
-      
+
       // Clear field errors when user starts typing
       if (fieldErrors[name]) {
         setFieldErrors(prev => ({
@@ -2084,6 +2101,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
 
   // FIXED handleSavePatient function
   const handleSavePatient = async () => {
+    if (isLoading) return; // Prevent double-clicks / concurrent saves
     if (!generatedUserId) {
       showMessage('Please fetch a registered Patient ID before saving.', 'error');
       return;
@@ -2092,107 +2110,108 @@ const PGDashboard = ({ brandTitleOverride }) => {
     if (!validateForm()) return;
     try {
       setIsLoading(true);
-      
+
       // Prepare the data in the format your backend expects
       const shouldIncludePregnancyStatus = formData.gender === 'Female' && formData.maritalStatus === 'Married';
 
       const patientData = isPublicHealthDentistry
         ? {
-            patientId: generatedUserId,
-            personalInfo: {
-              firstName: formData.firstName,
-              middleName: formData.middleName,
-              lastName: formData.lastName,
-              dateOfBirth: formData.dob,
-              age: parseInt(formData.age) || 0,
-              gender: formData.gender,
-              maritalStatus: formData.maritalStatus,
-              preferredLanguage: formData.preferredLanguage === 'Other' ? formData.otherLanguage : formData.preferredLanguage
-            },
-            medicalInfo: {
-              diagnosis: formData.diagnosis,
-              treatmentPlan: formData.treatmentPlan,
-            }
+          patientId: generatedUserId,
+          personalInfo: {
+            firstName: formData.firstName,
+            middleName: formData.middleName,
+            lastName: formData.lastName,
+            dateOfBirth: formData.dob,
+            age: parseInt(formData.age) || 0,
+            gender: formData.gender,
+            maritalStatus: formData.maritalStatus,
+            preferredLanguage: formData.preferredLanguage === 'Other' ? formData.otherLanguage : formData.preferredLanguage
+          },
+          medicalInfo: {
+            diagnosis: formData.diagnosis,
+            treatmentPlan: formData.treatmentPlan,
           }
+        }
         : {
-            patientId: generatedUserId,
-            personalInfo: {
-              firstName: formData.firstName,
-              middleName: formData.middleName,
-              lastName: formData.lastName,
-              dateOfBirth: formData.dob,
-              age: parseInt(formData.age) || 0,
-              gender: formData.gender,
-              maritalStatus: formData.maritalStatus,
-              preferredLanguage: formData.preferredLanguage === 'Other' ? formData.otherLanguage : formData.preferredLanguage
-            },
-            medicalInfo: {
-              chiefComplaint: formData.chiefComplaint,
-              hpi: hpiSelections,
-              pastMedicalHistory: pastMedicalHistory,
-              personalHabits: personalHabits,
-              currentMedications: formData.currentMedications.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
-              knownAllergies: formData.knownAllergies.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
-              chronicConditions: formData.chronicConditions.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
-              pastSurgeries: formData.pastSurgeries.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
-              pregnancyStatus: shouldIncludePregnancyStatus ? formData.pregnancyStatus : 'N/A',
-              dentalConcerns: formData.primaryDentalConcerns.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
-              lastDentalVisit: formData.lastDentalVisit || null
-            },
-            vitals: {
-              bloodGroup: formData.bloodGroup,
-              drugAllergies: formData.drugAllergies.split(',').map(item => item.trim()).filter(item => item),
-              dietAllergies: formData.dietAllergies.split(',').map(item => item.trim()).filter(item => item)
-            }
-          };
+          patientId: generatedUserId,
+          personalInfo: {
+            firstName: formData.firstName,
+            middleName: formData.middleName,
+            lastName: formData.lastName,
+            dateOfBirth: formData.dob,
+            age: parseInt(formData.age) || 0,
+            gender: formData.gender,
+            maritalStatus: formData.maritalStatus,
+            preferredLanguage: formData.preferredLanguage === 'Other' ? formData.otherLanguage : formData.preferredLanguage
+          },
+          medicalInfo: {
+            chiefComplaint: formData.chiefComplaint,
+            hpi: hpiSelections,
+            pastMedicalHistory: pastMedicalHistory,
+            personalHabits: personalHabits,
+            currentMedications: formData.currentMedications.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
+            knownAllergies: formData.knownAllergies.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
+            chronicConditions: formData.chronicConditions.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
+            pastSurgeries: formData.pastSurgeries.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
+            pregnancyStatus: shouldIncludePregnancyStatus ? formData.pregnancyStatus : 'N/A',
+            dentalConcerns: formData.primaryDentalConcerns.split(',').map(item => item.trim()).filter(item => item && item !== 'None'),
+            lastDentalVisit: formData.lastDentalVisit || null
+          },
+          vitals: {
+            bloodGroup: formData.bloodGroup,
+            drugAllergies: formData.drugAllergies.split(',').map(item => item.trim()).filter(item => item),
+            dietAllergies: formData.dietAllergies.split(',').map(item => item.trim()).filter(item => item),
+            criticalCondition: formData.criticalCondition || ''
+          }
+        };
 
       // Send data to backend
-    const response = await fetch(buildApiUrl('/api/doctor-patient'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(patientData)
-    });
+      const response = await fetch(buildApiUrl('/api/doctor-patient'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(patientData)
+      });
 
-    if (response.status === 401) {
-      await ensureActiveSession(response, 'Token expired');
-      return;
-    }
-
-    if (response.ok) {
-      const result = await response.json();
-      const id = result.patientId;
-      const name = result.patientName;
-      localStorage.setItem('CurrentpatientName', name);
-      localStorage.setItem('CurrentpatientId', id);
-
-      if (isPublicHealthDentistry) {
-        try {
-          await ensurePublicHealthCaseSheetGenerated({ patientId: id, patientName: name });
-        } catch (caseError) {
-          showMessage(`Patient saved, but case sheet generation failed: ${caseError.message}`, 'error');
-        }
+      if (response.status === 401) {
+        await ensureActiveSession(response, 'Token expired');
+        return;
       }
 
-      showMessage('Patient details saved successfully!', 'success');
-      console.log('Patient data from localStorage:', {
-      });
-      // Allow navigation to case files / history only after successful save
-      setCanNavigateCases(true);
-      // Refresh case-sheet status panel for this patient
-      fetchCaseStatuses(id);
-      fetchPgCaseSheetHistory();
-    } else {
-      const error = await response.json();
-      showMessage(`Error saving patient: ${error.message}`, 'error');
+      if (response.ok) {
+        const result = await response.json();
+        const id = result.patientId;
+        const name = result.patientName;
+        localStorage.setItem('CurrentpatientName', name);
+        localStorage.setItem('CurrentpatientId', id);
+
+        if (isPublicHealthDentistry) {
+          try {
+            await ensurePublicHealthCaseSheetGenerated({ patientId: id, patientName: name });
+          } catch (caseError) {
+            showMessage(`Patient saved, but case sheet generation failed: ${caseError.message}`, 'error');
+          }
+        }
+
+        showMessage('Patient details saved successfully!', 'success');
+        console.log('Patient data from localStorage:', {
+        });
+        // Allow navigation to case files / history only after successful save
+        setCanNavigateCases(true);
+        // Refresh case-sheet status panel for this patient
+        fetchCaseStatuses(id);
+        fetchPgCaseSheetHistory();
+      } else {
+        const error = await response.json();
+        showMessage(`Error saving patient: ${error.message}`, 'error');
+      }
+    } catch (error) {
+      showMessage('Error saving patient: ' + error.message, 'error');
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    showMessage('Error saving patient: ' + error.message, 'error');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleNavigation = (url) => {
     // In a real app, you would use React Router
@@ -2239,9 +2258,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
             aria-label={isSideNavOpen ? 'Collapse navigation' : 'Expand navigation'}
             title="Menu"
             onClick={() => setIsSideNavOpen((v) => !v)}
-            >
-              <i className="fas fa-bars"></i>
-            </button>
+          >
+            <i className="fas fa-bars"></i>
+          </button>
 
           <div className="chief-brand">
             <img
@@ -2339,7 +2358,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                 }}
               >
                 <span className="chief-nav-icon"><i className="fas fa-user-injured"></i></span>
-                  <span>Patient Management</span>
+                <span>Patient Management</span>
               </button>
 
               <button
@@ -2352,8 +2371,8 @@ const PGDashboard = ({ brandTitleOverride }) => {
                 }}
               >
                 <span className="chief-nav-icon"><i className="fas fa-file-medical"></i></span>
-                  <span className="pg-nav-label">
-                    Case Sheet
+                <span className="pg-nav-label">
+                  Case Sheet
                   <span className="pg-nav-alert-dot" data-status={assignedCasesAlertStatus} />
                 </span>
               </button>
@@ -2368,7 +2387,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                 }}
               >
                 <span className="chief-nav-icon"><i className="fas fa-calendar-check"></i></span>
-                  <span>My Appointments</span>
+                <span>My Appointments</span>
               </button>
 
               <button
@@ -2381,7 +2400,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                 }}
               >
                 <span className="chief-nav-icon"><i className="fas fa-chart-line"></i></span>
-                  <span>Analytics</span>
+                <span>Analytics</span>
               </button>
             </div>
           </aside>
@@ -2389,33 +2408,33 @@ const PGDashboard = ({ brandTitleOverride }) => {
 
         <main className="chief-main" aria-label="PG content">
           <div className="doctor-dashboard-content">
-              {/* Message boxes */}
-              {message && <div className="error-message">{message}</div>}
-              {successMessage && (
-                <div className="success-message" style={{ position: 'relative', paddingRight: 40 }}>
-                  <button
-                    type="button"
-                    onClick={() => setSuccessMessage('')}
-                    aria-label="Close"
-                    title="Close"
-                    style={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 10,
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      fontSize: 16,
-                      fontWeight: 700,
-                      lineHeight: 1,
-                      color: 'inherit',
-                    }}
-                  >
-                      &times;
-                  </button>
-                  {successMessage}
-                </div>
-              )}
+            {/* Message boxes */}
+            {message && <div className="error-message">{message}</div>}
+            {successMessage && (
+              <div className="success-message" style={{ position: 'relative', paddingRight: 40 }}>
+                <button
+                  type="button"
+                  onClick={() => setSuccessMessage('')}
+                  aria-label="Close"
+                  title="Close"
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 10,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    color: 'inherit',
+                  }}
+                >
+                  &times;
+                </button>
+                {successMessage}
+              </div>
+            )}
 
             {activeView === 'patient' && (
               <div className="doctor-dashboard-content">
@@ -2423,7 +2442,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
 
                 {/* Unique ID input */}
                 <div className="input-group">
-                  
+
                   <label>Search Patient</label>
                   <div style={{ position: 'relative', width: '100%' }}>
                     <input
@@ -2693,6 +2712,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
                             <label htmlFor="diet-allergies">Diet Allergies</label>
                             <input type="text" id="diet-allergies" name="dietAllergies" value={formData.dietAllergies} onChange={handleInputChange} placeholder="Specify diet allergies" />
                           </div>
+                          <div className="input-group">
+                            <label htmlFor="critical-condition">Critical Condition</label>
+                            <input type="text" id="critical-condition" name="criticalCondition" value={formData.criticalCondition} onChange={handleInputChange} placeholder="e.g. Cardiac arrest risk, Severe allergy, Haemophilia..." />
+                          </div>
                         </div>
                       </>
                     )}
@@ -2710,20 +2733,36 @@ const PGDashboard = ({ brandTitleOverride }) => {
                       >
                         Go to Department Case Sheet
                       </button>
-                      {!pgDepartmentKey.includes('oral') && (
-                      <button
-                        type="button"
-                        className="case-files-btn"
-                        onClick={() => {
-                          const caseId = String(generalCasePreview?._id || '').trim();
-                          if (caseId) {
-                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
-                          }
-                        }}
-                        disabled={!generalCasePreview?._id}
-                      >
-                        View Full General Case Sheet
-                      </button>
+                      {(pgDepartmentKey.includes('oral') || pgDepartmentKey.includes('periodont')) && (
+                        <button
+                          type="button"
+                          className="case-files-btn"
+                          onClick={() => {
+                            if (formData.uniqueId) {
+                              localStorage.setItem('CurrentpatientId', formData.uniqueId);
+                              localStorage.setItem('CurrentpatientName', `${formData.firstName} ${formData.lastName}`.trim());
+                              window.open('/case-history', '_blank');
+                            }
+                          }}
+                          disabled={!canNavigateCases}
+                        >
+                          Case History
+                        </button>
+                      )}
+                      {!pgDepartmentKey.includes('oral') && !(formData.uniqueId || '').toLowerCase().startsWith('c') && (
+                        <button
+                          type="button"
+                          className="case-files-btn"
+                          onClick={() => {
+                            const caseId = String(generalCasePreview?._id || '').trim();
+                            if (caseId) {
+                              window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
+                            }
+                          }}
+                          disabled={!generalCasePreview?._id}
+                        >
+                          View Full General Case Sheet
+                        </button>
                       )}
                     </div>
                   </div>
@@ -3013,7 +3052,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                               >
                                 {appointment?.patientId || '—'}
                               </td>
-                              <td 
+                              <td
                                 style={{ padding: '8px 6px', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                                 title={`${appointment?.appointmentDate || '—'}${appointment?.appointmentTime ? ` • ${appointment.appointmentTime}` : ''}`}
                               >
@@ -3028,12 +3067,12 @@ const PGDashboard = ({ brandTitleOverride }) => {
                               </td>
                               <td style={{ padding: '8px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                                 {appointmentStatus === 'rejected' ? (
-                                  <span style={{ 
-                                    background: '#f56565', 
-                                    color: '#fff', 
-                                    borderRadius: '12px', 
-                                    padding: '4px 10px', 
-                                    fontSize: '12px', 
+                                  <span style={{
+                                    background: '#f56565',
+                                    color: '#fff',
+                                    borderRadius: '12px',
+                                    padding: '4px 10px',
+                                    fontSize: '12px',
                                     fontWeight: 600,
                                     display: 'inline-block'
                                   }}>
@@ -3042,12 +3081,12 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                 ) : (
                                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
                                     {isAccepted ? (
-                                      <span style={{ 
-                                        background: '#2f855a', 
-                                        color: '#fff', 
-                                        borderRadius: '12px', 
-                                        padding: '6px 12px', 
-                                        fontSize: '0.8em', 
+                                      <span style={{
+                                        background: '#2f855a',
+                                        color: '#fff',
+                                        borderRadius: '12px',
+                                        padding: '6px 12px',
+                                        fontSize: '0.8em',
                                         fontWeight: 600,
                                         display: 'inline-block'
                                       }}>
@@ -3096,13 +3135,13 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                       Reschedule
                                     </button>
 
-                                    {!['confirmed','assigned','in_progress','rescheduled'].includes(appointmentStatus) && appointmentStatus !== 'pending' && (
-                                      <span style={{ 
-                                        background: '#ed8936', 
-                                        color: '#fff', 
-                                        borderRadius: '12px', 
-                                        padding: '4px 10px', 
-                                        fontSize: '12px', 
+                                    {!['confirmed', 'assigned', 'in_progress', 'rescheduled'].includes(appointmentStatus) && appointmentStatus !== 'pending' && (
+                                      <span style={{
+                                        background: '#ed8936',
+                                        color: '#fff',
+                                        borderRadius: '12px',
+                                        padding: '4px 10px',
+                                        fontSize: '12px',
                                         fontWeight: 600,
                                         display: 'inline-block'
                                       }}>
@@ -3136,10 +3175,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
             {!rescheduleSelectedDate ? (
               <>
                 {/* Calendar View */}
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                   marginBottom: '20px',
                   padding: '0 10px'
                 }}>
@@ -3162,19 +3201,19 @@ const PGDashboard = ({ brandTitleOverride }) => {
                   >
                     ‹
                   </button>
-                  
-                  <h4 style={{ 
-                    margin: 0, 
-                    fontSize: '18px', 
+
+                  <h4 style={{
+                    margin: 0,
+                    fontSize: '18px',
                     fontWeight: 'bold',
                     color: 'white'
                   }}>
-                    {new Date(rescheduleCalendarYear, rescheduleCalendarMonth).toLocaleDateString('en-US', { 
-                      month: 'long', 
-                      year: 'numeric' 
+                    {new Date(rescheduleCalendarYear, rescheduleCalendarMonth).toLocaleDateString('en-US', {
+                      month: 'long',
+                      year: 'numeric'
                     })}
                   </h4>
-                  
+
                   <button
                     type="button"
                     onClick={() => navigateRescheduleCalendar('next')}
@@ -3197,9 +3236,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
                 </div>
 
                 {/* Day Headers */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(7, 1fr)', 
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
                   gap: '2px',
                   marginBottom: '10px'
                 }}>
@@ -3217,9 +3256,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
                 </div>
 
                 {/* Calendar Grid */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(7, 1fr)', 
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
                   gap: '2px'
                 }}>
                   {generateRescheduleCalendarDates(rescheduleCalendarMonth, rescheduleCalendarYear).map((dateObj, index) => {
@@ -3233,9 +3272,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
                         style={{
                           padding: '12px 8px',
                           border: '2px solid rgba(255, 255, 255, 0.3)',
-                          backgroundColor: dateObj.isToday 
-                            ? 'rgba(60, 141, 255, 0.5)' 
-                            : dateObj.isCurrentMonth 
+                          backgroundColor: dateObj.isToday
+                            ? 'rgba(60, 141, 255, 0.5)'
+                            : dateObj.isCurrentMonth
                               ? (isSelectable ? 'rgba(60, 141, 255, 0.2)' : 'rgba(107, 114, 128, 0.2)')
                               : 'rgba(0, 0, 0, 0.1)',
                           color: dateObj.isCurrentMonth ? 'white' : 'rgba(255, 255, 255, 0.5)',
@@ -3270,16 +3309,16 @@ const PGDashboard = ({ brandTitleOverride }) => {
                         const isBooked = bookedCount >= maxSlots;
                         const isCurrentSlot = activeRescheduleAppointment?.appointmentTime === timeSlot && activeRescheduleAppointment?.appointmentDate === rescheduleSelectedDate;
                         const selected = String(rescheduleDrafts[activeRescheduleBookingId]?.appointmentTime || '') === timeSlot;
-                        
+
                         return (
                           <button
                             key={timeSlot}
                             type="button"
                             className={`pg-slot-chip ${selected ? 'selected' : ''}`}
                             disabled={isBooked && !isCurrentSlot || bookedSlotsLoadingDate === rescheduleSelectedDate}
-                            onClick={() => updateRescheduleDraft(activeRescheduleBookingId, { 
+                            onClick={() => updateRescheduleDraft(activeRescheduleBookingId, {
                               appointmentDate: rescheduleSelectedDate,
-                              appointmentTime: timeSlot 
+                              appointmentTime: timeSlot
                             })}
                             style={{
                               opacity: isBooked && !isCurrentSlot ? 0.5 : 1,
@@ -3312,7 +3351,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                   Back to Calendar
                 </button>
               ) : null}
-              
+
               <button
                 type="button"
                 className="view-button"

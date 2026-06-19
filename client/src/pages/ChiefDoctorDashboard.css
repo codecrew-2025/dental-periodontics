@@ -794,33 +794,8 @@
   }
 
   /* Print footer */
-  @page {
-    margin: 15mm;
-    
-    /* Add page numbers */
-    @bottom-right {
-      content: counter(page) " of " counter(pages);
-      font-size: 10pt;
-      color: #666;
-    }
-    
-    @bottom-left {
-      content: "Confidential - Hospital Management System";
-      font-size: 8pt;
-      color: #999;
-    }
-  }
-
-  @page :first {
-    margin-top: 25mm;
-    
-    @bottom-right {
-      content: "";
-    }
-    
-    @bottom-left {
-      content: "";
-    }
+  .full-report-body {
+    page-break-after: always;
   }
 
   /* Hide non-printable elements */
@@ -2804,30 +2779,8 @@ tr:hover td {
   }
 
   /* Page breaks for dashboard */
-  @page {
-    margin: 15mm;
-    
-    @bottom-center {
-      content: "Confidential - Hospital Management System";
-      font-size: 9pt;
-      color: #999;
-    }
-    
-    @bottom-right {
-      content: "Page " counter(page) " of " counter(pages);
-      font-size: 9pt;
-    }
-  }
-
-  @page :first {
-    margin-top: 25mm;
-    
-    @top-center {
-      content: "Chief Doctor Dashboard";
-      font-size: 12pt;
-      font-weight: bold;
-      color: #333;
-    }
+  .chief-container-page {
+    page-break-after: always;
   }
 
   /* Avoid breaking important elements */

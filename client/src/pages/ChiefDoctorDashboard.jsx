@@ -946,20 +946,29 @@ const ChiefDoctorDashboard = () => {
   const assignedDoctorCount = assignedDoctors.length;
   const upcomingAppointmentsCount = assignedAppointments.length;
 
-  const appointmentsGroupedByDoctor = assignedAppointments.reduce((acc, appointment) => {
-    const key = appointment.doctorId || appointment.doctorIdentity || "unknown";
-    if (!acc[key]) {
-      acc[key] = {
+  const appointmentsGroupedByDoctor = assignedDoctors.reduce((acc, doctor) => {
+    const key = String(doctor._id || doctor.Identity || "unknown");
+    acc[key] = {
+      doctorName: doctor.name || "Unassigned Doctor",
+      doctorIdentity: doctor.Identity || "-",
+      department: doctor.department || "-",
+      appointments: [],
+    };
+    return acc;
+  }, {});
+
+  assignedAppointments.forEach((appointment) => {
+    const key = String(appointment.doctorId || appointment.doctorIdentity || "unknown");
+    if (!appointmentsGroupedByDoctor[key]) {
+      appointmentsGroupedByDoctor[key] = {
         doctorName: appointment.doctorName || "Unassigned Doctor",
         doctorIdentity: appointment.doctorIdentity || "-",
         department: appointment.doctorDepartment || "-",
         appointments: [],
       };
     }
-
-    acc[key].appointments.push(appointment);
-    return acc;
-  }, {});
+    appointmentsGroupedByDoctor[key].appointments.push(appointment);
+  });
 
   const appointmentDoctorGroups = Object.values(appointmentsGroupedByDoctor);
 

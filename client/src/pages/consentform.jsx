@@ -1,6 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from "../config/api";
+import { saveConsentDraft, loadConsentDraft, clearConsentDraft } from '../utils/consentDraft';
+
+const debounce = (fn, delay) => {
+  let timer;
+  const debounced = (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+  debounced.cancel = () => clearTimeout(timer);
+  return debounced;
+};
 
 const CASE_CONSENT_NAV_STATE_KEY = 'caseSheetConsentApproved';
 const campusBg = '/images/campus.png';
@@ -14,6 +25,81 @@ const getSafeRedirectTarget = (search) => {
   if (redirectParam.startsWith('//')) return '/casePortal';
 
   return redirectParam;
+};
+
+const consentContentMap = {
+  'Prosthodontics': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் செயற்கை பல் கட்டும் பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'செயற்கை பல் கட்டும் மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. செயற்கைப் பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு செயற்கை பல் கட்டும் மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  },
+  'Periodontics': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் பல் ஈறு நோய் (Periodontics) பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'பல் ஈறு நோய் மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு பல் ஈறு நோய் மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  },
+  'Orthodontics': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் பல் சீரமைப்பு (Orthodontics) பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'பல் சீரமைப்பு மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு பல் சீரமைப்பு மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  },
+  'Oral Medicine and Radiology': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் வாய்வழி மருத்துவம் மற்றும் கதிரியக்கவியல் (Oral Medicine & Radiology) பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'வாய்வழி மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு வாய்வழி மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  },
+  'Pedodontics': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் குழந்தைகள் பல் மருத்துவம் (Pedodontics) பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'குழந்தைகள் பல் மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு குழந்தைகள் பல் மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  },
+  'Implantology': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் பல் உள்வைப்பு (Implantology) பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'பல் உள்வைப்பு மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு பல் உள்வைப்பு மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  },
+  'Fixed Partial Denture': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் செயற்கை பல் கட்டும் (FPD) பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'செயற்கை பல் கட்டும் மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. செயற்கைப் பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு செயற்கை பல் கட்டும் மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  },
+  'Partial Denture': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் செயற்கை பல் கட்டும் (Partial Denture) பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'செயற்கை பல் கட்டும் மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. செயற்கைப் பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு செயற்கை பல் கட்டும் மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  },
+  'Complete Denture': {
+    tamilIntro: 'ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் செயற்கை பல் கட்டும் (Complete Denture) பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.',
+    tamilBody: [
+      'செயற்கை பல் கட்டும் மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.',
+      'சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. செயற்கைப் பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.',
+      'இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு செயற்கை பல் கட்டும் மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.'
+    ]
+  }
 };
 
 const App = () => {
@@ -72,6 +158,7 @@ const App = () => {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [permissionError, setPermissionError] = useState("");
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
   const patientId =
     localStorage.getItem("CurrentpatientId") ||
     localStorage.getItem("patientId") ||
@@ -153,6 +240,85 @@ const App = () => {
       isCancelled = true;
     };
   }, [patientId]);
+
+  // Load consent draft on mount
+  useEffect(() => {
+    if (!patientId) {
+      setIsDraftLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDraft = async () => {
+      try {
+        const draft = await loadConsentDraft({ patientId });
+        if (cancelled || !draft?.data) {
+          setIsDraftLoaded(true);
+          return;
+        }
+
+        const d = draft.data;
+
+        if (d.formData) {
+          setFormData(prev => ({
+            ...prev,
+            patientName: d.formData.patientName || prev.patientName,
+            date: d.formData.date || prev.date,
+            agreed: d.formData.agreed || prev.agreed,
+            signatureImage: d.formData.signatureImage || prev.signatureImage,
+          }));
+        }
+
+        if (d.recordedVideoURL) setRecordedVideoURL(d.recordedVideoURL);
+        if (d.recordedVideoData) setRecordedVideoData(d.recordedVideoData);
+        if (d.permissionGranted) setPermissionGranted(d.permissionGranted);
+
+        console.log('[ConsentForm] Draft loaded for patient:', patientId);
+      } catch (error) {
+        console.error('[ConsentForm] Failed to load draft:', error);
+      } finally {
+        setIsDraftLoaded(true);
+      }
+    };
+
+    loadDraft();
+    return () => { cancelled = true; };
+  }, [patientId]);
+
+  // Debounced auto-save
+  const saveDraftDebounced = useMemo(
+    () => debounce(async () => {
+      if (!patientId || !isDraftLoaded) return;
+
+      const draftData = {
+        formData: {
+          patientName: formData.patientName,
+          date: formData.date,
+          agreed: formData.agreed,
+          signatureImage: formData.signatureImage,
+        },
+        recordedVideoURL,
+        recordedVideoData,
+        permissionGranted,
+      };
+
+      await saveConsentDraft({ patientId, data: draftData });
+    }, 2000),
+    [patientId, isDraftLoaded, formData, recordedVideoURL, recordedVideoData, permissionGranted]
+  );
+
+  useEffect(() => {
+    if (!isDraftLoaded) return;
+    saveDraftDebounced();
+  }, [formData, recordedVideoURL, recordedVideoData, permissionGranted, isDraftLoaded, saveDraftDebounced]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveDraftDebounced?.cancel) saveDraftDebounced.cancel();
+    };
+  }, [saveDraftDebounced]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -354,7 +520,7 @@ const App = () => {
       alert("Please upload your signature image.");
       return;
     }
-    if (!recordedVideoURL) {
+    if (!recordedVideoURL && !recordedVideoData) {
       alert("Please record a video consent before submitting.");
       return;
     }
@@ -396,6 +562,26 @@ const App = () => {
         return;
       }
 
+      // Forcefully save the final state to the draft so it persists for 1 day.
+      try {
+        await saveConsentDraft({
+          patientId,
+          data: {
+            formData: {
+              patientName: formData.patientName.trim(),
+              date: formData.date,
+              agreed: formData.agreed,
+              signatureImage: formData.signatureImage,
+            },
+            recordedVideoData: videoConsentData,
+            permissionGranted: true,
+          }
+        });
+        console.log('[ConsentForm] Final draft saved forcefully on submit');
+      } catch (error) {
+        console.error('[ConsentForm] Failed to save final draft:', error);
+      }
+
       setSubmitted(true);
     } catch (error) {
       console.error("Consent submission failed:", error);
@@ -408,8 +594,9 @@ const App = () => {
   const handlePrint = async () => {
     let frameUrl = null;
     const printLogoSrc = `${window.location.origin}/images/logo2.png`;
-    if (recordedVideoURL) {
-      frameUrl = await createVideoThumbnail(recordedVideoURL);
+    const videoSource = recordedVideoURL || recordedVideoData;
+    if (videoSource) {
+      frameUrl = await createVideoThumbnail(videoSource);
     }
 
     const sigHtml = formData.signatureImage
@@ -421,7 +608,7 @@ const App = () => {
            <img src="${frameUrl}" alt="Video Consent Frame" style="width:100%;max-width:520px;border:1px solid #ccc;border-radius:6px;display:block;" />
            <p style="font-size:12px;color:#555;margin-top:4px;">Printed preview of recorded video consent on ${formData.date}</p>
          </div>`
-      : recordedVideoURL
+      : videoSource
         ? `<p style="color:#2e7d32;font-weight:bold;">&#10003; Video consent was recorded on ${formData.date}</p>`
         : '<p style="color:#888;font-style:italic;">No video consent recorded</p>';
 
@@ -469,15 +656,21 @@ const App = () => {
     <p class="field-value">${formData.patientName || '—'}</p>
   </div>
 
+  ${consentContentMap[departmentLabel] ? `
   <p style="font-size:15px;line-height:1.7;color:#444;text-align:justify;margin-bottom:16px;">
-    ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் செயற்கை பல் கட்டும் பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.
+    ${consentContentMap[departmentLabel].tamilIntro}
   </p>
 
   <div class="consent-box">
-    <p>செயற்கை பல் கட்டும் மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.</p>
-    <p style="margin-top:10px">சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. செயற்கைப் பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.</p>
-    <p style="margin-top:10px;font-weight:bold;color:#222;">இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு செயற்கை பல் கட்டும் மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.</p>
+    <p>${consentContentMap[departmentLabel].tamilBody[0]}</p>
+    <p style="margin-top:10px">${consentContentMap[departmentLabel].tamilBody[1]}</p>
+    <p style="margin-top:10px;font-weight:bold;color:#222;">${consentContentMap[departmentLabel].tamilBody[2]}</p>
   </div>
+  ` : `
+  <div class="consent-box">
+    <p style="text-align:center;color:#666;">Consent form content not available for this department.</p>
+  </div>
+  `}
 
   <div class="row">
     <div class="field">
@@ -575,15 +768,24 @@ const App = () => {
           </div>
 
           {/* Tamil Consent Text */}
-          <p style={styles.bodyText}>
-            ஆகிய நான், இராமாபுரம், எஸ்.ஆர்.எம். பல் மருத்துவக் கல்லூரியில் செயற்கை பல் கட்டும் பிரிவு மருத்துவர்களுக்கு முழு மனதுடன் எழுதிக்கொடுக்கும் சம்மதப்படிவம்.
-          </p>
-
-          <div style={styles.consentBox}>
-            <p>செயற்கை பல் கட்டும் மருத்துவத்துறையின் சிகிச்சைப் பற்றி அனைத்து விவரங்களையும் அதற்கான சிகிச்சைக் காலம், எத்தனை முறை சிகிச்சைக்கு வரவேண்டும், அதற்குண்டான கட்டணம், தேவையான இதர பல் சிகிச்சைகள் மற்றும் முன்காப்பு, பின் விளைவுகள் பற்றி விவரமாக என்னிடம் தெரிவிக்கப்பட்டது.</p>
-            <p style={{ marginTop: "10px" }}>சிகிச்சை காலத்தில் ஏற்படக்கூடிய சிகிச்சை மாற்றங்களை தெளிவாக விளக்கப்பட்டது. செயற்கைப் பல் சிகிச்சைக்கான காலம் மற்றும் சிகிச்சைக் கட்டணம் தோராயமாகக் கூறப்பட்டது.</p>
-            <p style={{ marginTop: "10px", fontWeight: "bold", color: "#222" }}>இந்த பல் சிகிச்சையினால் எனக்கு ஏற்படக்கூடிய, தவிர்க்க முடியாத பின் விளைவுகளுக்கு செயற்கை பல் கட்டும் மருத்துவக் குழுவை காரணமாக சொல்ல மாட்டேன் என்று உறுதியாக கூறுகிறேன்.</p>
-          </div>
+          {consentContentMap[departmentLabel] ? (
+            <>
+              <p style={styles.bodyText}>
+                {consentContentMap[departmentLabel].tamilIntro}
+              </p>
+              <div style={styles.consentBox}>
+                <p>{consentContentMap[departmentLabel].tamilBody[0]}</p>
+                <p style={{ marginTop: "10px" }}>{consentContentMap[departmentLabel].tamilBody[1]}</p>
+                <p style={{ marginTop: "10px", fontWeight: "bold", color: "#222" }}>
+                  {consentContentMap[departmentLabel].tamilBody[2]}
+                </p>
+              </div>
+            </>
+          ) : (
+            <div style={styles.consentBox}>
+              <p style={{ textAlign: "center", color: "#666" }}>Consent form content not available for this department.</p>
+            </div>
+          )}
 
           {/* Date + Consent Checkbox + Signature */}
           <div style={styles.inputGrid}>
@@ -669,11 +871,11 @@ const App = () => {
                     <button type="button" style={styles.stopButton} onClick={stopRecording}>⏹ Stop Recording</button>
                   )}
                 </div>
-                {recordedVideoURL && (
+                {(recordedVideoURL || recordedVideoData) && (
                   <div style={{ marginTop: "12px" }}>
                     <p style={{ fontWeight: "bold", color: "green", marginBottom: "6px" }}>✅ Recording saved!</p>
-                    <video src={recordedVideoURL} controls style={styles.videoPreview} />
-                    <a href={recordedVideoURL} download="consent-video.webm" style={styles.downloadLink}>
+                    <video src={recordedVideoURL || recordedVideoData} controls style={styles.videoPreview} />
+                    <a href={recordedVideoURL || recordedVideoData} download="consent-video.webm" style={styles.downloadLink}>
                       ⬇️ Download Recording
                     </a>
                   </div>

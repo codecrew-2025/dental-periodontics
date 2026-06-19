@@ -44,6 +44,9 @@ import PGDashboard from './pages/PGDashboard';
 import UGDashboard from './pages/UGDashboard';
 import ConsentForm from './pages/consentform';
 import CampDashboard from './pages/CampDashboard';
+import GeneralCaseSheetView from './pages/GeneralCaseSheetView';
+import Generalcasesheet from './pages/Generalcasesheet';
+import CampPeriodonticsCaseSheet from './pages/Casesheets/CampPeriodonticsCaseSheet';
 
 
 const getDashboardRouteByRole = (role) => {
@@ -398,6 +401,9 @@ const AppRoutes = () => {
         <Route path='/admin-dashboard/billing/case' element={<BillX />} />
         <Route path='/admin-dashboard/billing/xray' element={<XRayBilling />} />
         <Route path='/consent-form' element={<ConsentForm />} />
+        <Route path="/general-case-view" element={<GeneralCaseSheetView />} />
+        <Route path="/general-case-sheet" element={<Generalcasesheet />} />
+        <Route path="/camp-periodontics-case-sheet" element={<CampPeriodonticsCaseSheet />} />
 
         <Route path='/reset-password' element={<ForgetPassword />} />
         <Route path="/unauthorized" element={<center><h2>UnAuthorized Access Try!</h2></center>} />

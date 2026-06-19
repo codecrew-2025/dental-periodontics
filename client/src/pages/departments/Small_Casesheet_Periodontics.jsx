@@ -215,7 +215,7 @@ const App = ({ initialCaseData, readOnly = false }) => {
     }
     if (isValid) {
       setIsSubmitting(true);
-      
+
       if ((appointmentDate && !appointmentTime) || (!appointmentDate && appointmentTime)) {
         alert('Please select both appointment date and time, or leave both blank.');
         setIsSubmitting(false);
@@ -237,7 +237,7 @@ const App = ({ initialCaseData, readOnly = false }) => {
       // Prepare form data to send to backend
       const doctorId = localStorage.getItem('pgId') || localStorage.getItem('ugId') || localStorage.getItem('doctorId') || '';
       const token = localStorage.getItem('token');
-      
+
       const caseData = {
         patientId,
         patientName,
@@ -548,10 +548,33 @@ const App = ({ initialCaseData, readOnly = false }) => {
         </span>
       </div>
 
-      {showAllergy && (
+      {criticalCondition && (
         <div style={{
           position: 'fixed',
           top: 0,
+          left: 0,
+          right: 0,
+          width: '100vw',
+          background: '#ef4444',
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '8px 20px',
+          boxShadow: '0 3px 12px rgba(0,0,0,0.16)',
+          zIndex: 10000,
+          fontWeight: 'bold',
+          letterSpacing: '1px'
+        }}>
+          <span style={{ marginRight: '8px' }}>⚠️</span>
+          <span>CRITICAL CONDITION: {criticalCondition}</span>
+        </div>
+      )}
+
+      {showAllergy && (
+        <div style={{
+          position: 'fixed',
+          top: criticalCondition ? 44 : 0,
           left: 0,
           right: 0,
           width: '100vw',
@@ -637,349 +660,349 @@ const App = ({ initialCaseData, readOnly = false }) => {
 
         <form ref={formRef} id="periodonticsForm" onSubmit={(e) => e.preventDefault()}>
           <fieldset disabled={readOnly} style={{ border: 'none', margin: 0, padding: 0 }}>
-          
-          {/* Page 1: Extra & Intra Oral */}
-          {currentPage === 0 && (
-            <div className="animate-in">
-              <h2>1. Extra – Oral Examination</h2>
-              {["Facial Symmetry", "TMJ Examination", "Mouth Opening", "Lymph Node Examination", "Lip Competence"].map((label) => (
-                <div className="form-group" key={label}>
-                  <label>{label}:</label>
-                  <input type="text" />
-                </div>
-              ))}
 
-              <h2>2. Intra – Oral Examination (Soft Tissues)</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {["Buccal mucosa", "Labial mucosa", "Palatal/lingual mucosa", "Tongue", "Palate", "Floor of mouth", "Vestibule", "Tonsils"].map((label) => (
+            {/* Page 1: Extra & Intra Oral */}
+            {currentPage === 0 && (
+              <div className="animate-in">
+                <h2>1. Extra – Oral Examination</h2>
+                {["Facial Symmetry", "TMJ Examination", "Mouth Opening", "Lymph Node Examination", "Lip Competence"].map((label) => (
                   <div className="form-group" key={label}>
                     <label>{label}:</label>
                     <input type="text" />
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
 
-          {/* Page 2: Gingiva Tables */}
-          {currentPage === 1 && (
-            <div className="animate-in">
-              <h2>3. Periodontal Examination - Gingiva</h2>
-              
-              <h3>Maxilla</h3>
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th rowSpan="2">Feature</th>
-                      <th colSpan="2">Surface</th>
-                      <th colSpan="4">Tooth Groups</th>
-                    </tr>
-                    <tr>
-                      <th>Buccal</th>
-                      <th>Palatal</th>
-                      <th>18-14</th>
-                      <th>13-11</th>
-                      <th>21-23</th>
-                      <th>24-28</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {["Color", "Contour", "Consistency", "Surface Texture", "Position"].map((f) => renderRow(f))}
-                  </tbody>
-                </table>
-              </div>
-
-              <h3>Mandible</h3>
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th rowSpan="2">Feature</th>
-                      <th colSpan="2">Surface</th>
-                      <th colSpan="4">Tooth Groups</th>
-                    </tr>
-                    <tr>
-                      <th>Buccal</th>
-                      <th>Lingual</th>
-                      <th>48-45</th>
-                      <th>43-41</th>
-                      <th>31-33</th>
-                      <th>34-38</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {["Color", "Contour", "Consistency", "Surface Texture", "Position"].map((f) => renderRow(f))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Page 3: Mucogingival & Depth */}
-          {currentPage === 2 && (
-            <div className="animate-in">
-              <h2>Mucogingival Unit</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="form-group">
-                  <label>Mucogingival Junction:</label>
-                  <input type="text" />
-                </div>
-                <div className="form-group">
-                  <label>Width of Attached Gingiva (mm):</label>
-                  <input type="text" />
-                </div>
-                <div className="form-group">
-                  <label>Frenal Attachment:</label>
-                  <input type="text" />
-                </div>
-                <div className="form-group">
-                  <label>Vestibular Depth (mm):</label>
-                  <input type="text" />
+                <h2>2. Intra – Oral Examination (Soft Tissues)</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {["Buccal mucosa", "Labial mucosa", "Palatal/lingual mucosa", "Tongue", "Palate", "Floor of mouth", "Vestibule", "Tonsils"].map((label) => (
+                    <div className="form-group" key={label}>
+                      <label>{label}:</label>
+                      <input type="text" />
+                    </div>
+                  ))}
                 </div>
               </div>
+            )}
 
-              <div className="form-group mt-2">
-                <label>Other Findings:</label>
-                <textarea rows="3"></textarea>
-              </div>
+            {/* Page 2: Gingiva Tables */}
+            {currentPage === 1 && (
+              <div className="animate-in">
+                <h2>3. Periodontal Examination - Gingiva</h2>
 
-              <h2>Probing Depth (mm)</h2>
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Quadrant</th>
-                      <th>Distal</th>
-                      <th>Mid</th>
-                      <th>Mesial</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {["Maxillary Right", "Maxillary Left", "Mandibular Right", "Mandibular Left"].map(q => (
-                      <tr key={q}>
-                        <td className="font-bold">{q}</td>
-                        <td><input type="number" /></td>
-                        <td><input type="number" /></td>
-                        <td><input type="number" /></td>
-                        <td><input type="text" /></td>
+                <h3>Maxilla</h3>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th rowSpan="2">Feature</th>
+                        <th colSpan="2">Surface</th>
+                        <th colSpan="4">Tooth Groups</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Page 4: Recession/Mobility/OHIS */}
-          {currentPage === 3 && (
-            <div className="animate-in">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <h2>Recession & Mobility</h2>
-                  <div className="table-container">
-                    <table>
-                      <thead>
-                        <tr><th>Tooth</th><th>Recession (mm)</th><th>Mobility (Gr)</th></tr>
-                      </thead>
-                      <tbody>
-                        {[1, 2, 3, 4].map(i => (
-                          <tr key={i}>
-                            <td><input type="text" placeholder="#" /></td>
-                            <td><input type="text" /></td>
-                            <td><input type="text" /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      <tr>
+                        <th>Buccal</th>
+                        <th>Palatal</th>
+                        <th>18-14</th>
+                        <th>13-11</th>
+                        <th>21-23</th>
+                        <th>24-28</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {["Color", "Contour", "Consistency", "Surface Texture", "Position"].map((f) => renderRow(f))}
+                    </tbody>
+                  </table>
                 </div>
-                <div>
-                  <h2>Oral Hygiene Index- simplified</h2>
-                  <div className="table-container">
-                    <table>
-                      <thead>
-                        <tr><th>Segment</th><th>Debris</th><th>Calculus</th></tr>
-                      </thead>
-                      <tbody>
-                        {["Upper", "Lower"].map(s => (
-                          <tr key={s}>
-                            <td className="font-bold">{s}</td>
-                            <td><input type="text" /></td>
-                            <td><input type="text" /></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+
+                <h3>Mandible</h3>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th rowSpan="2">Feature</th>
+                        <th colSpan="2">Surface</th>
+                        <th colSpan="4">Tooth Groups</th>
+                      </tr>
+                      <tr>
+                        <th>Buccal</th>
+                        <th>Lingual</th>
+                        <th>48-45</th>
+                        <th>43-41</th>
+                        <th>31-33</th>
+                        <th>34-38</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {["Color", "Contour", "Consistency", "Surface Texture", "Position"].map((f) => renderRow(f))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
+            )}
 
-              <h2>13. Examination of Teeth / Hard Tissue</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="form-group">
-                  <label>No. of teeth:</label>
-                  <input type="number" />
-                </div>
-                <div className="form-group">
-                  <label>Missing teeth:</label>
-                  <input type="text" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Page 5: Hard Tissue Cont. */}
-          {currentPage === 4 && (
-            <div className="animate-in">
-              <h2>13. Examination of Teeth / Hard Tissue (Continued)</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  "Overhanging restorations", "Dental caries", "Restored", 
-                  "Food impaction", "Pathological migrations", "Open contacts",
-                  "Dental hypersensitivity", "Wasting disease"
-                ].map(label => (
-                  <div className="form-group" key={label}>
-                    <label>{label}:</label>
+            {/* Page 3: Mucogingival & Depth */}
+            {currentPage === 2 && (
+              <div className="animate-in">
+                <h2>Mucogingival Unit</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="form-group">
+                    <label>Mucogingival Junction:</label>
                     <input type="text" />
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Page 6: Summary */}
-          {currentPage === 5 && (
-            <div className="animate-in">
-              <h2>14. Investigations</h2>
-              <div className="form-group">
-                <label>Investigations:</label>
-                <textarea rows="4"></textarea>
-              </div>
-
-              <h2>15. Case Summary</h2>
-              <div className="form-group">
-                <label>Case Summary:</label>
-                <textarea rows="6"></textarea>
-              </div>
-            </div>
-          )}
-
-          {/* Page 7: Diagnosis, Risk & Plan */}
-          {currentPage === 6 && (
-            <div className="animate-in">
-              <h2>16. Diagnosis</h2>
-              <div className="form-group">
-                <label>Diagnosis:</label>
-                <textarea rows="2"></textarea>
-              </div>
-
-              <h2>17. Risk Assessment</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {["a. Risk factors", "b. Risk determinants", "c. Risk indicators", "d. Risk predictors"].map(label => (
-                  <div className="form-group" key={label}>
-                    <label>{label}:</label>
-                    <textarea rows="2"></textarea>
-                  </div>
-                ))}
-              </div>
-
-              <h2>18. Treatment Plan</h2>
-              <div className="form-group">
-                <label>Treatment Plan:</label>
-                <textarea rows="3"></textarea>
-              </div>
-
-              <div className="mt-8 p-6 bg-white/10 rounded-xl border border-white/20">
-                <h2 className="mt-0 border-none text-white">Doctor's Authorization</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="form-group">
-                    <label className="after:content-['*'] after:ml-1 after:text-red-400">Doctor's Name:</label>
-                    <input
-                      type="text"
-                      value={doctorName}
-                      onChange={handleDoctorNameChange}
-                      className="bg-white text-blue-900"
-                    />
+                    <label>Width of Attached Gingiva (mm):</label>
+                    <input type="text" />
                   </div>
-                   <div className="form-group">
-                    <label className={readOnly ? '' : "after:content-['*'] after:ml-1 after:text-red-400"}>Signature Image:</label>
-                    {readOnly ? (
-                      signaturePreviewSrc ? (
-                        <img
-                          src={signaturePreviewSrc}
-                          alt="Signature"
-                          className="signature-preview"
-                          style={{ maxWidth: '200px', maxHeight: '120px', display: 'block', marginTop: 8 }}
-                        />
-                      ) : (
-                        <div style={{ color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', marginTop: 8 }}>No signature on file</div>
-                      )
-                    ) : (
-                      <>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          ref={signatureInputRef}
-                          onChange={handleSignatureChange}
-                          className="bg-white text-blue-900 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                        />
-                        {signaturePreviewSrc && (
+                  <div className="form-group">
+                    <label>Frenal Attachment:</label>
+                    <input type="text" />
+                  </div>
+                  <div className="form-group">
+                    <label>Vestibular Depth (mm):</label>
+                    <input type="text" />
+                  </div>
+                </div>
+
+                <div className="form-group mt-2">
+                  <label>Other Findings:</label>
+                  <textarea rows="3"></textarea>
+                </div>
+
+                <h2>Probing Depth (mm)</h2>
+                <div className="table-container">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Quadrant</th>
+                        <th>Distal</th>
+                        <th>Mid</th>
+                        <th>Mesial</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {["Maxillary Right", "Maxillary Left", "Mandibular Right", "Mandibular Left"].map(q => (
+                        <tr key={q}>
+                          <td className="font-bold">{q}</td>
+                          <td><input type="number" /></td>
+                          <td><input type="number" /></td>
+                          <td><input type="number" /></td>
+                          <td><input type="text" /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Page 4: Recession/Mobility/OHIS */}
+            {currentPage === 3 && (
+              <div className="animate-in">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <h2>Recession & Mobility</h2>
+                    <div className="table-container">
+                      <table>
+                        <thead>
+                          <tr><th>Tooth</th><th>Recession (mm)</th><th>Mobility (Gr)</th></tr>
+                        </thead>
+                        <tbody>
+                          {[1, 2, 3, 4].map(i => (
+                            <tr key={i}>
+                              <td><input type="text" placeholder="#" /></td>
+                              <td><input type="text" /></td>
+                              <td><input type="text" /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div>
+                    <h2>Oral Hygiene Index- simplified</h2>
+                    <div className="table-container">
+                      <table>
+                        <thead>
+                          <tr><th>Segment</th><th>Debris</th><th>Calculus</th></tr>
+                        </thead>
+                        <tbody>
+                          {["Upper", "Lower"].map(s => (
+                            <tr key={s}>
+                              <td className="font-bold">{s}</td>
+                              <td><input type="text" /></td>
+                              <td><input type="text" /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <h2>13. Examination of Teeth / Hard Tissue</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="form-group">
+                    <label>No. of teeth:</label>
+                    <input type="number" />
+                  </div>
+                  <div className="form-group">
+                    <label>Missing teeth:</label>
+                    <input type="text" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Page 5: Hard Tissue Cont. */}
+            {currentPage === 4 && (
+              <div className="animate-in">
+                <h2>13. Examination of Teeth / Hard Tissue (Continued)</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    "Overhanging restorations", "Dental caries", "Restored",
+                    "Food impaction", "Pathological migrations", "Open contacts",
+                    "Dental hypersensitivity", "Wasting disease"
+                  ].map(label => (
+                    <div className="form-group" key={label}>
+                      <label>{label}:</label>
+                      <input type="text" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Page 6: Summary */}
+            {currentPage === 5 && (
+              <div className="animate-in">
+                <h2>14. Investigations</h2>
+                <div className="form-group">
+                  <label>Investigations:</label>
+                  <textarea rows="4"></textarea>
+                </div>
+
+                <h2>15. Case Summary</h2>
+                <div className="form-group">
+                  <label>Case Summary:</label>
+                  <textarea rows="6"></textarea>
+                </div>
+              </div>
+            )}
+
+            {/* Page 7: Diagnosis, Risk & Plan */}
+            {currentPage === 6 && (
+              <div className="animate-in">
+                <h2>16. Diagnosis</h2>
+                <div className="form-group">
+                  <label>Diagnosis:</label>
+                  <textarea rows="2"></textarea>
+                </div>
+
+                <h2>17. Risk Assessment</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {["a. Risk factors", "b. Risk determinants", "c. Risk indicators", "d. Risk predictors"].map(label => (
+                    <div className="form-group" key={label}>
+                      <label>{label}:</label>
+                      <textarea rows="2"></textarea>
+                    </div>
+                  ))}
+                </div>
+
+                <h2>18. Treatment Plan</h2>
+                <div className="form-group">
+                  <label>Treatment Plan:</label>
+                  <textarea rows="3"></textarea>
+                </div>
+
+                <div className="mt-8 p-6 bg-white/10 rounded-xl border border-white/20">
+                  <h2 className="mt-0 border-none text-white">Doctor's Authorization</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="form-group">
+                      <label className="after:content-['*'] after:ml-1 after:text-red-400">Doctor's Name:</label>
+                      <input
+                        type="text"
+                        value={doctorName}
+                        onChange={handleDoctorNameChange}
+                        className="bg-white text-blue-900"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className={readOnly ? '' : "after:content-['*'] after:ml-1 after:text-red-400"}>Signature Image:</label>
+                      {readOnly ? (
+                        signaturePreviewSrc ? (
                           <img
                             src={signaturePreviewSrc}
-                            alt="Preview"
+                            alt="Signature"
                             className="signature-preview"
+                            style={{ maxWidth: '200px', maxHeight: '120px', display: 'block', marginTop: 8 }}
                           />
-                        )}
-                      </>
+                        ) : (
+                          <div style={{ color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', marginTop: 8 }}>No signature on file</div>
+                        )
+                      ) : (
+                        <>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            ref={signatureInputRef}
+                            onChange={handleSignatureChange}
+                            className="bg-white text-blue-900 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                          />
+                          {signaturePreviewSrc && (
+                            <img
+                              src={signaturePreviewSrc}
+                              alt="Preview"
+                              className="signature-preview"
+                            />
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {!readOnly && (
+                  <div style={{ marginTop: '24px', padding: '18px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '10px', background: 'rgba(255,255,255,0.05)' }}>
+                    <h2 style={{ marginTop: 0 }}>Optional Follow-up Appointment</h2>
+                    <p style={{ marginBottom: '14px', color: '#d1d5db' }}>
+                      Schedule a patient appointment when you finish the case sheet. Leave blank to skip booking.
+                    </p>
+                    <div className="form-group">
+                      <label htmlFor="appointmentDate">Appointment Date:</label>
+                      <input
+                        type="date"
+                        id="appointmentDate"
+                        value={appointmentDate}
+                        min={getTodayIso()}
+                        onChange={(e) => setAppointmentDate(e.target.value)}
+                        disabled={readOnly}
+                        style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="appointmentTime">Appointment Time:</label>
+                      <select
+                        id="appointmentTime"
+                        value={appointmentTime}
+                        onChange={(e) => setAppointmentTime(e.target.value)}
+                        disabled={readOnly}
+                        style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
+                      >
+                        <option value="">Select time</option>
+                        {ALLOWED_APPOINTMENT_TIMES.map((time) => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {patientEmail ? (
+                      <p style={{ marginTop: '10px', color: '#cbd5e1' }}><strong>Patient email:</strong> {patientEmail}</p>
+                    ) : (
+                      <p style={{ marginTop: '10px', color: '#fbbf24' }}>Patient email not available. Appointment booking will use a fallback address.</p>
                     )}
                   </div>
-                </div>
+                )}
               </div>
-
-              {!readOnly && (
-                <div style={{ marginTop: '24px', padding: '18px', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '10px', background: 'rgba(255,255,255,0.05)' }}>
-                  <h2 style={{ marginTop: 0 }}>Optional Follow-up Appointment</h2>
-                  <p style={{ marginBottom: '14px', color: '#d1d5db' }}>
-                    Schedule a patient appointment when you finish the case sheet. Leave blank to skip booking.
-                  </p>
-                  <div className="form-group">
-                    <label htmlFor="appointmentDate">Appointment Date:</label>
-                    <input
-                      type="date"
-                      id="appointmentDate"
-                      value={appointmentDate}
-                      min={getTodayIso()}
-                      onChange={(e) => setAppointmentDate(e.target.value)}
-                      disabled={readOnly}
-                      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="appointmentTime">Appointment Time:</label>
-                    <select
-                      id="appointmentTime"
-                      value={appointmentTime}
-                      onChange={(e) => setAppointmentTime(e.target.value)}
-                      disabled={readOnly}
-                      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
-                    >
-                      <option value="">Select time</option>
-                      {ALLOWED_APPOINTMENT_TIMES.map((time) => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {patientEmail ? (
-                    <p style={{ marginTop: '10px', color: '#cbd5e1' }}><strong>Patient email:</strong> {patientEmail}</p>
-                  ) : (
-                    <p style={{ marginTop: '10px', color: '#fbbf24' }}>Patient email not available. Appointment booking will use a fallback address.</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            )}
           </fieldset>
 
           {/* Navigation */}

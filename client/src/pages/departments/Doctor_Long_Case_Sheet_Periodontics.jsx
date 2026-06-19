@@ -95,13 +95,13 @@ function MeasurementTable({ idPrefix, teeth, sides }) {
 
 // ─── 16-tooth chart (single data row) ────────────────────────────────────────
 function ToothChart16({ prefix }) {
-  const sides = ["8r","7r","6r","5r","4r","3r","2r","1r","1l","2l","3l","4l","5l","6l","7l","8l"];
+  const sides = ["8r", "7r", "6r", "5r", "4r", "3r", "2r", "1r", "1l", "2l", "3l", "4l", "5l", "6l", "7l", "8l"];
   return (
     <div className="table-container">
       <table className="tooth-chart">
         <thead>
           <tr>
-            {[8,7,6,5,4,3,2,1,1,2,3,4,5,6,7,8].map((n, i) => <th key={i}>{n}</th>)}
+            {[8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8].map((n, i) => <th key={i}>{n}</th>)}
           </tr>
         </thead>
         <tbody>
@@ -121,13 +121,13 @@ function IndexChart({ prefix }) {
       <table className="tooth-chart">
         <thead>
           <tr>
-            {[8,7,6,5,4,3,2,1,1,2,3,4,5,6,7,8].map((n, i) => <th key={i}>{n}</th>)}
+            {[8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8].map((n, i) => <th key={i}>{n}</th>)}
           </tr>
         </thead>
         <tbody>
-          {[1,2,3,4].map(ri => (
+          {[1, 2, 3, 4].map(ri => (
             <tr key={ri}>
-              {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map(ci => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map(ci => (
                 <td key={ci}><TI id={`${prefix}_r${ri}_c${ci}`} /></td>
               ))}
             </tr>
@@ -147,13 +147,13 @@ function Page1() {
     <>
       <h2>EXTRA ORAL EXAMINATION</h2>
       {[
-        ["facial_symmetry","Facial Symmetry:"],
-        ["tmj_examination","TMJ Examination:"],
-        ["mouth_opening","Mouth Opening:"],
-        ["lymph_node_examination","Lymph node Examination:"],
-        ["lip_competence","Lip competence:"],
-        ["lesions","Lesions:"],
-        ["halitosis","Halitosis:"],
+        ["facial_symmetry", "Facial Symmetry:"],
+        ["tmj_examination", "TMJ Examination:"],
+        ["mouth_opening", "Mouth Opening:"],
+        ["lymph_node_examination", "Lymph node Examination:"],
+        ["lip_competence", "Lip competence:"],
+        ["lesions", "Lesions:"],
+        ["halitosis", "Halitosis:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -163,10 +163,10 @@ function Page1() {
 
       <h2>Soft Tissues</h2>
       {[
-        ["buccal_mucosa","Buccal Mucosa:"],
-        ["labial_mucosa","Labial Mucosa:"],
-        ["tongue","Tongue:"],
-        ["palate","Palate:"],
+        ["buccal_mucosa", "Buccal Mucosa:"],
+        ["labial_mucosa", "Labial Mucosa:"],
+        ["tongue", "Tongue:"],
+        ["palate", "Palate:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -176,9 +176,9 @@ function Page1() {
 
       <h2>INTRA ORAL EXAMINATION</h2>
       {[
-        ["floor_of_mouth","Floor of the Mouth:"],
-        ["vestibule","Vestibule:"],
-        ["tonsils","Tonsils:"],
+        ["floor_of_mouth", "Floor of the Mouth:"],
+        ["vestibule", "Vestibule:"],
+        ["tonsils", "Tonsils:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -196,27 +196,27 @@ function Page2() {
       <h2>IX) Examination Of Gingiva</h2>
       <GingivaTable
         prefix="maxilla"
-        colHeaders={["18,17,16,15,14","13,12,11","21,22,23","24,25,26,27,28"]}
+        colHeaders={["18,17,16,15,14", "13,12,11", "21,22,23", "24,25,26,27,28"]}
       />
       <br />
       <GingivaTable
         prefix="mandible"
-        colHeaders={["48,47,46,45,44","43,42,41","31,32,33","34,35,36,37,38"]}
+        colHeaders={["48,47,46,45,44", "43,42,41", "31,32,33", "34,35,36,37,38"]}
       />
     </>
   );
 }
 
 function Page3() {
-  const maxTeeth = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
-  const mandTeeth = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
+  const maxTeeth = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+  const mandTeeth = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
   return (
     <>
       <h2>Mucogingival Unit</h2>
       {[
-        ["vestibule_examination","Vestibule:"],
-        ["frenal_attachment","Frenal Attachment:"],
-        ["width_attached_gingiva","Width of Attached Gingiva:"],
+        ["vestibule_examination", "Vestibule:"],
+        ["frenal_attachment", "Frenal Attachment:"],
+        ["width_attached_gingiva", "Width of Attached Gingiva:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -225,20 +225,20 @@ function Page3() {
       ))}
 
       <h2>Probing depth:</h2>
-      <MeasurementTable idPrefix="pd" teeth={maxTeeth} sides={["B","P"]} />
-      <MeasurementTable idPrefix="pd" teeth={mandTeeth} sides={["B","L"]} />
+      <MeasurementTable idPrefix="pd" teeth={maxTeeth} sides={["B", "P"]} />
+      <MeasurementTable idPrefix="pd" teeth={mandTeeth} sides={["B", "L"]} />
     </>
   );
 }
 
 function Page4() {
-  const maxTeeth = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
-  const mandTeeth = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
+  const maxTeeth = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
+  const mandTeeth = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
   return (
     <>
       <h2>Clinical Attachement Level:</h2>
-      <MeasurementTable idPrefix="cal" teeth={maxTeeth} sides={["B","P"]} />
-      <MeasurementTable idPrefix="cal" teeth={mandTeeth} sides={["B","L"]} />
+      <MeasurementTable idPrefix="cal" teeth={maxTeeth} sides={["B", "P"]} />
+      <MeasurementTable idPrefix="cal" teeth={mandTeeth} sides={["B", "L"]} />
 
       <div className="table-container">
         <table className="attachment-table">
@@ -253,10 +253,10 @@ function Page4() {
           </thead>
           <tbody>
             <tr><td className="attachment-label"><b>Maxilla</b></td><td colSpan={4}></td></tr>
-            {["Recession","Mobility","Furcation"].map(row => (
+            {["Recession", "Mobility", "Furcation"].map(row => (
               <tr key={row}>
                 <td className="attachment-label">{row}</td>
-                {[1,2,3,4].map(i => <td key={i}><TI id={`${row.toLowerCase()}_${i}`} /></td>)}
+                {[1, 2, 3, 4].map(i => <td key={i}><TI id={`${row.toLowerCase()}_${i}`} /></td>)}
               </tr>
             ))}
           </tbody>
@@ -276,10 +276,10 @@ function Page4() {
           </thead>
           <tbody>
             <tr><td className="attachment-label"><b>Mandible</b></td><td colSpan={4}></td></tr>
-            {["Furcation","Mobility","Recession"].map(row => (
+            {["Furcation", "Mobility", "Recession"].map(row => (
               <tr key={row}>
                 <td className="attachment-label">{row}</td>
-                {[1,2,3,4].map(i => <td key={i}><TI id={`${row.toLowerCase()}_lower_${i}`} /></td>)}
+                {[1, 2, 3, 4].map(i => <td key={i}><TI id={`${row.toLowerCase()}_lower_${i}`} /></td>)}
               </tr>
             ))}
           </tbody>
@@ -304,14 +304,14 @@ function Page5() {
           <thead>
             <tr>
               <th></th>
-              {[16,11,26,36,31,46].map(t => <th key={t}>{t}</th>)}
+              {[16, 11, 26, 36, 31, 46].map(t => <th key={t}>{t}</th>)}
             </tr>
           </thead>
           <tbody>
-            {[["DIS-","dis"],["CI-S","cis"]].map(([label, key]) => (
+            {[["DIS-", "dis"], ["CI-S", "cis"]].map(([label, key]) => (
               <tr key={key}>
                 <td>{label}</td>
-                {[16,11,26,36,31,46].map(t => (
+                {[16, 11, 26, 36, 31, 46].map(t => (
                   <td key={t}><TI id={`ohi_${key}_${t}`} /></td>
                 ))}
               </tr>
@@ -326,10 +326,10 @@ function Page5() {
 
       <h2>XIII) Examination Of The Teeth/Hard Tissue</h2>
       {[
-        ["num_teeth","No of teeth:"],
-        ["missing_teeth","Missing teeth:"],
-        ["overhanging_restorations","Overhanging restorations:"],
-        ["impacted_teeth","Impacted teeth:"],
+        ["num_teeth", "No of teeth:"],
+        ["missing_teeth", "Missing teeth:"],
+        ["overhanging_restorations", "Overhanging restorations:"],
+        ["impacted_teeth", "Impacted teeth:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -362,11 +362,11 @@ function Page6() {
       <ToothChart16 prefix="wasting_mand" />
 
       {[
-        ["open_contacts","Open contacts:"],
-        ["food_impaction","Food impaction:"],
-        ["dentinal_hypersensitivity","Dentinal Hypersensitivity:"],
-        ["pathological_migration","Pathological Migration:"],
-        ["dental_stains","Dental Stains:"],
+        ["open_contacts", "Open contacts:"],
+        ["food_impaction", "Food impaction:"],
+        ["dentinal_hypersensitivity", "Dentinal Hypersensitivity:"],
+        ["pathological_migration", "Pathological Migration:"],
+        ["dental_stains", "Dental Stains:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -382,14 +382,14 @@ function Page7() {
     <>
       <h2>Occlusal evaluation</h2>
       {[
-        ["occlusion_type","Type of Occlusion:"],
-        ["centric_occlusion","Centric Occlusion:"],
-        ["overjet","Overjet:"],
-        ["overbite","Overbite:"],
-        ["fremitus_test","Fremitus Test:"],
-        ["prematurities","Prematurities:"],
-        ["plunger_cusp","Plunger cusp:"],
-        ["occlusal_others","Others:"],
+        ["occlusion_type", "Type of Occlusion:"],
+        ["centric_occlusion", "Centric Occlusion:"],
+        ["overjet", "Overjet:"],
+        ["overbite", "Overbite:"],
+        ["fremitus_test", "Fremitus Test:"],
+        ["prematurities", "Prematurities:"],
+        ["plunger_cusp", "Plunger cusp:"],
+        ["occlusal_others", "Others:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -415,12 +415,12 @@ function Page8() {
   return (
     <>
       {[
-        ["blood_tests","Blood Tests:"],
-        ["study_models","Study Models:"],
-        ["photographs","Photographs:"],
-        ["vitality","Vitality:"],
-        ["biopsy_examination","Biopsy Examination:"],
-        ["microbiological_examination","Microbiological Examination:"],
+        ["blood_tests", "Blood Tests:"],
+        ["study_models", "Study Models:"],
+        ["photographs", "Photographs:"],
+        ["vitality", "Vitality:"],
+        ["biopsy_examination", "Biopsy Examination:"],
+        ["microbiological_examination", "Microbiological Examination:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -450,10 +450,10 @@ function Page9() {
 
       <h2>XIX) Risk assessment</h2>
       {[
-        ["risk_factors","a. Risk factors:"],
-        ["risk_determinants","b. Risk determinants:"],
-        ["risk_indicators","c. Risk indicators:"],
-        ["risk_predictors_markers","d. Risk predictors / markers:"],
+        ["risk_factors", "a. Risk factors:"],
+        ["risk_determinants", "b. Risk determinants:"],
+        ["risk_indicators", "c. Risk indicators:"],
+        ["risk_predictors_markers", "d. Risk predictors / markers:"],
       ].map(([id, lbl]) => (
         <div className="form-group" key={id}>
           <label htmlFor={id}>{lbl}</label>
@@ -708,8 +708,8 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
   }, [readOnly, initialCaseData, currentPage]);
 
   const isFirstPage = currentPage === 0;
-  const isLastPage  = currentPage === TOTAL_PAGES - 1;
-  const canSubmit   = doctorName.trim() !== "" && signatureFile !== null && !isSubmitting;
+  const isLastPage = currentPage === TOTAL_PAGES - 1;
+  const canSubmit = doctorName.trim() !== "" && signatureFile !== null && !isSubmitting;
 
   useEffect(() => {
     setTimeout(() => {

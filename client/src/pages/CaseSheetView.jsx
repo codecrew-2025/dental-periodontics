@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import "./CaseSheetView.css";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -59,6 +59,45 @@ const Section = ({ title, children }) => (
     {children}
   </div>
 );
+
+// ─── Camp Periodontics Read-Only View ─────────────────────────────────────────
+
+function CampPeriodonticsCaseView({ caseData }) {
+  const sigSrc = decodeSignature(caseData?.digitalSignature);
+
+  return (
+    <div>
+      <Section title="Camp Details">
+        <Field label="Camp Serial Number" value={caseData.campSerialNo} />
+        <Field label="Name of Venue" value={caseData.venueName} />
+        <Field label="Date" value={caseData.date ? new Date(caseData.date).toLocaleDateString("en-GB") : "—"} />
+      </Section>
+
+      <Section title="Patient Information">
+        <Field label="Patient Name" value={caseData.patientName} />
+        <Field label="Patient ID" value={caseData.patientId} />
+        <Field label="Age" value={caseData.age} />
+        <Field label="Sex" value={caseData.sex} />
+      </Section>
+
+      <Section title="Clinical Details">
+        <Field label="Diagnosis" value={caseData.diagnosis} />
+        <Field label="Treatment Plan" value={caseData.treatmentPlan} />
+      </Section>
+
+      <div style={{ marginTop: 40, paddingTop: 20, borderTop: "2px solid #ddd" }}>
+        <h3 style={{ marginBottom: 16, color: "#333" }}>Doctor's Authentication</h3>
+        <Field label="Doctor's Name" value={caseData.doctorName} />
+        <label style={{ fontWeight: 600, display: "block", marginBottom: 8, marginTop: 12 }}>Digital Signature</label>
+        {sigSrc ? (
+          <img src={normalizeXraySrc(sigSrc)} alt="Doctor's Signature" style={{ maxWidth: "100%", maxHeight: 120, border: "1px solid #ddd", padding: 5, borderRadius: 4 }} />
+        ) : (
+          <div className="readonly-field">No signature provided</div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Periodontics Read-Only View ──────────────────────────────────────────────
 
@@ -357,8 +396,13 @@ function OralCaseView({ caseData }) {
 
 const CaseSheetView = () => {
   const { caseId } = useParams();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const paramDept = queryParams.get("department");
+  const paramPatientId = queryParams.get("patientId");
+
   const [caseData, setCaseData] = useState(null);
-  const [department, setDepartment] = useState("");
+  const [department, setDepartment] = useState(paramDept || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -375,6 +419,19 @@ const CaseSheetView = () => {
       const storedDept = (localStorage.getItem("viewCaseDepartment") || "").toLowerCase();
 
       const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+      // 0. Handle Camp Periodontics separately
+      if (paramDept === "Camp Periodontics" && paramPatientId) {
+        const campRes = await fetch(`${API_BASE}/api/camp-periodontics/${encodeURIComponent(paramPatientId)}`, { headers });
+        if (campRes.ok) {
+          const json = await campRes.json();
+          if (json?.data) {
+            setCaseData(json.data);
+            setDepartment("Camp Periodontics");
+            return;
+          }
+        }
+      }
 
       // 1. Try the unified casesheets endpoint (supports all departments)
       const unifiedRes = await fetch(`${API_BASE}/api/casesheets/${caseId}`, { headers });
@@ -437,9 +494,12 @@ const CaseSheetView = () => {
   }
 
   const dept = department.toLowerCase();
-  const isPeriodontics = dept.includes("periodontics") || dept.includes("periodontology");
+  const isCampPeriodontics = dept.includes("camp periodontics");
+  const isPeriodontics = !isCampPeriodontics && (dept.includes("periodontics") || dept.includes("periodontology"));
   const isOral = dept.includes("oral");
-  const departmentLabel = isPeriodontics
+  const departmentLabel = isCampPeriodontics
+    ? "CAMP PERIODONTICS"
+    : isPeriodontics
     ? "PERIODONTICS"
     : isOral
     ? "ORAL MEDICINE AND RADIOLOGY"
@@ -458,10 +518,13 @@ const CaseSheetView = () => {
           <h1>SRM DENTAL COLLEGE</h1>
           <h2>DEPARTMENT OF {departmentLabel}</h2>
           {isPeriodontics && <h3>LONG CASE SHEET — READ ONLY VIEW</h3>}
+          {isCampPeriodontics && <h3>CAMP CASE SHEET — READ ONLY VIEW</h3>}
         </div>
 
         {/* Case content by department */}
-        {isPeriodontics ? (
+        {isCampPeriodontics ? (
+          <CampPeriodonticsCaseView caseData={caseData} />
+        ) : isPeriodontics ? (
           <PeriodonticsCaseView caseData={caseData} />
         ) : isOral ? (
           <OralCaseView caseData={caseData} />

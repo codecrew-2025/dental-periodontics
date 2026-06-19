@@ -2,6 +2,7 @@ import Pedodontics from "../departments/Pedodontics";
 import OralMedicine from "../departments/OralMedicine";
 import SmallCasesheetPeriodontics from "../departments/Small_Casesheet_Periodontics";
 import DigitalDoctorCasesheetPeriodontics from "../departments/Doctor_Long_Case_Sheet_Periodontics";
+import CampPeriodonticsCaseSheet from "./CampPeriodonticsCaseSheet";
 
 // ─── Decode MongoDB Buffer signature to a base64 data URL ─────────────────────
 const decodeSignature = (sig) => {
@@ -116,6 +117,9 @@ const CaseSheetView = ({ caseSheet }) => {
         return <DigitalDoctorCasesheetPeriodontics initialCaseData={enriched} readOnly={true} />;
       }
       return <SmallCasesheetPeriodontics initialCaseData={enriched} readOnly={true} />;
+
+    case 'camp periodontics':
+      return <CampPeriodonticsCaseSheet initialCaseData={enriched} readOnly={true} />;
 
     default:
       return (

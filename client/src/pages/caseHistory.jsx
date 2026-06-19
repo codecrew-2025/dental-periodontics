@@ -45,13 +45,14 @@ const CaseHistory = () => {
         { url: buildApiUrl(`/api/oral/patient/${encodeURIComponent(patientId)}`), department: "Oral Medicine and Radiology" },
         { url: buildApiUrl(`/api/casesheets/periodontics/patient/${encodeURIComponent(patientId)}`), department: "Periodontics" },
         { url: buildApiUrl(`/api/pedodontics/patient/${encodeURIComponent(patientId)}`), department: "Pedodontics" },
+        { url: buildApiUrl(`/api/camp-periodontics/${encodeURIComponent(patientId)}`), department: "Camp Periodontics" }
       ];
 
       // If we can identify the department, only query relevant endpoint(s);
       // otherwise query all so nothing is missed.
       let endpoints;
       if (normalizedDepartment.includes('periodontic')) {
-        endpoints = [allEndpoints[1]];
+        endpoints = [allEndpoints[1], allEndpoints[3]];
       } else if (normalizedDepartment.includes('pedodont')) {
         endpoints = [allEndpoints[2]];
       } else {
@@ -72,8 +73,10 @@ const CaseHistory = () => {
           const text = await res.text();
           const parsed = text ? JSON.parse(text) : null;
 
-          if (parsed?.data && Array.isArray(parsed.data)) {
-            return parsed.data.map((item) => ({ department, ...item }));
+          if (parsed?.data) {
+            const dataArr = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
+            const filtered = dataArr.filter(item => item != null);
+            return filtered.map((item) => ({ department, ...item }));
           }
 
           if (Array.isArray(parsed)) {
@@ -100,8 +103,8 @@ const CaseHistory = () => {
     }
   };
 
-  const viewCaseSheet = (caseId) => {
-    window.open(`/case-sheet-view/${caseId}`, "_blank");
+  const viewCaseSheet = (caseItem) => {
+    window.open(`/case-sheet-view/${caseItem._id}?department=${encodeURIComponent(caseItem.department || '')}&patientId=${encodeURIComponent(caseItem.patientId || '')}`, "_blank");
   };
 
   const viewPrescription = (caseItem) => {
@@ -224,7 +227,7 @@ const CaseHistory = () => {
                     <td>{c.department || "—"}</td>
                     <td>{c.doctorName}</td>
                     <td>
-                      <button onClick={() => viewCaseSheet(c._id)}>View</button>
+                      <button onClick={() => viewCaseSheet(c)}>View</button>
                     </td>
                     <td>
                       <button onClick={() => viewPrescription(c)}>View</button>

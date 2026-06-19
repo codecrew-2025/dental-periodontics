@@ -187,12 +187,15 @@ const CampDashboard = () => {
 
   const handleGeneratePatientId = () => generateUniquePatientId();
 
-  const filteredPatients = patients.filter(patient =>
-    patient.patientId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.personalInfo?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.personalInfo?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.personalInfo?.phone?.includes(searchTerm)
-  );
+  const filteredPatients = patients.filter(patient => {
+    const isCampPatient = patient.patientId?.toLowerCase().startsWith('c');
+    if (!isCampPatient) return false;
+    
+    return patient.patientId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.personalInfo?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.personalInfo?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.personalInfo?.phone?.includes(searchTerm);
+  });
 
   const handleSearchChange = (e) => {
     const searchValue = e.target.value;

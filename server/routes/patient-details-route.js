@@ -7,6 +7,8 @@ import { PatientDetails } from '../models/patientDetails.js';
 import { User } from '../models/User.js';
 import generateNextPatientId from '../utils/patientIdGenerator.js';
 import { hash } from 'bcryptjs';
+import Appointment from '../models/AppoitmentBooked.js';
+import AssignmentState from '../models/AssignmentState.js';
  
 
 const router = express.Router();
@@ -20,6 +22,37 @@ const normalizeDateOrNull = (value) => {
   const parsedDate = new Date(value);
   return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
+
+const generateBookingId = () => {
+  return "SRMDNT" + Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+const GENERAL_DOCTOR_DEPT_KEYS = new Set([
+  'general', 'generaldentistry', 'oral', 'oralmedicine',
+  'oralmedicineandradiology', 'oralmedicineradiology',
+  'oralandmaxillofacial'
+]);
+
+const normalizeDept = (value) => String(value || '').trim().toLowerCase()
+  .replace(/&/g, 'and')
+  .replace(/[^a-z0-9]+/g, '');
+
+const pickDoctorForAutoAppointment = async () => {
+  const doctors = await User.find({ role: { $in: ['doctor', 'chief-doctor', 'chief'] } }).lean();
+  const generalDoctors = doctors.filter(d => GENERAL_DOCTOR_DEPT_KEYS.has(normalizeDept(d.department)));
+  if (!generalDoctors.length) return null;
+
+  const state = await AssignmentState.findOneAndUpdate(
+    { key: 'appointmentRoundRobin' },
+    { $setOnInsert: { key: 'appointmentRoundRobin' }, $inc: { counter: 1 } },
+    { new: true, upsert: true }
+  ).lean();
+
+  const counter = typeof state?.counter === 'number' ? state.counter : 1;
+  const idx = ((counter - 1) % generalDoctors.length + generalDoctors.length) % generalDoctors.length;
+  return generalDoctors[idx];
+};
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LEGACY_PATIENTS_FILE = path.resolve(__dirname, '../all-patients.json');
@@ -138,23 +171,32 @@ const generateNextNumericPatientId = async () => {
   const startingNumber = 2600000;
   const numericRegex = /^\d+$/;
 
-  const [lastUser, lastPatient] = await Promise.all([
-    User.findOne({ Identity: { $regex: numericRegex }, role: 'patient' })
-      .sort({ Identity: -1 })
-      .lean(),
-    PatientDetails.findOne({ patientId: { $regex: numericRegex } })
-      .sort({ patientId: -1 })
-      .lean(),
+  const [userAgg, patientAgg] = await Promise.all([
+    User.aggregate([
+      { $match: { Identity: { $regex: numericRegex }, role: 'patient' } },
+      { $project: { Identity: 1, numId: { $toDouble: "$Identity" } } },
+      { $sort: { numId: -1 } },
+      { $limit: 1 }
+    ]),
+    PatientDetails.aggregate([
+      { $match: { patientId: { $regex: numericRegex } } },
+      { $project: { patientId: 1, numId: { $toDouble: "$patientId" } } },
+      { $sort: { numId: -1 } },
+      { $limit: 1 }
+    ])
   ]);
+
+  const lastUser = userAgg[0] || null;
+  const lastPatient = patientAgg[0] || null;
 
   let maxNumericId = 0;
 
-  if (lastUser && numericRegex.test(String(lastUser.Identity || ''))) {
-    maxNumericId = Math.max(maxNumericId, Number(lastUser.Identity));
+  if (lastUser && lastUser.numId) {
+    maxNumericId = Math.max(maxNumericId, lastUser.numId);
   }
 
-  if (lastPatient && numericRegex.test(String(lastPatient.patientId || ''))) {
-    maxNumericId = Math.max(maxNumericId, Number(lastPatient.patientId));
+  if (lastPatient && lastPatient.numId) {
+    maxNumericId = Math.max(maxNumericId, lastPatient.numId);
   }
 
   const legacyPatients = await loadLegacyPatients();
@@ -397,6 +439,59 @@ router.post('/', async (req, res) => {
     console.log('Patient object before saving:', JSON.stringify(newPatient, null, 2));
     const savedPatient = await newPatient.save();
     console.log('Patient saved successfully:', savedPatient.patientId);
+
+    const chiefComplaint = String(req.body?.medicalInfo?.chiefComplaint || '').trim();
+
+    if (chiefComplaint) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const assignedDoctor = await pickDoctorForAutoAppointment();
+
+        console.log(`[AutoAppt] chiefComplaint="${chiefComplaint}", assignedDoctor=`, assignedDoctor ? { id: assignedDoctor._id, name: assignedDoctor.name, dept: assignedDoctor.department } : null);
+
+        if (assignedDoctor) {
+          // patientEmail is required by the schema — use a placeholder if blank to avoid validation failure
+          const rawEmail = String(personalInfo?.email || '').trim() || String(linkedUser?.email || '').trim();
+          const patientEmail = rawEmail || `${finalPatientId}@walkin.local`;
+
+          const doctorIdStr = String(assignedDoctor._id);
+
+          let bookingCreated = false;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const bookingId = generateBookingId();
+            try {
+              await Appointment.create({
+                bookingId,
+                patientId: finalPatientId,
+                patientEmail,
+                chiefComplaint,
+                appointmentDate: today,
+                appointmentTime: '9:00 AM',
+                // Set BOTH fields so the appointment is visible to the general doctor
+                generalDoctorId: doctorIdStr,
+                doctorId: doctorIdStr,
+                status: 'assigned',
+                isProcessed: false,
+                needsGeneralApproval: false,
+                needsPgApproval: false,
+              });
+              bookingCreated = true;
+              break;
+            } catch (createErr) {
+              if (createErr?.code !== 11000 || attempt === 2) throw createErr;
+            }
+          }
+
+          if (bookingCreated) {
+            console.log(`✅ Auto-created appointment for patient ${finalPatientId} with doctor ${doctorIdStr}`);
+          }
+        } else {
+          console.warn(`[AutoAppt] No general doctor found — skipping auto-appointment for patient ${finalPatientId}`);
+        }
+      } catch (apptError) {
+        console.error('⚠️ Failed to auto-create appointment:', apptError.message, apptError.errors || '');
+      }
+    }
 
     res.status(201).json({
       success: true,

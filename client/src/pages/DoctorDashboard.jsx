@@ -163,7 +163,7 @@ const DoctorDashboard = () => {
   const [pgLoading, setPGLoading] = useState(false);
   const [pgError, setPGError] = useState('');
   const [selectedAppointmentPG, setSelectedAppointmentPG] = useState('');
-    const [pgSearchTerm, setPGSearchTerm] = useState('');
+  const [pgSearchTerm, setPGSearchTerm] = useState('');
   const [pgFromDate, setPgFromDate] = useState('');
   const [pgToDate, setPgToDate] = useState('');
   const [manageActionLoadingPGId, setManageActionLoadingPGId] = useState('');
@@ -565,6 +565,7 @@ const DoctorDashboard = () => {
     localStorage.getItem('doctorDepartment') || user?.department || ''
   );
   const doctorDepartmentLabel = String(user?.department || localStorage.getItem('doctorDepartment') || '').trim();
+  const patientIdForCheck = String(formData?.uniqueId || localStorage.getItem('CurrentpatientId') || '').trim();
   const isPublicHealthDentistry =
     doctorDepartmentKey.includes('publichealthdentistry') ||
     doctorDepartmentKey.includes('publichealth') ||
@@ -610,7 +611,7 @@ const DoctorDashboard = () => {
   };
 
   const handleLogout = () => {
-    logout(); 
+    logout();
   };
 
   const toggleLogoutDropdown = () => {
@@ -693,9 +694,9 @@ const DoctorDashboard = () => {
             const res = await fetch(url, {
               headers: token
                 ? {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  }
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                }
                 : { 'Content-Type': 'application/json' },
             });
 
@@ -749,6 +750,26 @@ const DoctorDashboard = () => {
   };
 
   const goToDepartmentCaseSheet = async () => {
+    const patientId = getStoredPatientId();
+    if (patientId && patientId.toLowerCase().startsWith('c')) {
+      const deptKey = String(localStorage.getItem('doctorDepartment') || user?.department || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+      if (deptKey === 'periodontics') {
+        navigate(`/camp-periodontics-case-sheet?patientId=${encodeURIComponent(patientId)}&new=true`);
+        return;
+      }
+      try {
+        await ensurePublicHealthCaseSheetGenerated({
+          patientId: patientId,
+          patientName: localStorage.getItem('CurrentpatientName') || formData.firstName
+        });
+        const dept = String(localStorage.getItem('doctorDepartment') || user?.department || '').trim();
+        navigate(`/general-case-view?patientId=${encodeURIComponent(patientId)}&department=${encodeURIComponent(dept)}`);
+      } catch (err) {
+        window.alert(err.message || 'Error opening Camp Case Sheet');
+      }
+      return;
+    }
+
     const deptKey = String(localStorage.getItem('doctorDepartment') || user?.department || '').trim().toLowerCase().replace(/[\s_]+/g, '');
     if (!isDepartmentAllowed(deptKey)) {
       window.alert("Your department is currently disabled in this application.");
@@ -758,7 +779,6 @@ const DoctorDashboard = () => {
 
     // For Oral Medicine, always require the consent form first.
     if (deptKey.includes('oral')) {
-      const patientId = getStoredPatientId();
       const resumeTarget = patientId ? await getPatientResumeTarget(patientId) : null;
       const targetRoute = resumeTarget?.routeKey || route;
       navigate(`/consent-form?redirect=${encodeURIComponent(targetRoute)}`, { replace: true });
@@ -770,7 +790,6 @@ const DoctorDashboard = () => {
       return;
     }
 
-    const patientId = getStoredPatientId();
     const resumeTarget = patientId ? await getPatientResumeTarget(patientId) : null;
 
     // If there is an unfinished draft for this patient, resume — but still request consent.
@@ -892,25 +911,25 @@ const DoctorDashboard = () => {
     const errors = {};
     const requiredFields = isPublicHealthDentistry
       ? {
-          firstName: 'First Name',
-          lastName: 'Last Name',
-          dob: 'Date of Birth',
-          gender: 'Gender',
-          maritalStatus: 'Marital Status',
-          preferredLanguage: 'Preferred Language',
-          diagnosis: 'Diagnosis',
-          treatmentPlan: 'Treatment Plan',
-        }
+        firstName: 'First Name',
+        lastName: 'Last Name',
+        dob: 'Date of Birth',
+        gender: 'Gender',
+        maritalStatus: 'Marital Status',
+        preferredLanguage: 'Preferred Language',
+        diagnosis: 'Diagnosis',
+        treatmentPlan: 'Treatment Plan',
+      }
       : {
-          firstName: 'First Name',
-          lastName: 'Last Name',
-          dob: 'Date of Birth',
-          gender: 'Gender',
-          maritalStatus: 'Marital Status',
-          preferredLanguage: 'Preferred Language',
-          chiefComplaint: 'Chief Complaint',
-          bloodGroup: 'Blood Group'
-        };
+        firstName: 'First Name',
+        lastName: 'Last Name',
+        dob: 'Date of Birth',
+        gender: 'Gender',
+        maritalStatus: 'Marital Status',
+        preferredLanguage: 'Preferred Language',
+        chiefComplaint: 'Chief Complaint',
+        bloodGroup: 'Blood Group'
+      };
 
     // Check required fields
     for (const [field, label] of Object.entries(requiredFields)) {
@@ -1031,7 +1050,7 @@ const DoctorDashboard = () => {
       populateFormWithPatientData(registeredPatient);
       setGeneratedUserId(resolvedPatientId);
       showMessage(`Patient details loaded for ID: ${resolvedPatientId}`, 'success');
-      
+
       // Store patient name for display (no localStorage for patient ID)
       if (registeredPatient?.patientName || registeredPatient?.personalInfo?.firstName) {
         const fallbackName = [
@@ -1069,16 +1088,16 @@ const DoctorDashboard = () => {
             headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
           }
         );
-        
+
         if (appointmentRes.ok) {
           const appointmentData = await appointmentRes.json();
           if (appointmentData.success && Array.isArray(appointmentData.appointments) && appointmentData.appointments.length > 0) {
             // Sort by creation date to get the latest appointment
-            const sortedAppointments = appointmentData.appointments.sort((a, b) => 
+            const sortedAppointments = appointmentData.appointments.sort((a, b) =>
               new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
             );
             const latestAppointment = sortedAppointments[0];
-            
+
             // Update chief complaint if there's a new appointment
             if (latestAppointment.chiefComplaint) {
               setFormData(prev => ({
@@ -1086,7 +1105,7 @@ const DoctorDashboard = () => {
                 chiefComplaint: latestAppointment.chiefComplaint
               }));
             }
-            
+
             console.log('✅ Latest appointment loaded for patient:', resolvedPatientId, latestAppointment);
           }
         }
@@ -1111,11 +1130,19 @@ const DoctorDashboard = () => {
   useEffect(() => {
     // Load appointments on mount
     fetchMyAppointments();
+
+    // Auto-refresh every 30 seconds so newly registered patients appear without manual Refresh
+    const pollInterval = setInterval(() => {
+      fetchMyAppointments({ silent: true });
+    }, 30000);
+
+    return () => clearInterval(pollInterval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (type === 'checkbox') {
       if (name === 'hpi') {
         if (checked && value === 'None') {
@@ -1123,7 +1150,7 @@ const DoctorDashboard = () => {
         } else if (!checked && value === 'None') {
           setHpiSelections([]);
         } else if (checked) {
-          setHpiSelections(prev => 
+          setHpiSelections(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -1135,7 +1162,7 @@ const DoctorDashboard = () => {
         } else if (!checked && value === 'None') {
           setPastMedicalHistory([]);
         } else if (checked) {
-          setPastMedicalHistory(prev => 
+          setPastMedicalHistory(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -1147,7 +1174,7 @@ const DoctorDashboard = () => {
         } else if (!checked && value === 'None') {
           setPersonalHabits([]);
         } else if (checked) {
-          setPersonalHabits(prev => 
+          setPersonalHabits(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -1160,31 +1187,31 @@ const DoctorDashboard = () => {
           ...prev,
           [name]: value
         };
-        
+
         // Auto-calculate age when DOB changes
         if (name === 'dob') {
           const age = calculateAge(value);
           newData.age = age;
         }
-        
+
         // Handle pregnancy status logic
         if (name === 'gender' || name === 'maritalStatus') {
-          const showPregnancyStatus = (name === 'gender' ? value : newData.gender) === 'Female' && 
-                                    (name === 'maritalStatus' ? value : newData.maritalStatus) === 'Married';
+          const showPregnancyStatus = (name === 'gender' ? value : newData.gender) === 'Female' &&
+            (name === 'maritalStatus' ? value : newData.maritalStatus) === 'Married';
           if (!showPregnancyStatus) {
             // Must be a valid enum value in the backend schema when not applicable
             newData.pregnancyStatus = 'N/A';
           }
         }
-        
+
         // Handle preferred language logic
         if (name === 'preferredLanguage' && value !== 'Other') {
           newData.otherLanguage = '';
         }
-        
+
         return newData;
       });
-      
+
       // Clear field errors when user starts typing
       if (fieldErrors[name]) {
         setFieldErrors(prev => ({
@@ -1209,7 +1236,7 @@ const DoctorDashboard = () => {
     if (!validateForm()) return;
     try {
       setIsLoading(true);
-      
+
       // Prepare the data in the format your backend expects
       const shouldIncludePregnancyStatus = formData.gender === 'Female' && formData.maritalStatus === 'Married';
 
@@ -1272,38 +1299,38 @@ const DoctorDashboard = () => {
         }
       };
       // Send data to backend
-     const response = await fetch(buildApiUrl('/api/doctor-patient'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(patientData)
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      const id = result.patientId;
-      const name = result.patientName;
-      localStorage.setItem('CurrentpatientName', name);
-      setStoredPatientId(id);
-      showMessage('Patient details saved successfully!', 'success');
-      console.log('Patient data from localStorage:', {
+      const response = await fetch(buildApiUrl('/api/doctor-patient'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(patientData)
       });
-      triggerSuccessToast('Patient Details Saved Successfully');
-      // Allow navigation to case files / history only after successful save
-      setCanNavigateCases(true);
-      // Refresh case-sheet status panel for this patient
-      fetchCaseStatuses(id);
-    } else {
-      const error = await response.json();
-      showMessage(`Error saving patient: ${error.message}`, 'error');
+
+      if (response.ok) {
+        const result = await response.json();
+        const id = result.patientId;
+        const name = result.patientName;
+        localStorage.setItem('CurrentpatientName', name);
+        setStoredPatientId(id);
+        showMessage('Patient details saved successfully!', 'success');
+        console.log('Patient data from localStorage:', {
+        });
+        triggerSuccessToast('Patient Details Saved Successfully');
+        // Allow navigation to case files / history only after successful save
+        setCanNavigateCases(true);
+        // Refresh case-sheet status panel for this patient
+        fetchCaseStatuses(id);
+      } else {
+        const error = await response.json();
+        showMessage(`Error saving patient: ${error.message}`, 'error');
+      }
+    } catch (error) {
+      showMessage('Error saving patient: ' + error.message, 'error');
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    showMessage('Error saving patient: ' + error.message, 'error');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleNavigation = (url) => {
     // In a real app, you would use React Router
@@ -2132,12 +2159,12 @@ const DoctorDashboard = () => {
     return 'status-badge pending';
   };
 
-    const getCaseFilesStatusIndicator = () => {
-      if (!cases || cases.length === 0) return null;
-      const allApproved = cases.every((caseItem) => getApprovalStatus(caseItem) === 'Approved');
-      if (allApproved) return 'green';
-      return 'yellow';
-    };
+  const getCaseFilesStatusIndicator = () => {
+    if (!cases || cases.length === 0) return null;
+    const allApproved = cases.every((caseItem) => getApprovalStatus(caseItem) === 'Approved');
+    if (allApproved) return 'green';
+    return 'yellow';
+  };
 
   const formatDate = (date) =>
     new Date(date).toLocaleDateString('en-GB', {
@@ -2391,25 +2418,25 @@ const DoctorDashboard = () => {
               >
                 <span className="chief-nav-icon">📁</span>
                 <span>Case Files</span>
-                  {getCaseFilesStatusIndicator() && (
-                    <span
-                      className="case-files-status-indicator"
-                      style={{
-                        display: 'inline-block',
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        backgroundColor: getCaseFilesStatusIndicator(),
-                        marginLeft: '6px',
-                        verticalAlign: 'middle'
-                      }}
-                      title={
-                        getCaseFilesStatusIndicator() === 'green'
-                          ? 'All cases approved'
-                          : 'Waiting for approval'
-                      }
-                    />
-                  )}
+                {getCaseFilesStatusIndicator() && (
+                  <span
+                    className="case-files-status-indicator"
+                    style={{
+                      display: 'inline-block',
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      backgroundColor: getCaseFilesStatusIndicator(),
+                      marginLeft: '6px',
+                      verticalAlign: 'middle'
+                    }}
+                    title={
+                      getCaseFilesStatusIndicator() === 'green'
+                        ? 'All cases approved'
+                        : 'Waiting for approval'
+                    }
+                  />
+                )}
               </button>
 
               <button
@@ -2531,7 +2558,7 @@ const DoctorDashboard = () => {
                 <table className="chief-simple-table">
                   <thead>
                     <tr>
-                        <th>S.No</th>
+                      <th>S.No</th>
                       <th>Name</th>
                       <th>Number</th>
                       <th>Mail</th>
@@ -2540,10 +2567,10 @@ const DoctorDashboard = () => {
                     </tr>
                   </thead>
                   <tbody>
-                      {assignedPGs.map((pg, index) => (
+                    {assignedPGs.map((pg, index) => (
                       <tr key={pg._id}>
                         <td>
-                            {index + 1}
+                          {index + 1}
                         </td>
                         <td>
                           {pg.name || '-'}
@@ -2666,33 +2693,33 @@ const DoctorDashboard = () => {
               ) : (
                 <>
                   <div className="chief-doctor-selector pg-appointment-selector">
-                      <input
-                        type="text"
-                        placeholder="Search doctor by name or ID..."
-                        value={pgSearchTerm}
-                        onChange={(e) => setPGSearchTerm(e.target.value)}
-                        className="chief-select pg-select-doctor"
-                      />
-                    <select 
+                    <input
+                      type="text"
+                      placeholder="Search doctor by name or ID..."
+                      value={pgSearchTerm}
+                      onChange={(e) => setPGSearchTerm(e.target.value)}
+                      className="chief-select pg-select-doctor"
+                    />
+                    <select
                       id="pg-select"
                       value={selectedAppointmentPG}
                       onChange={(e) => setSelectedAppointmentPG(e.target.value)}
                       className="chief-select pg-select-doctor"
                     >
                       <option value="">All PGs</option>
-                        {assignedPGs
-                          .filter((pg) => {
-                            if (!pgSearchTerm.trim()) return true;
-                            const searchLower = pgSearchTerm.toLowerCase();
-                            return (
-                              (pg.name || '').toLowerCase().includes(searchLower) ||
-                              (pg.Identity || '').toLowerCase().includes(searchLower)
-                            );
-                          })
-                          .map((pg) => (
-                        <option key={`${pg.Identity}-${pg.department}`} value={pg.Identity}>
-                          {pg.name} ({pg.Identity})
-                        </option>
+                      {assignedPGs
+                        .filter((pg) => {
+                          if (!pgSearchTerm.trim()) return true;
+                          const searchLower = pgSearchTerm.toLowerCase();
+                          return (
+                            (pg.name || '').toLowerCase().includes(searchLower) ||
+                            (pg.Identity || '').toLowerCase().includes(searchLower)
+                          );
+                        })
+                        .map((pg) => (
+                          <option key={`${pg.Identity}-${pg.department}`} value={pg.Identity}>
+                            {pg.name} ({pg.Identity})
+                          </option>
                         ))}
                     </select>
 
@@ -2717,7 +2744,7 @@ const DoctorDashboard = () => {
                   <table className="chief-simple-table">
                     <thead>
                       <tr>
-                          <th>S.No</th>
+                        <th>S.No</th>
                         <th>PG Name</th>
                         <th>Booking ID</th>
                         <th>Patient ID</th>
@@ -3065,7 +3092,7 @@ const DoctorDashboard = () => {
                       <p>{doctorPgAnalyticsReport.totals?.approvalCounts?.approved || 0}</p>
                     </div>
                     <div className="chief-summary-card">
-                        <h3>Redo</h3>
+                      <h3>Redo</h3>
                       <p>{doctorPgAnalyticsReport.totals?.approvalCounts?.rejected || 0}</p>
                     </div>
                   </div>
@@ -3263,130 +3290,130 @@ const DoctorDashboard = () => {
                 <div className="chief-empty-state">No analytics data available for assigned students.</div>
               ) : (
                 <>
-                <div className="chief-summary-grid" style={{ marginBottom: 16 }}>
-                  <div className="chief-summary-card">
-                    <h3>PGs</h3>
-                    <p>{doctorPgAnalyticsReport.assignedPGCount || 0}</p>
-                  </div>
-                  <div className="chief-summary-card">
-                    <h3>UGs</h3>
-                    <p>{doctorPgAnalyticsReport.assignedUGCount ?? assignedUGs.length}</p>
-                  </div>
-                  <div className="chief-summary-card">
-                    <h3>Total Patients</h3>
-                    <p>{doctorPgAnalyticsReport.totals?.uniquePatients || 0}</p>
-                  </div>
-                  <div className="chief-summary-card">
-                    <h3>Approved</h3>
-                    <p>{doctorPgAnalyticsReport.totals?.approvalCounts?.approved || 0}</p>
-                  </div>
-                  <div className="chief-summary-card">
-                    <h3>Redo</h3>
-                    <p>{doctorPgAnalyticsReport.totals?.approvalCounts?.rejected || 0}</p>
-                  </div>
-                </div>
-
-                <div className="chief-analytics-charts">
-                  {/* Gender Distribution Pie Chart */}
-                  <div className="chief-chart-container">
-                    <h3>Gender Distribution</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { 
-                              name: 'Male', 
-                              value: doctorPgAnalyticsReport.pgs.reduce((sum, d) => sum + (d.malePatients || 0), 0) 
-                            },
-                            { 
-                              name: 'Female', 
-                              value: doctorPgAnalyticsReport.pgs.reduce((sum, d) => sum + (d.femalePatients || 0), 0) 
-                            }
-                          ]}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={(entry) => `${entry.name}: ${entry.value}`}
-                        >
-                          <Cell fill="#3b82f6" />
-                          <Cell fill="#ec4899" />
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="chief-summary-grid" style={{ marginBottom: 16 }}>
+                    <div className="chief-summary-card">
+                      <h3>PGs</h3>
+                      <p>{doctorPgAnalyticsReport.assignedPGCount || 0}</p>
+                    </div>
+                    <div className="chief-summary-card">
+                      <h3>UGs</h3>
+                      <p>{doctorPgAnalyticsReport.assignedUGCount ?? assignedUGs.length}</p>
+                    </div>
+                    <div className="chief-summary-card">
+                      <h3>Total Patients</h3>
+                      <p>{doctorPgAnalyticsReport.totals?.uniquePatients || 0}</p>
+                    </div>
+                    <div className="chief-summary-card">
+                      <h3>Approved</h3>
+                      <p>{doctorPgAnalyticsReport.totals?.approvalCounts?.approved || 0}</p>
+                    </div>
+                    <div className="chief-summary-card">
+                      <h3>Redo</h3>
+                      <p>{doctorPgAnalyticsReport.totals?.approvalCounts?.rejected || 0}</p>
+                    </div>
                   </div>
 
-                  {/* New vs Old Patients Pie Chart */}
-                  <div className="chief-chart-container">
-                    <h3>Old vs New Patients</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { 
-                              name: 'New Patients', 
-                              value: doctorPgAnalyticsReport.pgs.reduce((sum, d) => sum + (d.newPatients || 0), 0) 
-                            },
-                            { 
-                              name: 'Old Patients', 
-                              value: doctorPgAnalyticsReport.pgs.reduce((sum, d) => sum + (d.oldPatients || 0), 0) 
-                            }
-                          ]}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label={(entry) => `${entry.name}: ${entry.value}`}
-                        >
-                          <Cell fill="#10b981" />
-                          <Cell fill="#f59e0b" />
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="chief-analytics-charts">
+                    {/* Gender Distribution Pie Chart */}
+                    <div className="chief-chart-container">
+                      <h3>Gender Distribution</h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              {
+                                name: 'Male',
+                                value: doctorPgAnalyticsReport.pgs.reduce((sum, d) => sum + (d.malePatients || 0), 0)
+                              },
+                              {
+                                name: 'Female',
+                                value: doctorPgAnalyticsReport.pgs.reduce((sum, d) => sum + (d.femalePatients || 0), 0)
+                              }
+                            ]}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={(entry) => `${entry.name}: ${entry.value}`}
+                          >
+                            <Cell fill="#3b82f6" />
+                            <Cell fill="#ec4899" />
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* New vs Old Patients Pie Chart */}
+                    <div className="chief-chart-container">
+                      <h3>Old vs New Patients</h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              {
+                                name: 'New Patients',
+                                value: doctorPgAnalyticsReport.pgs.reduce((sum, d) => sum + (d.newPatients || 0), 0)
+                              },
+                              {
+                                name: 'Old Patients',
+                                value: doctorPgAnalyticsReport.pgs.reduce((sum, d) => sum + (d.oldPatients || 0), 0)
+                              }
+                            ]}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={(entry) => `${entry.name}: ${entry.value}`}
+                          >
+                            <Cell fill="#10b981" />
+                            <Cell fill="#f59e0b" />
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+
                   </div>
 
-                </div>
-
-                <table className="chief-simple-table" style={{ marginTop: 16 }}>
-                  <thead>
-                    <tr>
-                      <th>S.No</th>
-                      <th>Student</th>
-                      <th>Patients</th>
-                      <th>Male</th>
-                      <th>Female</th>
-                      <th>New</th>
-                      <th>Old</th>
-                      <th>Case Sheets</th>
-                      <th>Approved</th>
-                      <th>Redo</th>
-                      <th>Pending</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {doctorPgAnalyticsReport.pgs.map((row, index) => (
-                      <tr key={row.pgIdentity}>
-                        <td>{index + 1}</td>
-                        <td>{row.pgName || row.pgIdentity}</td>
-                        <td>{row.uniquePatients || 0}</td>
-                        <td>{row.malePatients || 0}</td>
-                        <td>{row.femalePatients || 0}</td>
-                        <td>{row.newPatients || 0}</td>
-                        <td>{row.oldPatients || 0}</td>
-                        <td>{row.totalCaseSheets || 0}</td>
-                        <td>{row.approvalCounts?.approved || 0}</td>
-                        <td>{row.approvalCounts?.rejected || 0}</td>
-                        <td>{row.approvalCounts?.pending || 0}</td>
+                  <table className="chief-simple-table" style={{ marginTop: 16 }}>
+                    <thead>
+                      <tr>
+                        <th>S.No</th>
+                        <th>Student</th>
+                        <th>Patients</th>
+                        <th>Male</th>
+                        <th>Female</th>
+                        <th>New</th>
+                        <th>Old</th>
+                        <th>Case Sheets</th>
+                        <th>Approved</th>
+                        <th>Redo</th>
+                        <th>Pending</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {doctorPgAnalyticsReport.pgs.map((row, index) => (
+                        <tr key={row.pgIdentity}>
+                          <td>{index + 1}</td>
+                          <td>{row.pgName || row.pgIdentity}</td>
+                          <td>{row.uniquePatients || 0}</td>
+                          <td>{row.malePatients || 0}</td>
+                          <td>{row.femalePatients || 0}</td>
+                          <td>{row.newPatients || 0}</td>
+                          <td>{row.oldPatients || 0}</td>
+                          <td>{row.totalCaseSheets || 0}</td>
+                          <td>{row.approvalCounts?.approved || 0}</td>
+                          <td>{row.approvalCounts?.rejected || 0}</td>
+                          <td>{row.approvalCounts?.pending || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </>
               )}
             </section>
@@ -3453,13 +3480,13 @@ const DoctorDashboard = () => {
                         const query = searchTerm.toLowerCase();
                         return (c.doctorName || '').toLowerCase().includes(query);
                       })
-                            // Show case-sheets that require doctor/chief approval.
-                            // Previously we required explicit signature fields; some departments
-                            // only store `digitalSignature` or may not set signature fields yet.
-                            // Surface all Pending case-sheets so doctors can review and approve them.
-                            // Show all case-sheets (not only 'Pending') so doctors can view oral cases too
-                            // Previously this filtered to only Pending items which hid Approved/Resent cases
-                            .filter(() => true)
+                      // Show case-sheets that require doctor/chief approval.
+                      // Previously we required explicit signature fields; some departments
+                      // only store `digitalSignature` or may not set signature fields yet.
+                      // Surface all Pending case-sheets so doctors can review and approve them.
+                      // Show all case-sheets (not only 'Pending') so doctors can view oral cases too
+                      // Previously this filtered to only Pending items which hid Approved/Resent cases
+                      .filter(() => true)
                       .sort((a, b) => {
                         const statusA = getApprovalStatus(a);
                         const statusB = getApprovalStatus(b);
@@ -3516,8 +3543,8 @@ const DoctorDashboard = () => {
                               </button>
                             </td>
                             <td>
-                                <div className="chief-actions-group">
-                                  {isSpecialistDoctor && status === 'Pending' ? (
+                              <div className="chief-actions-group">
+                                {isSpecialistDoctor && status === 'Pending' ? (
                                   <div className="action-buttons">
                                     {actionLoadingCaseId === c._id ? (
                                       <div
@@ -3573,582 +3600,582 @@ const DoctorDashboard = () => {
 
           {/* Patient View (Original Content) */}
           {activeView === 'patient' && (
-          <div className="doctor-dashboard-content">
-            <h2 className="dashboard-title">Patient Details</h2>
+            <div className="doctor-dashboard-content">
+              <h2 className="dashboard-title">Patient Details</h2>
 
               {/* Message boxes */}
               {message && <div className="error-message">{message}</div>}
               {successMessage && <div className="success-message">{successMessage}</div>}
 
-            {/* Patient Search */}
-            <div className="input-group" style={{ position: 'relative' }}>
-              <label>Search Patient</label>
-              <input
-                type="text"
-                value={searchQuery || formData.uniqueId || ''}
-                onChange={e => {
-                  const val = e.target.value;
-                  setSearchQuery(val);
-                  setFormData(p => ({ ...p, uniqueId: val }));
-                  setSearchType(/^\d+$/.test(val.trim()) ? 'id' : 'name');
-                  if (val.length >= 2) handlePatientSearch(val);
-                  else setSearchResults([]);
-                }}
-                placeholder="Enter name, patient ID or phone number"
-                autoComplete="off"
-              />
-              {/* Search results dropdown */}
-              {searchResults.length > 0 && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
-                  background: '#1e2a4a', border: '1px solid rgba(255,255,255,0.15)',
-                  borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', maxHeight: 260, overflowY: 'auto',
-                }}>
-                  {searchResults.map((p, i) => {
-                    const fullName = [p.personalInfo?.firstName, p.personalInfo?.lastName].filter(Boolean).join(' ') || p.patientName || '—';
-                    const phone = p.personalInfo?.phone || '—';
-                    return (
-                      <div key={p.patientId || i}
-                        onClick={() => handleSelectSearchResult(p)}
-                        style={{
-                          padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.07)',
-                          display: 'flex', flexDirection: 'column', gap: 2,
-                          transition: 'background 0.15s',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(60,141,255,0.18)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>{fullName}</span>
-                        <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)' }}>
-                          ID: {p.patientId} &nbsp;·&nbsp; 📞 {phone}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {searchLoading && (
-                <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#3C8DFF', fontSize: '0.8rem' }}>
-                  Searching…
-                </div>
-              )}
-            </div>
-
-
-            {/* Get Details Button */}
-            <button className="get-details-btn" onClick={handleGetDetails} disabled={isLoading}>
-              {isLoading ? 'Loading...' : 'Verify & Load Patient Details'}
-            </button>
-
-            {/* Generated User ID Display */}
-            {showUserIdDisplay && (
-              <div className="patient-id-display">
-                <p>
-                  Current Patient ID: <span>{generatedUserId}</span>
-                </p>
-              </div>
-            )}
-
-            {/* Form Section */}
-            {showForm && (
-              <div className="patient-form">
-                <h3>Personal Information</h3>
-
-            {/* Name fields */}
-            <div className="form-row">
-              <div className="input-group">
-                <label htmlFor="first-name">
-                  First Name <span style={{ color: "red" }}>*</span>
-                </label>
+              {/* Patient Search */}
+              <div className="input-group" style={{ position: 'relative' }}>
+                <label>Search Patient</label>
                 <input
                   type="text"
-                  id="first-name"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleInputChange}
-                  required
+                  value={searchQuery || formData.uniqueId || ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setSearchQuery(val);
+                    setFormData(p => ({ ...p, uniqueId: val }));
+                    setSearchType(/^\d+$/.test(val.trim()) ? 'id' : 'name');
+                    if (val.length >= 2) handlePatientSearch(val);
+                    else setSearchResults([]);
+                  }}
+                  placeholder="Enter name, patient ID or phone number"
+                  autoComplete="off"
                 />
-                {fieldErrors.firstName && <div className="error-message">{fieldErrors.firstName}</div>}
+                {/* Search results dropdown */}
+                {searchResults.length > 0 && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 999,
+                    background: '#1e2a4a', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', maxHeight: 260, overflowY: 'auto',
+                  }}>
+                    {searchResults.map((p, i) => {
+                      const fullName = [p.personalInfo?.firstName, p.personalInfo?.lastName].filter(Boolean).join(' ') || p.patientName || '—';
+                      const phone = p.personalInfo?.phone || '—';
+                      return (
+                        <div key={p.patientId || i}
+                          onClick={() => handleSelectSearchResult(p)}
+                          style={{
+                            padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.07)',
+                            display: 'flex', flexDirection: 'column', gap: 2,
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(60,141,255,0.18)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>{fullName}</span>
+                          <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)' }}>
+                            ID: {p.patientId} &nbsp;·&nbsp; 📞 {phone}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {searchLoading && (
+                  <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', color: '#3C8DFF', fontSize: '0.8rem' }}>
+                    Searching…
+                  </div>
+                )}
               </div>
-              <div className="input-group">
-                <label htmlFor="middle-name">
-                  Middle Name
-                </label>
-                <input
-                  type="text"
-                  id="middle-name"
-                  name="middleName"
-                  value={formData.middleName}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
 
-            <div className="input-group">
-              <label htmlFor="last-name">
-                Last Name <span style={{ color: "red" }}>*</span>
-              </label>
-              <input
-                type="text"
-                id="last-name"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                required
-              />
-              {fieldErrors.lastName && <div className="error-message">{fieldErrors.lastName}</div>}
-            </div>
 
-            {/* DOB and Age */}
-            <div className="form-row">
-              <div className="input-group">
-                <label htmlFor="dob">
-                  Date of Birth <span style={{ color: "red" }}>*</span>
-                </label>
-                <input
-                  type="date"
-                  id="dob"
-                  name="dob"
-                  value={formData.dob}
-                  onChange={handleInputChange}
-                  required
-                />
-                {fieldErrors.dob && <div className="error-message">{fieldErrors.dob}</div>}
-              </div>
-              <div className="input-group">
-                <label htmlFor="age">
-                  Age
-                </label>
-                <input
-                  type="number"
-                  id="age"
-                  name="age"
-                  value={formData.age}
-                  readOnly
-                />
-              </div>
-            </div>
+              {/* Get Details Button */}
+              <button className="get-details-btn" onClick={handleGetDetails} disabled={isLoading}>
+                {isLoading ? 'Loading...' : 'Verify & Load Patient Details'}
+              </button>
 
-            {/* Gender */}
-            <div className="input-group">
-              <label>
-                Gender <span style={{ color: "red" }}>*</span>
-              </label>
-              <div className="radio-options">
-                {['Male', 'Female', 'Other'].map((gender) => (
-                  <label key={gender} className="radio-option">
-                    <input
-                      type="radio"
-                      name="gender"
-                      value={gender}
-                      checked={formData.gender === gender}
-                      onChange={handleInputChange}
-                    />
-                    <span>{gender}</span>
-                  </label>
-                ))}
-              </div>
-              {fieldErrors.gender && <div className="error-message">{fieldErrors.gender}</div>}
-            </div>
+              {/* Generated User ID Display */}
+              {showUserIdDisplay && (
+                <div className="patient-id-display">
+                  <p>
+                    Current Patient ID: <span>{generatedUserId}</span>
+                  </p>
+                </div>
+              )}
 
-            {/* Marital Status */}
-            <div className="input-group">
-              <label>
-                Marital Status <span style={{ color: "red" }}>*</span>
-              </label>
-              <div className="radio-options">
-                {['Single', 'Married', 'Other'].map((status) => (
-                  <label key={status} className="radio-option">
-                    <input
-                      type="radio"
-                      name="maritalStatus"
-                      value={status}
-                      checked={formData.maritalStatus === status}
-                      onChange={handleInputChange}
-                    />
-                    <span>{status}</span>
-                  </label>
-                ))}
-              </div>
-              {fieldErrors.maritalStatus && <div className="error-message">{fieldErrors.maritalStatus}</div>}
-            </div>
+              {/* Form Section */}
+              {showForm && (
+                <div className="patient-form">
+                  <h3>Personal Information</h3>
 
-            {/* Pregnancy Status - Show only when Female and Married */}
-            {formData.gender === 'Female' && formData.maritalStatus === 'Married' && (
-              <div className="input-group">
-                <label>
-                  Pregnancy Status <span style={{ color: "red" }}>*</span>
-                </label>
-                <div className="radio-options">
-                  {['No', 'Yes', 'N/A'].map((status) => (
-                    <label key={status} className="radio-option">
+                  {/* Name fields */}
+                  <div className="form-row">
+                    <div className="input-group">
+                      <label htmlFor="first-name">
+                        First Name <span style={{ color: "red" }}>*</span>
+                      </label>
                       <input
-                        type="radio"
-                        name="pregnancyStatus"
-                        value={status}
-                        checked={formData.pregnancyStatus === status}
+                        type="text"
+                        id="first-name"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleInputChange}
+                        required
+                      />
+                      {fieldErrors.firstName && <div className="error-message">{fieldErrors.firstName}</div>}
+                    </div>
+                    <div className="input-group">
+                      <label htmlFor="middle-name">
+                        Middle Name
+                      </label>
+                      <input
+                        type="text"
+                        id="middle-name"
+                        name="middleName"
+                        value={formData.middleName}
                         onChange={handleInputChange}
                       />
-                      <span>{status}</span>
+                    </div>
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="last-name">
+                      Last Name <span style={{ color: "red" }}>*</span>
                     </label>
-                  ))}
-                </div>
-                {fieldErrors.pregnancyStatus && <div className="error-message">{fieldErrors.pregnancyStatus}</div>}
-              </div>
-            )}
+                    <input
+                      type="text"
+                      id="last-name"
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      required
+                    />
+                    {fieldErrors.lastName && <div className="error-message">{fieldErrors.lastName}</div>}
+                  </div>
 
-            {/* Vitals — right after Marital Status */}
-            <h3>Vitals</h3>
-            <div className="form-row">
-              <div className="input-group">
-                <label>Blood Pressure</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input type="text" name="vitalBP" placeholder="120/80"
-                    value={formData.vitalBP} onChange={handleInputChange} />
-                  <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>mmHg</span>
-                </div>
-              </div>
-              <div className="input-group">
-                <label>Temperature</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input type="text" name="vitalTemp" placeholder="37.0"
-                    value={formData.vitalTemp} onChange={handleInputChange} />
-                  <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>°C</span>
-                </div>
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="input-group">
-                <label>Weight</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input type="text" name="vitalWeight" placeholder="65"
-                    value={formData.vitalWeight} onChange={handleInputChange} />
-                  <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>kg</span>
-                </div>
-              </div>
-              <div className="input-group">
-                <label>Height</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input type="text" name="vitalHeight" placeholder="165"
-                    value={formData.vitalHeight} onChange={handleInputChange} />
-                  <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>cm</span>
-                </div>
-              </div>
-            </div>
+                  {/* DOB and Age */}
+                  <div className="form-row">
+                    <div className="input-group">
+                      <label htmlFor="dob">
+                        Date of Birth <span style={{ color: "red" }}>*</span>
+                      </label>
+                      <input
+                        type="date"
+                        id="dob"
+                        name="dob"
+                        value={formData.dob}
+                        onChange={handleInputChange}
+                        required
+                      />
+                      {fieldErrors.dob && <div className="error-message">{fieldErrors.dob}</div>}
+                    </div>
+                    <div className="input-group">
+                      <label htmlFor="age">
+                        Age
+                      </label>
+                      <input
+                        type="number"
+                        id="age"
+                        name="age"
+                        value={formData.age}
+                        readOnly
+                      />
+                    </div>
+                  </div>
 
-            {/* Additional Information */}
-            <h3>Additional Information</h3>
-            <div className="form-row">
-              <div className="input-group">
-                <label htmlFor="occupation">Occupation</label>
-                <input type="text" id="occupation" name="occupation"
-                  value={formData.occupation} onChange={handleInputChange}
-                  placeholder="e.g. Teacher, Engineer" />
-              </div>
-              <div className="input-group">
-                <label htmlFor="income">Income</label>
-                <input type="text" id="income" name="income"
-                  value={formData.income} onChange={handleInputChange}
-                  placeholder="e.g. 30,000 / month" />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="input-group">
-                <label htmlFor="religion">Religion</label>
-                <input type="text" id="religion" name="religion"
-                  value={formData.religion} onChange={handleInputChange}
-                  placeholder="e.g. Hindu, Christian" />
-              </div>
-              <div className="input-group">
-                <label htmlFor="address">Address</label>
-                <input type="text" id="address" name="address"
-                  value={formData.address} onChange={handleInputChange}
-                  placeholder="Full address" />
-              </div>
-            </div>
+                  {/* Gender */}
+                  <div className="input-group">
+                    <label>
+                      Gender <span style={{ color: "red" }}>*</span>
+                    </label>
+                    <div className="radio-options">
+                      {['Male', 'Female', 'Other'].map((gender) => (
+                        <label key={gender} className="radio-option">
+                          <input
+                            type="radio"
+                            name="gender"
+                            value={gender}
+                            checked={formData.gender === gender}
+                            onChange={handleInputChange}
+                          />
+                          <span>{gender}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {fieldErrors.gender && <div className="error-message">{fieldErrors.gender}</div>}
+                  </div>
 
-            {/* Preferred Language */}
-            <div className="input-group">
-              <label htmlFor="preferred-language">
-                Preferred Language <span style={{ color: "red" }}>*</span>
-              </label>
-              <select id="preferred-language" name="preferredLanguage"
-                value={formData.preferredLanguage} onChange={handleInputChange}>
-                <option value="">Select</option>
-                <option value="English">English</option>
-                <option value="Hindi">Hindi</option>
-                <option value="Tamil">Tamil</option>
-                <option value="Other">Other</option>
-              </select>
-              {fieldErrors.preferredLanguage && <div className="error-message">{fieldErrors.preferredLanguage}</div>}
-            </div>
+                  {/* Marital Status */}
+                  <div className="input-group">
+                    <label>
+                      Marital Status <span style={{ color: "red" }}>*</span>
+                    </label>
+                    <div className="radio-options">
+                      {['Single', 'Married', 'Other'].map((status) => (
+                        <label key={status} className="radio-option">
+                          <input
+                            type="radio"
+                            name="maritalStatus"
+                            value={status}
+                            checked={formData.maritalStatus === status}
+                            onChange={handleInputChange}
+                          />
+                          <span>{status}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {fieldErrors.maritalStatus && <div className="error-message">{fieldErrors.maritalStatus}</div>}
+                  </div>
 
-            {formData.preferredLanguage === 'Other' && (
-              <div className="input-group">
-                <label htmlFor="other-language">Specify Language <span style={{ color: "red" }}>*</span></label>
-                <input type="text" id="other-language" name="otherLanguage"
-                  value={formData.otherLanguage} onChange={handleInputChange}
-                  placeholder="Enter preferred language" />
-                {fieldErrors.otherLanguage && <div className="error-message">{fieldErrors.otherLanguage}</div>}
-              </div>
-            )}
+                  {/* Pregnancy Status - Show only when Female and Married */}
+                  {formData.gender === 'Female' && formData.maritalStatus === 'Married' && (
+                    <div className="input-group">
+                      <label>
+                        Pregnancy Status <span style={{ color: "red" }}>*</span>
+                      </label>
+                      <div className="radio-options">
+                        {['No', 'Yes', 'N/A'].map((status) => (
+                          <label key={status} className="radio-option">
+                            <input
+                              type="radio"
+                              name="pregnancyStatus"
+                              value={status}
+                              checked={formData.pregnancyStatus === status}
+                              onChange={handleInputChange}
+                            />
+                            <span>{status}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {fieldErrors.pregnancyStatus && <div className="error-message">{fieldErrors.pregnancyStatus}</div>}
+                    </div>
+                  )}
 
-            {isPublicHealthDentistry && (
-              <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                <h3>Public Health Dentistry: Diagnosis & Treatment Plan</h3>
-                <p style={{ marginTop: 0, opacity: 0.85 }}>
-                  For this department, only personal information plus diagnosis and treatment plan are stored.
-                </p>
+                  {/* Vitals — right after Marital Status */}
+                  <h3>Vitals</h3>
+                  <div className="form-row">
+                    <div className="input-group">
+                      <label>Blood Pressure</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input type="text" name="vitalBP" placeholder="120/80"
+                          value={formData.vitalBP} onChange={handleInputChange} />
+                        <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>mmHg</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>Temperature</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input type="text" name="vitalTemp" placeholder="37.0"
+                          value={formData.vitalTemp} onChange={handleInputChange} />
+                        <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>°C</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <div className="input-group">
+                      <label>Weight</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input type="text" name="vitalWeight" placeholder="65"
+                          value={formData.vitalWeight} onChange={handleInputChange} />
+                        <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>kg</span>
+                      </div>
+                    </div>
+                    <div className="input-group">
+                      <label>Height</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input type="text" name="vitalHeight" placeholder="165"
+                          value={formData.vitalHeight} onChange={handleInputChange} />
+                        <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>cm</span>
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="input-group">
-                  <label htmlFor="diagnosis">
-                    Diagnosis <span style={{ color: 'red' }}>*</span>
-                  </label>
-                  <textarea
-                    id="diagnosis"
-                    name="diagnosis"
-                    value={formData.diagnosis}
-                    onChange={handleInputChange}
-                    rows="3"
-                    placeholder="Enter diagnosis"
-                  />
-                  {fieldErrors.diagnosis && <div className="error-message">{fieldErrors.diagnosis}</div>}
-                </div>
+                  {/* Additional Information */}
+                  <h3>Additional Information</h3>
+                  <div className="form-row">
+                    <div className="input-group">
+                      <label htmlFor="occupation">Occupation</label>
+                      <input type="text" id="occupation" name="occupation"
+                        value={formData.occupation} onChange={handleInputChange}
+                        placeholder="e.g. Teacher, Engineer" />
+                    </div>
+                    <div className="input-group">
+                      <label htmlFor="income">Income</label>
+                      <input type="text" id="income" name="income"
+                        value={formData.income} onChange={handleInputChange}
+                        placeholder="e.g. 30,000 / month" />
+                    </div>
+                  </div>
+                  <div className="form-row">
+                    <div className="input-group">
+                      <label htmlFor="religion">Religion</label>
+                      <input type="text" id="religion" name="religion"
+                        value={formData.religion} onChange={handleInputChange}
+                        placeholder="e.g. Hindu, Christian" />
+                    </div>
+                    <div className="input-group">
+                      <label htmlFor="address">Address</label>
+                      <input type="text" id="address" name="address"
+                        value={formData.address} onChange={handleInputChange}
+                        placeholder="Full address" />
+                    </div>
+                  </div>
 
-                <div className="input-group">
-                  <label htmlFor="treatment-plan">
-                    Treatment Plan <span style={{ color: 'red' }}>*</span>
-                  </label>
-                  <textarea
-                    id="treatment-plan"
-                    name="treatmentPlan"
-                    value={formData.treatmentPlan}
-                    onChange={handleInputChange}
-                    rows="4"
-                    placeholder="Enter treatment plan"
-                  />
-                  {fieldErrors.treatmentPlan && <div className="error-message">{fieldErrors.treatmentPlan}</div>}
-                </div>
-              </div>
-            )}
+                  {/* Preferred Language */}
+                  <div className="input-group">
+                    <label htmlFor="preferred-language">
+                      Preferred Language <span style={{ color: "red" }}>*</span>
+                    </label>
+                    <select id="preferred-language" name="preferredLanguage"
+                      value={formData.preferredLanguage} onChange={handleInputChange}>
+                      <option value="">Select</option>
+                      <option value="English">English</option>
+                      <option value="Hindi">Hindi</option>
+                      <option value="Tamil">Tamil</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    {fieldErrors.preferredLanguage && <div className="error-message">{fieldErrors.preferredLanguage}</div>}
+                  </div>
 
-            {/* Patient Case Entry Section */}
-            <h3>Patient Case Entry - Chief Complaint & History</h3>
+                  {formData.preferredLanguage === 'Other' && (
+                    <div className="input-group">
+                      <label htmlFor="other-language">Specify Language <span style={{ color: "red" }}>*</span></label>
+                      <input type="text" id="other-language" name="otherLanguage"
+                        value={formData.otherLanguage} onChange={handleInputChange}
+                        placeholder="Enter preferred language" />
+                      {fieldErrors.otherLanguage && <div className="error-message">{fieldErrors.otherLanguage}</div>}
+                    </div>
+                  )}
 
-            {/* Chief Complaint */}
-            <div className="input-group">
-              <label htmlFor="chief-complaint">
-                Chief Complaint <span style={{ color: "red" }}>*</span>
-              </label>
-              <textarea id="chief-complaint" name="chiefComplaint" rows={2}
-                value={formData.chiefComplaint} onChange={handleInputChange}
-                placeholder="Describe the chief complaint..." />
-              {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
-            </div>
+                  {isPublicHealthDentistry && (
+                    <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                      <h3>Public Health Dentistry: Diagnosis & Treatment Plan</h3>
+                      <p style={{ marginTop: 0, opacity: 0.85 }}>
+                        For this department, only personal information plus diagnosis and treatment plan are stored.
+                      </p>
 
-            <div className="input-group">
-              <label htmlFor="history-of-present-illness">History of Presenting Illness</label>
-              <textarea id="history-of-present-illness" name="historyOfPresentIllness" rows={3}
-                value={formData.historyOfPresentIllness} onChange={handleInputChange}
-                placeholder="Describe the history of the presenting illness..." />
-            </div>
+                      <div className="input-group">
+                        <label htmlFor="diagnosis">
+                          Diagnosis <span style={{ color: 'red' }}>*</span>
+                        </label>
+                        <textarea
+                          id="diagnosis"
+                          name="diagnosis"
+                          value={formData.diagnosis}
+                          onChange={handleInputChange}
+                          rows="3"
+                          placeholder="Enter diagnosis"
+                        />
+                        {fieldErrors.diagnosis && <div className="error-message">{fieldErrors.diagnosis}</div>}
+                      </div>
 
-            <div className="input-group">
-              <label htmlFor="past-medical-history">Past Medical History</label>
-              <textarea id="past-medical-history" name="pastMedicalHistory" rows={3}
-                value={formData.pastMedicalHistory} onChange={handleInputChange}
-                placeholder="e.g. Diabetes, Hypertension, previous illnesses..." />
-            </div>
+                      <div className="input-group">
+                        <label htmlFor="treatment-plan">
+                          Treatment Plan <span style={{ color: 'red' }}>*</span>
+                        </label>
+                        <textarea
+                          id="treatment-plan"
+                          name="treatmentPlan"
+                          value={formData.treatmentPlan}
+                          onChange={handleInputChange}
+                          rows="4"
+                          placeholder="Enter treatment plan"
+                        />
+                        {fieldErrors.treatmentPlan && <div className="error-message">{fieldErrors.treatmentPlan}</div>}
+                      </div>
+                    </div>
+                  )}
 
-            <div className="input-group">
-              <label htmlFor="past-surgical-history">Past Surgical History</label>
-              <textarea id="past-surgical-history" name="pastSurgicalHistory" rows={2}
-                value={formData.pastSurgicalHistory} onChange={handleInputChange}
-                placeholder="e.g. Previous surgeries, procedures..." />
-            </div>
+                  {/* Patient Case Entry Section */}
+                  <h3>Patient Case Entry - Chief Complaint & History</h3>
 
-            <div className="input-group">
-              <label htmlFor="past-dental-history">Past Dental History</label>
-              <textarea id="past-dental-history" name="pastDentalHistory" rows={2}
-                value={formData.pastDentalHistory} onChange={handleInputChange}
-                placeholder="e.g. Previous dental treatments, extractions..." />
-            </div>
+                  {/* Chief Complaint */}
+                  <div className="input-group">
+                    <label htmlFor="chief-complaint">
+                      Chief Complaint <span style={{ color: "red" }}>*</span>
+                    </label>
+                    <textarea id="chief-complaint" name="chiefComplaint" rows={2}
+                      value={formData.chiefComplaint} onChange={handleInputChange}
+                      placeholder="Describe the chief complaint..." />
+                    {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
+                  </div>
 
-            {/* HPI, Past Medical History, Personal Habits, Medical History
+                  <div className="input-group">
+                    <label htmlFor="history-of-present-illness">History of Presenting Illness</label>
+                    <textarea id="history-of-present-illness" name="historyOfPresentIllness" rows={3}
+                      value={formData.historyOfPresentIllness} onChange={handleInputChange}
+                      placeholder="Describe the history of the presenting illness..." />
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="past-medical-history">Past Medical History</label>
+                    <textarea id="past-medical-history" name="pastMedicalHistory" rows={3}
+                      value={formData.pastMedicalHistory} onChange={handleInputChange}
+                      placeholder="e.g. Diabetes, Hypertension, previous illnesses..." />
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="past-surgical-history">Past Surgical History</label>
+                    <textarea id="past-surgical-history" name="pastSurgicalHistory" rows={2}
+                      value={formData.pastSurgicalHistory} onChange={handleInputChange}
+                      placeholder="e.g. Previous surgeries, procedures..." />
+                  </div>
+
+                  <div className="input-group">
+                    <label htmlFor="past-dental-history">Past Dental History</label>
+                    <textarea id="past-dental-history" name="pastDentalHistory" rows={2}
+                      value={formData.pastDentalHistory} onChange={handleInputChange}
+                      placeholder="e.g. Previous dental treatments, extractions..." />
+                  </div>
+
+                  {/* HPI, Past Medical History, Personal Habits, Medical History
                 — hidden for Oral Medicine and Endodontics departments */}
-            {!String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') && 
-             !String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('endo') && (<>
+                  {!String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') &&
+                    !String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('endo') && (<>
 
-            {/* Text areas for additional information */}
-            <div className="input-group">
-              <h3>Medical history</h3>
-              <label htmlFor="current-medications">
-                Current Medications
-              </label>
-              <textarea
-                id="current-medications"
-                name="currentMedications"
-                value={formData.currentMedications}
-                onChange={handleInputChange}
-                rows="2"
-              />
+                      {/* Text areas for additional information */}
+                      <div className="input-group">
+                        <h3>Medical history</h3>
+                        <label htmlFor="current-medications">
+                          Current Medications
+                        </label>
+                        <textarea
+                          id="current-medications"
+                          name="currentMedications"
+                          value={formData.currentMedications}
+                          onChange={handleInputChange}
+                          rows="2"
+                        />
+                      </div>
+
+                      <div className="input-group">
+                        <label htmlFor="known-allergies">
+                          Known Allergies (e.g., latex, medications, anesthetics)
+                        </label>
+                        <textarea
+                          id="known-allergies"
+                          name="knownAllergies"
+                          value={formData.knownAllergies}
+                          onChange={handleInputChange}
+                          rows="2"
+                        />
+                      </div>
+
+                      <div className="input-group">
+                        <label htmlFor="chronic-conditions">
+                          Chronic Conditions (e.g., diabetes, heart disease)
+                        </label>
+                        <textarea
+                          id="chronic-conditions"
+                          name="chronicConditions"
+                          value={formData.chronicConditions}
+                          onChange={handleInputChange}
+                          rows="2"
+                        />
+                      </div>
+
+                      <div className="input-group">
+                        <label htmlFor="past-surgeries">
+                          Past Surgeries
+                        </label>
+                        <textarea
+                          id="past-surgeries"
+                          name="pastSurgeries"
+                          value={formData.pastSurgeries}
+                          onChange={handleInputChange}
+                          rows="2"
+                        />
+                      </div>
+
+                      <div className="input-group">
+                        <label htmlFor="primary-dental-concerns">
+                          Primary Dental Concerns (e.g., pain, sensitivity, bleeding gums)
+                        </label>
+                        <textarea
+                          id="primary-dental-concerns"
+                          name="primaryDentalConcerns"
+                          value={formData.primaryDentalConcerns}
+                          onChange={handleInputChange}
+                          rows="2"
+                        />
+                      </div>
+
+                      <div className="input-group">
+                        <label htmlFor="last-dental-visit">
+                          Date of Last Dental Visit
+                        </label>
+                        <input
+                          type="date"
+                          id="last-dental-visit"
+                          name="lastDentalVisit"
+                          value={formData.lastDentalVisit}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+
+                    </>)}
+
+                  {/* Vitals Section */}
+                  <h3>Other Information</h3>
+
+                  <div className="form-grid">
+                    <div className="input-group">
+                      <label htmlFor="blood-group">Blood Group <span style={{ color: "red" }}>*</span></label>
+                      <select
+                        id="blood-group"
+                        name="bloodGroup"
+                        value={formData.bloodGroup}
+                        onChange={handleInputChange}
+                      >
+                        <option value="">Select Blood Group</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                      </select>
+                      {fieldErrors.bloodGroup && <div className="error-message">{fieldErrors.bloodGroup}</div>}
+                    </div>
+                    <div className="input-group">
+                      <label htmlFor="drug-allergies">Drug Allergies <span style={{ color: "red" }}>*</span></label>
+                      <input
+                        type="text"
+                        id="drug-allergies"
+                        name="drugAllergies"
+                        value={formData.drugAllergies}
+                        onChange={handleInputChange}
+                        placeholder="Specify drug allergies"
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label htmlFor="diet-allergies">Diet Allergies <span style={{ color: "red" }}>*</span></label>
+                      <input
+                        type="text"
+                        id="diet-allergies"
+                        name="dietAllergies"
+                        value={formData.dietAllergies}
+                        onChange={handleInputChange}
+                        placeholder="Specify diet allergies"
+                      />
+                    </div>
+                    <div className="input-group">
+                      <label htmlFor="critical-condition">Critical Condition</label>
+                      <input
+                        type="text"
+                        id="critical-condition"
+                        name="criticalCondition"
+                        value={formData.criticalCondition}
+                        onChange={handleInputChange}
+                        placeholder="e.g. Cardiac arrest risk, Severe allergy, Haemophilia..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Navigation buttons */}
+                  <div className="form-actions">
+                    <button
+                      className="save-btn"
+                      onClick={handleSavePatient}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? '...Saved...' : 'Save Patient Details'}
+                    </button>
+                    <button
+                      className="case-files-btn"
+                      onClick={goToDepartmentCaseSheet}
+                      type="button"
+                      disabled={!canNavigateCases}
+                    >
+                      Go to Case Files
+                    </button>
+                    <button
+                      className="case-history-btn"
+                      onClick={() => navigate('/case-history')}
+                      type="button"
+                      disabled={!canNavigateCases}
+                    >
+                      Case History
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-
-            <div className="input-group">
-              <label htmlFor="known-allergies">
-                Known Allergies (e.g., latex, medications, anesthetics)
-              </label>
-              <textarea
-                id="known-allergies"
-                name="knownAllergies"
-                value={formData.knownAllergies}
-                onChange={handleInputChange}
-                rows="2"
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="chronic-conditions">
-                Chronic Conditions (e.g., diabetes, heart disease)
-              </label>
-              <textarea
-                id="chronic-conditions"
-                name="chronicConditions"
-                value={formData.chronicConditions}
-                onChange={handleInputChange}
-                rows="2"
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="past-surgeries">
-                Past Surgeries
-              </label>
-              <textarea
-                id="past-surgeries"
-                name="pastSurgeries"
-                value={formData.pastSurgeries}
-                onChange={handleInputChange}
-                rows="2"
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="primary-dental-concerns">
-                Primary Dental Concerns (e.g., pain, sensitivity, bleeding gums)
-              </label>
-              <textarea
-                id="primary-dental-concerns"
-                name="primaryDentalConcerns"
-                value={formData.primaryDentalConcerns}
-                onChange={handleInputChange}
-                rows="2"
-              />
-            </div>
-
-            <div className="input-group">
-              <label htmlFor="last-dental-visit">
-                Date of Last Dental Visit
-              </label>
-              <input
-                type="date"
-                id="last-dental-visit"
-                name="lastDentalVisit"
-                value={formData.lastDentalVisit}
-                onChange={handleInputChange}
-              />
-            </div>
-
-            </>)}
-
-            {/* Vitals Section */}
-            <h3>Other Information</h3>
-            
-            <div className="form-grid">
-              <div className="input-group">
-                <label htmlFor="blood-group">Blood Group <span style={{ color: "red" }}>*</span></label>
-                <select
-                  id="blood-group"
-                  name="bloodGroup"
-                  value={formData.bloodGroup}
-                  onChange={handleInputChange}
-                >
-                  <option value="">Select Blood Group</option>
-                  <option value="A+">A+</option>
-                  <option value="A-">A-</option>
-                  <option value="B+">B+</option>
-                  <option value="B-">B-</option>
-                  <option value="AB+">AB+</option>
-                  <option value="AB-">AB-</option>
-                  <option value="O+">O+</option>
-                  <option value="O-">O-</option>
-                </select>
-                {fieldErrors.bloodGroup && <div className="error-message">{fieldErrors.bloodGroup}</div>}
-              </div>
-              <div className="input-group">
-                <label htmlFor="drug-allergies">Drug Allergies <span style={{ color: "red" }}>*</span></label>
-                <input
-                  type="text"
-                  id="drug-allergies"
-                  name="drugAllergies"
-                  value={formData.drugAllergies}
-                  onChange={handleInputChange}
-                  placeholder="Specify drug allergies"
-                />
-              </div>
-              <div className="input-group">
-                <label htmlFor="diet-allergies">Diet Allergies <span style={{ color: "red" }}>*</span></label>
-                <input
-                  type="text"
-                  id="diet-allergies"
-                  name="dietAllergies"
-                  value={formData.dietAllergies}
-                  onChange={handleInputChange}
-                  placeholder="Specify diet allergies"
-                />
-              </div>
-              <div className="input-group">
-                <label htmlFor="critical-condition">Critical Condition</label>
-                <input
-                  type="text"
-                  id="critical-condition"
-                  name="criticalCondition"
-                  value={formData.criticalCondition}
-                  onChange={handleInputChange}
-                  placeholder="e.g. Cardiac arrest risk, Severe allergy, Haemophilia..."
-                />
-              </div>
-            </div>
-
-            {/* Navigation buttons */}
-            <div className="form-actions">
-              <button
-                className="save-btn"
-                onClick={handleSavePatient}
-                disabled={isLoading}
-              >
-                {isLoading ? '...Saved...' : 'Save Patient Details'}
-              </button>
-              <button
-                className="case-files-btn"
-                onClick={goToDepartmentCaseSheet}
-                type="button"
-                disabled={!canNavigateCases}
-              >
-                Go to Case Files
-              </button>
-              <button
-                className="case-history-btn"
-                onClick={() => navigate('/case-history')}
-                type="button"
-                disabled={!canNavigateCases}
-              >
-                Case History
-              </button>
-            </div>
-              </div>
-            )}
-          </div>
           )}
         </main>
       </div>

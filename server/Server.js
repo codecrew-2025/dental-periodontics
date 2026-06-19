@@ -16,12 +16,14 @@ import oralRoutes from './routes/oral-route.js';
 import generalCaseRoutes from './routes/general-case.js';
 import consentFormRoutes from './routes/consent-form.js';
 import caseDraftRoutes from './routes/case-draft.js';
+import consentDraftRoutes from './routes/consent-draft.js';
 
 import prescriptionRoutes from './routes/prescription.js';
 import patientDetailsRoutes from './routes/patient-details-route.js';
 import reportsRoutes from './routes/reports.js';
 import billingRoutes from './routes/bill-route.js';
 import debugQueryRoutes from './routes/debug-query.js';
+import campPeriodonticsRoutes from './routes/campPeriodonticsRoutes.js';
 
 dotenv.config();
 
@@ -142,8 +144,8 @@ app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 
 // Increase payload limits
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve React build in production
 if (isProduction) {
@@ -276,8 +278,14 @@ console.log('✓ Billing routes registered at /api/billing');
 app.use('/api/consent-forms', consentFormRoutes);
 console.log('✓ Consent form routes registered at /api/consent-forms');
 
+app.use('/api/consent-drafts', consentDraftRoutes);
+console.log('✓ Consent draft routes registered at /api/consent-drafts');
+
 app.use('/api/debug', debugQueryRoutes);
 console.log('✓ Debug routes registered at /api/debug');
+
+app.use('/api/camp-periodontics', campPeriodonticsRoutes);
+console.log('✓ Camp Periodontics routes registered at /api/camp-periodontics');
 
 // React Router fallback (GET non-API routes)
 if (isProduction) {

@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import CaseSheetView from "./Casesheets/CaseSheetView";
 import { API_BASE_URL } from "../config/api";
@@ -10,6 +10,10 @@ const CaseSheetViewer = () => {
   const [attempts, setAttempts] = useState([]);
   const [authError, setAuthError] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const paramDept = queryParams.get("department");
+  const paramPatientId = queryParams.get("patientId");
 
   useEffect(() => {
     loadCaseMeta();
@@ -40,8 +44,29 @@ const CaseSheetViewer = () => {
       let data = null;
       let dept = null;
 
+      /* ---------- HANDLE CAMP PERIODONTICS ---------- */
+      if (paramDept === "Camp Periodontics") {
+        try {
+          const campRes = await fetch(`${API_BASE_URL}/api/camp-periodontics/case/${encodeURIComponent(caseId)}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (campRes.ok) {
+            const text = await campRes.text();
+            let json;
+            try { json = JSON.parse(text); } catch { json = text; }
+            if (json?.data) {
+              data = json.data;
+              dept = "camp periodontics";
+            }
+          }
+        } catch (e) {
+          console.error("Camp Periodontics fetch error", e);
+        }
+      }
+
       /* ---------- TRY UNIFIED ENDPOINT ---------- */
-      try {
+      if (!data) {
+        try {
         const resUnified = await fetch(
           `${API_BASE_URL}${unifiedEndpoint}`,
           {
@@ -86,6 +111,7 @@ const CaseSheetViewer = () => {
             body: String(uErr)
           }
         ]);
+      }
       }
 
       /* ---------- FALLBACK ENDPOINTS ---------- */

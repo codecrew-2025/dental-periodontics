@@ -1220,12 +1220,17 @@ router.get('/assigned-doctors/overview', auth, requireRole(['chief', 'chief-doct
     const { PatientDetails } = await import('../models/patientDetails.js');
     const requesterDepartment = String(req.user?.department || '').trim();
 
+    const queryOptions = {
+      role: { $in: ['doctor'] }
+    };
+    if (requesterDepartment) {
+      queryOptions.department = requesterDepartment;
+    } else {
+      queryOptions.createdBy = req.user._id;
+    }
+
     const assignedDoctors = await User.find(
-      {
-        role: 'doctor',
-        createdBy: req.user._id,
-        ...(requesterDepartment ? { department: requesterDepartment } : {}),
-      },
+      queryOptions,
       { _id: 1, name: 1, Identity: 1, email: 1, phone: 1, department: 1, createdAt: 1 }
     )
       .sort({ createdAt: -1 })
@@ -1249,7 +1254,63 @@ router.get('/assigned-doctors/overview', auth, requireRole(['chief', 'chief-doct
       )
     );
 
-    const appointments = await Appointment.find({ doctorId: { $in: doctorQueryKeys } })
+    // Fetch patients assigned to these doctors via cases
+    let assignedCases = [];
+    try {
+      const GeneralCase = (await import('../models/GeneralCase.js')).default;
+      const gcases = await GeneralCase.find(
+        { assignedPgId: { $in: doctorQueryKeys }, specialistStatus: 'approved' },
+        { patientId: 1, assignedPgId: 1 }
+      ).lean();
+      gcases.forEach(c => assignedCases.push({ patientId: c.patientId, assignedPgId: c.assignedPgId }));
+    } catch (e) { console.warn('GeneralCase error:', e.message); }
+
+    try {
+      const OralCase = (await import('../models/Oral-model.js')).default;
+      const orcases = await OralCase.find(
+        { doctorId: { $in: doctorQueryKeys }, chiefApproval: { $regex: /^approved$/i } },
+        { patientId: 1, doctorId: 1 }
+      ).lean();
+      orcases.forEach(c => assignedCases.push({ patientId: c.patientId, assignedPgId: c.doctorId }));
+    } catch (e) { console.warn('OralCase error:', e.message); }
+
+    try {
+      const PedodonticsCase = (await import('../models/PedodonticsCase.js')).default;
+      const pedcases = await PedodonticsCase.find(
+        { doctorId: { $in: doctorQueryKeys }, chiefApproval: { $regex: /^approved$/i } },
+        { patientId: 1, doctorId: 1 }
+      ).lean();
+      pedcases.forEach(c => assignedCases.push({ patientId: c.patientId, assignedPgId: c.doctorId }));
+    } catch (e) { console.warn('PedodonticsCase error:', e.message); }
+
+    try {
+      const PeriodonticsCaseModel = (await import('../models/PeriodonticsCaseModel.js')).default;
+      const percases = await PeriodonticsCaseModel.find(
+        { doctorId: { $in: doctorQueryKeys }, chiefApproval: { $regex: /^approved$/i } },
+        { patientId: 1, doctorId: 1 }
+      ).lean();
+      percases.forEach(c => assignedCases.push({ patientId: c.patientId, assignedPgId: c.doctorId }));
+    } catch (e) { console.warn('PeriodonticsCaseModel error:', e.message); }
+
+    const patientIdToPgMap = new Map();
+    assignedCases.forEach(c => {
+      const pid = String(c.patientId || '').trim();
+      const pgId = String(c.assignedPgId || '').trim();
+      if (pid && pgId) patientIdToPgMap.set(pid, pgId);
+    });
+
+    const assignedPatientIds = Array.from(patientIdToPgMap.keys());
+
+    const appointments = await Appointment.find({
+      $or: [
+        { doctorId: { $in: doctorQueryKeys } },
+        { supervisingDeptDoctorId: { $in: doctorQueryKeys } },
+        { deptDoctorId: { $in: doctorQueryKeys } },
+        { assignedPgUgId: { $in: doctorQueryKeys } },
+        { pgDoctorId: { $in: doctorQueryKeys } },
+        { patientId: { $in: assignedPatientIds.length > 0 ? assignedPatientIds : ['__dummy__'] } }
+      ]
+    })
       .sort({ appointmentDate: 1, appointmentTime: 1 })
       .lean();
 
@@ -1272,8 +1333,31 @@ router.get('/assigned-doctors/overview', auth, requireRole(['chief', 'chief-doct
     const uniquePatientIds = new Set();
 
     appointments.forEach((appt) => {
-      const appointmentDoctorKey = String(appt.doctorId || '').trim();
-      const doctorKey = doctorKeyToCanonical.get(appointmentDoctorKey);
+      let appointmentDoctorKey = String(appt.doctorId || '').trim();
+      let doctorKey = doctorKeyToCanonical.get(appointmentDoctorKey);
+
+      if (!doctorKey || !doctorLookup.has(doctorKey)) {
+        // Try other fields if doctorId didn't match
+        const fieldsToTry = [
+          appt.supervisingDeptDoctorId,
+          appt.deptDoctorId,
+          appt.assignedPgUgId,
+          appt.pgDoctorId,
+          patientIdToPgMap.get(String(appt.patientId || '').trim()) // Fallback to case assignment map
+        ];
+        
+        for (const field of fieldsToTry) {
+          if (field) {
+            const key = String(field).trim();
+            if (doctorKeyToCanonical.has(key)) {
+              appointmentDoctorKey = key;
+              doctorKey = doctorKeyToCanonical.get(key);
+              break;
+            }
+          }
+        }
+      }
+
       if (!doctorKey || !doctorLookup.has(doctorKey)) return;
 
       const status = String(appt.status || '').toLowerCase();

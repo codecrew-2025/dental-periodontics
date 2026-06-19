@@ -28,14 +28,31 @@ const Periodontics = () => {
           >
             Back to Periodontics Menu
           </button>
-          <button
-            type="button"
-            className="button-portal"
-            onClick={() => navigate('/')}
-            style={{ minWidth: 180 }}
-          >
-            Back to Dashboard
-          </button>
+
+<button
+  type="button"
+  className="button-portal"
+  onClick={() => navigate('/')}
+  style={{ minWidth: 180 }}
+>
+  Back to Dashboard
+</button>
+<button
+  type="button"
+  className="button-portal"
+  onClick={() => {
+    const pId = location.state?.patientId || localStorage.getItem('CurrentpatientId') || '';
+    const pName = location.state?.patientName || localStorage.getItem('CurrentpatientName') || '';
+    if (pId) {
+      localStorage.setItem('CurrentpatientId', pId);
+      localStorage.setItem('CurrentpatientName', pName);
+    }
+    navigate('/case-history');
+  }}
+  style={{ minWidth: 180 }}
+>
+  Case History
+</button>
         </div>
       </div>
     </div>
