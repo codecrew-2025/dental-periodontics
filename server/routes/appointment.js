@@ -755,50 +755,78 @@ router.get('/department-queue/:deptKey', auth, requireRole(['doctor','chief-doct
     const todayStr = new Date().toISOString().split('T')[0];
     const activeStatuses = ['pending','assigned','rescheduled','in_progress'];
 
-    let assignedPatientIds = [];
-    try {
-      const GeneralCase = (await import('../models/GeneralCase.js')).default;
-      const assignedCases = await GeneralCase.find(
-        { assignedPgId: { $in: keys }, specialistStatus: 'approved' },
-        { patientId: 1 }
-      ).maxTimeMS(5000).lean();
-      assignedPatientIds = assignedCases.map(c => String(c.patientId || '')).filter(Boolean);
-    } catch (gcErr) {
-      console.warn('[dept-queue] GeneralCase lookup timed out or failed:', gcErr.message);
-    }
-
-    // Include patients referred via Oral Case Sheets to this department (fault-tolerant)
-    let oralReferredPatientIds = [];
-    try {
-      const OralCase = (await import('../models/Oral-model.js')).default;
-      const deptAliasLabels = aliases.map(a => a.replace(/[^a-z0-9]/gi, '').toLowerCase());
-      const allOralCases = await OralCase.find(
-        { referredDepartment: { $ne: '' } },
-        { patientId: 1, referredDepartment: 1 }
-      ).maxTimeMS(5000).lean();
-      oralReferredPatientIds = allOralCases
-        .filter(c => {
-          const rd = String(c.referredDepartment || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
-          return deptAliasLabels.includes(rd);
-        })
-        .map(c => String(c.patientId || '').trim())
-        .filter(Boolean);
-    } catch (oralErr) {
-      console.warn('[dept-queue] OralCase lookup timed out or failed, skipping oral referrals:', oralErr.message);
-    }
-
-    const allReferredPatientIds = Array.from(new Set([...assignedPatientIds, ...oralReferredPatientIds]));
-
-    const appointments = await Appointment.find({
-      $or: [
-        { doctorId: { $in: keys } },
-        { supervisingDeptDoctorId: { $in: keys } },
-        { deptDoctorId: { $in: keys } },
-        { patientId: { $in: allReferredPatientIds } }
-      ],
+    // 1. Fetch all upcoming appointments matching active statuses first
+    let futureAppointments = await Appointment.find({
       status: { $in: activeStatuses },
       appointmentDate: { $gte: todayStr }
-    }).sort({ appointmentDate: 1, appointmentTime: 1 }).lean();
+    }).lean();
+
+    const deptAppointments = [];
+    const potentialReferredPatientIds = new Set();
+
+    for (const appt of futureAppointments) {
+      if (
+        keys.includes(String(appt.doctorId)) ||
+        keys.includes(String(appt.supervisingDeptDoctorId)) ||
+        keys.includes(String(appt.deptDoctorId))
+      ) {
+        deptAppointments.push(appt);
+      } else if (appt.patientId) {
+        potentialReferredPatientIds.add(String(appt.patientId));
+      }
+    }
+
+    let allReferredPatientIds = new Set();
+    if (potentialReferredPatientIds.size > 0) {
+      const pIds = Array.from(potentialReferredPatientIds);
+
+      // Check GeneralCase for these patients
+      try {
+        const GeneralCase = (await import('../models/GeneralCase.js')).default;
+        const assignedCases = await GeneralCase.find({
+          patientId: { $in: pIds },
+          assignedPgId: { $in: keys },
+          specialistStatus: 'approved'
+        }, { patientId: 1 }).maxTimeMS(5000).lean();
+        assignedCases.forEach(c => allReferredPatientIds.add(String(c.patientId)));
+      } catch (gcErr) {
+        console.warn('[dept-queue] GeneralCase lookup timed out or failed:', gcErr.message);
+      }
+
+      // Check OralCase for these patients
+      try {
+        const OralCase = (await import('../models/Oral-model.js')).default;
+        const deptAliasLabels = aliases.map(a => a.replace(/[^a-z0-9]/gi, '').toLowerCase());
+        const relevantOralCases = await OralCase.find({
+          patientId: { $in: pIds },
+          referredDepartment: { $ne: '' }
+        }, { patientId: 1, referredDepartment: 1 }).maxTimeMS(5000).lean();
+        
+        for (const c of relevantOralCases) {
+          const rd = String(c.referredDepartment || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+          if (deptAliasLabels.includes(rd)) {
+            allReferredPatientIds.add(String(c.patientId));
+          }
+        }
+      } catch (oralErr) {
+        console.warn('[dept-queue] OralCase lookup timed out or failed:', oralErr.message);
+      }
+    }
+
+    const appointments = futureAppointments.filter(appt => 
+      keys.includes(String(appt.doctorId)) ||
+      keys.includes(String(appt.supervisingDeptDoctorId)) ||
+      keys.includes(String(appt.deptDoctorId)) ||
+      allReferredPatientIds.has(String(appt.patientId))
+    );
+    
+    // Sort appointments
+    appointments.sort((a, b) => {
+      if (a.appointmentDate === b.appointmentDate) {
+        return String(a.appointmentTime || '').localeCompare(String(b.appointmentTime || ''));
+      }
+      return String(a.appointmentDate || '').localeCompare(String(b.appointmentDate || ''));
+    });
 
     const enriched = await attachPatientName(appointments);
     return res.json({ success: true, appointments: enriched });
@@ -893,52 +921,76 @@ router.get("/my-appointments", auth, requireRole(["doctor", "chief-doctor"]), as
         matchingDeptDoctors.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))
       ));
 
-      let assignedPatientIds = [];
-      try {
-        const GeneralCase = (await import('../models/GeneralCase.js')).default;
-        const assignedCases = await GeneralCase.find(
-          { assignedPgId: { $in: deptDoctorKeys }, specialistStatus: 'approved' },
-          { patientId: 1 }
-        ).maxTimeMS(5000).lean();
-        assignedPatientIds = assignedCases.map(c => String(c.patientId || '')).filter(Boolean);
-      } catch (gcErr) {
-        console.warn('[my-appointments] GeneralCase lookup timed out or failed:', gcErr.message);
-      }
-
-      // Also include patients referred via Oral Case Sheets to this department (fault-tolerant)
-      let oralReferredPatientIds = [];
-      try {
-        const OralCase = (await import('../models/Oral-model.js')).default;
-        const deptAliasLabels = aliases.map(a =>
-          a.replace(/[^a-z0-9]/gi, '').toLowerCase()
-        );
-        const allOralCases = await OralCase.find(
-          { referredDepartment: { $ne: '' } },
-          { patientId: 1, referredDepartment: 1 }
-        ).maxTimeMS(5000).lean();
-        oralReferredPatientIds = allOralCases
-          .filter(c => {
-            const rd = String(c.referredDepartment || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
-            return deptAliasLabels.includes(rd);
-          })
-          .map(c => String(c.patientId || '').trim())
-          .filter(Boolean);
-      } catch (oralErr) {
-        console.warn('[my-appointments] OralCase lookup timed out or failed, skipping oral referrals:', oralErr.message);
-      }
-
-      const allReferredPatientIds = Array.from(new Set([...assignedPatientIds, ...oralReferredPatientIds]));
-
-      appointments = await Appointment.find({
-        $or: [
-          { doctorId: { $in: deptDoctorKeys } },
-          { supervisingDeptDoctorId: { $in: deptDoctorKeys } },
-          { deptDoctorId: { $in: deptDoctorKeys } },
-          { patientId: { $in: allReferredPatientIds } }
-        ],
+      // 1. Fetch all upcoming appointments first
+      const futureAppointments = await Appointment.find({
         status: { $nin: excludedStatuses },
         appointmentDate: { $gte: todayStr },
-      }).sort({ appointmentDate: 1, appointmentTime: 1 });
+      }).lean();
+
+      const potentialReferredPatientIds = new Set();
+
+      for (const appt of futureAppointments) {
+        if (
+          !deptDoctorKeys.includes(String(appt.doctorId)) &&
+          !deptDoctorKeys.includes(String(appt.supervisingDeptDoctorId)) &&
+          !deptDoctorKeys.includes(String(appt.deptDoctorId)) &&
+          appt.patientId
+        ) {
+          potentialReferredPatientIds.add(String(appt.patientId));
+        }
+      }
+
+      let allReferredPatientIds = new Set();
+      if (potentialReferredPatientIds.size > 0) {
+        const pIds = Array.from(potentialReferredPatientIds);
+
+        // Check GeneralCase for these patients
+        try {
+          const GeneralCase = (await import('../models/GeneralCase.js')).default;
+          const assignedCases = await GeneralCase.find({
+            patientId: { $in: pIds },
+            assignedPgId: { $in: deptDoctorKeys },
+            specialistStatus: 'approved'
+          }, { patientId: 1 }).maxTimeMS(5000).lean();
+          assignedCases.forEach(c => allReferredPatientIds.add(String(c.patientId)));
+        } catch (gcErr) {
+          console.warn('[my-appointments] GeneralCase lookup timed out or failed:', gcErr.message);
+        }
+
+        // Check OralCase for these patients
+        try {
+          const OralCase = (await import('../models/Oral-model.js')).default;
+          const deptAliasLabels = aliases.map(a => a.replace(/[^a-z0-9]/gi, '').toLowerCase());
+          const relevantOralCases = await OralCase.find({
+            patientId: { $in: pIds },
+            referredDepartment: { $ne: '' }
+          }, { patientId: 1, referredDepartment: 1 }).maxTimeMS(5000).lean();
+          
+          for (const c of relevantOralCases) {
+            const rd = String(c.referredDepartment || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+            if (deptAliasLabels.includes(rd)) {
+              allReferredPatientIds.add(String(c.patientId));
+            }
+          }
+        } catch (oralErr) {
+          console.warn('[my-appointments] OralCase lookup timed out or failed:', oralErr.message);
+        }
+      }
+
+      appointments = futureAppointments.filter(appt => 
+        deptDoctorKeys.includes(String(appt.doctorId)) ||
+        deptDoctorKeys.includes(String(appt.supervisingDeptDoctorId)) ||
+        deptDoctorKeys.includes(String(appt.deptDoctorId)) ||
+        allReferredPatientIds.has(String(appt.patientId))
+      );
+      
+      // Sort appointments
+      appointments.sort((a, b) => {
+        if (a.appointmentDate === b.appointmentDate) {
+          return String(a.appointmentTime || '').localeCompare(String(b.appointmentTime || ''));
+        }
+        return String(a.appointmentDate || '').localeCompare(String(b.appointmentDate || ''));
+      });
     }
 
     const enriched = await attachPatientName(appointments);
@@ -1171,23 +1223,56 @@ router.get('/department/:deptKey', auth, requireRole(['doctor','chief-doctor','c
     const todayStr = new Date().toISOString().split('T')[0];
     const excludedStatuses = ['cancelled', 'completed', 'closed'];
 
-    const GeneralCase = (await import('../models/GeneralCase.js')).default;
-    const assignedCases = await GeneralCase.find(
-      { assignedPgId: { $in: keys }, specialistStatus: 'approved' },
-      { patientId: 1 }
-    ).lean();
-    const assignedPatientIds = assignedCases.map(c => String(c.patientId || '')).filter(Boolean);
-
-    const appointments = await Appointment.find({
-      $or: [
-        { doctorId: { $in: keys } },
-        { supervisingDeptDoctorId: { $in: keys } },
-        { deptDoctorId: { $in: keys } },
-        { patientId: { $in: assignedPatientIds } }
-      ],
+    // 1. Fetch all upcoming appointments first
+    const futureAppointments = await Appointment.find({
       status: { $nin: excludedStatuses },
       appointmentDate: { $gte: todayStr }
-    }).sort({ appointmentDate: 1, appointmentTime: 1 }).lean();
+    }).lean();
+
+    const potentialReferredPatientIds = new Set();
+    for (const appt of futureAppointments) {
+      if (
+        !keys.includes(String(appt.doctorId)) &&
+        !keys.includes(String(appt.supervisingDeptDoctorId)) &&
+        !keys.includes(String(appt.deptDoctorId)) &&
+        appt.patientId
+      ) {
+        potentialReferredPatientIds.add(String(appt.patientId));
+      }
+    }
+
+    let allReferredPatientIds = new Set();
+    if (potentialReferredPatientIds.size > 0) {
+      const pIds = Array.from(potentialReferredPatientIds);
+
+      // Check GeneralCase for these patients
+      try {
+        const GeneralCase = (await import('../models/GeneralCase.js')).default;
+        const assignedCases = await GeneralCase.find({
+          patientId: { $in: pIds },
+          assignedPgId: { $in: keys },
+          specialistStatus: 'approved'
+        }, { patientId: 1 }).maxTimeMS(5000).lean();
+        assignedCases.forEach(c => allReferredPatientIds.add(String(c.patientId)));
+      } catch (gcErr) {
+        console.warn('[department] GeneralCase lookup timed out or failed:', gcErr.message);
+      }
+    }
+
+    const appointments = futureAppointments.filter(appt => 
+      keys.includes(String(appt.doctorId)) ||
+      keys.includes(String(appt.supervisingDeptDoctorId)) ||
+      keys.includes(String(appt.deptDoctorId)) ||
+      allReferredPatientIds.has(String(appt.patientId))
+    );
+    
+    // Sort appointments
+    appointments.sort((a, b) => {
+      if (a.appointmentDate === b.appointmentDate) {
+        return String(a.appointmentTime || '').localeCompare(String(b.appointmentTime || ''));
+      }
+      return String(a.appointmentDate || '').localeCompare(String(b.appointmentDate || ''));
+    });
 
     const enriched = await attachPatientName(appointments);
     return res.json({ success: true, appointments: enriched });
