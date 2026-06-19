@@ -1773,54 +1773,23 @@ const DoctorDashboard = () => {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
       console.log('[DoctorDashboard] fetchCases starting, token present:', !!token);
-      // If a patient is selected in the UI, show only that patient's case sheets
-      const currentPatientId = localStorage.getItem('CurrentpatientId') || localStorage.getItem('currentPatientId') || '';
-      if (currentPatientId && String(currentPatientId).trim()) {
-        const pid = encodeURIComponent(String(currentPatientId).trim());
-        const endpoints = [
-          { url: buildApiUrl(`/api/oral/patient/${pid}`), department: 'Oral' },
-          { url: buildApiUrl(`/api/pedodontics/patient/${pid}`), department: 'Pedodontics' },
-        ];
+      // ALWAYS fetch cases from assigned PGs for the "Case Files" inbox
+      const assignedUrl = buildApiUrl('/api/auth/doctor/assigned-pgs/cases');
+      const res = await fetch(assignedUrl, { headers });
+      const text = await res.text().catch(() => '');
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch { parsed = text; }
+      console.log('[DoctorDashboard] assigned-pgs/cases', assignedUrl, 'status', res.status, 'body:', parsed);
 
-        const results = await Promise.all(
-          endpoints.map(async ({ url, department }) => {
-            try {
-              const res = await fetch(url, { headers: { ...headers, 'x-bypass-department-check': '1' } });
-              if (!res.ok) return [];
-              const json = await res.json().catch(() => null);
-              console.log('[DoctorDashboard] patient cases fetch', url, 'status', res.status, 'items', Array.isArray(json?.data) ? json.data.length : 0);
-              const items = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
-              return items.map((it) => ({ department, ...it }));
-            } catch (err) {
-              console.warn('Patient cases fetch failed for', url, err && err.message ? err.message : err);
-              return [];
-            }
-          })
-        );
-
-        const merged = [];
-        results.forEach((r) => { if (Array.isArray(r)) merged.push(...r); });
-        merged.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-        setCases(merged);
-      } else {
-        // Fallback: fetch cases from assigned PGs (original behavior)
-        const assignedUrl = buildApiUrl('/api/auth/doctor/assigned-pgs/cases');
-        const res = await fetch(assignedUrl, { headers });
-        const text = await res.text().catch(() => '');
-        let parsed = null;
-        try { parsed = JSON.parse(text); } catch { parsed = text; }
-        console.log('[DoctorDashboard] assigned-pgs/cases', assignedUrl, 'status', res.status, 'body:', parsed);
-
-        if (!res.ok) {
-          const msg = (parsed && typeof parsed === 'object' && parsed.message) ? parsed.message : `Status ${res.status}`;
-          console.warn('Error fetching cases:', msg);
-          throw new Error(msg || 'Failed to fetch cases');
-        }
-
-        const json = typeof parsed === 'object' ? parsed : null;
-        const allCases = (json && (json.cases || json.data)) || [];
-        setCases(allCases);
+      if (!res.ok) {
+        const msg = (parsed && typeof parsed === 'object' && parsed.message) ? parsed.message : `Status ${res.status}`;
+        console.warn('Error fetching cases:', msg);
+        throw new Error(msg || 'Failed to fetch cases');
       }
+
+      const json = typeof parsed === 'object' ? parsed : null;
+      const allCases = (json && (json.cases || json.data)) || [];
+      setCases(allCases);
     } catch (err) {
       console.error(err);
       setCasesError('Failed to fetch cases from your assigned PGs');
