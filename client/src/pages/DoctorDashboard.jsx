@@ -3973,33 +3973,7 @@ const DoctorDashboard = () => {
                     {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
                   </div>
 
-                  <div className="input-group">
-                    <label htmlFor="history-of-present-illness">History of Presenting Illness</label>
-                    <textarea id="history-of-present-illness" name="historyOfPresentIllness" rows={3}
-                      value={formData.historyOfPresentIllness} onChange={handleInputChange}
-                      placeholder="Describe the history of the presenting illness..." />
-                  </div>
 
-                  <div className="input-group">
-                    <label htmlFor="past-medical-history">Past Medical History</label>
-                    <textarea id="past-medical-history" name="pastMedicalHistory" rows={3}
-                      value={formData.pastMedicalHistory} onChange={handleInputChange}
-                      placeholder="e.g. Diabetes, Hypertension, previous illnesses..." />
-                  </div>
-
-                  <div className="input-group">
-                    <label htmlFor="past-surgical-history">Past Surgical History</label>
-                    <textarea id="past-surgical-history" name="pastSurgicalHistory" rows={2}
-                      value={formData.pastSurgicalHistory} onChange={handleInputChange}
-                      placeholder="e.g. Previous surgeries, procedures..." />
-                  </div>
-
-                  <div className="input-group">
-                    <label htmlFor="past-dental-history">Past Dental History</label>
-                    <textarea id="past-dental-history" name="pastDentalHistory" rows={2}
-                      value={formData.pastDentalHistory} onChange={handleInputChange}
-                      placeholder="e.g. Previous dental treatments, extractions..." />
-                  </div>
 
                   {/* HPI, Past Medical History, Personal Habits, Medical History
                 — hidden for Oral Medicine and Endodontics departments */}

@@ -120,6 +120,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
     age: '',
     gender: '',
     maritalStatus: '',
+    occupation: '',
+    income: '',
+    religion: '',
+    address: '',
     preferredLanguage: '',
     otherLanguage: '',
     chiefComplaint: '',
@@ -1836,6 +1840,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
         age: resolvedAge,
         gender: patientData.personalInfo?.gender || patientData.gender || prev.gender || '',
         maritalStatus: patientData.personalInfo?.maritalStatus || patientData.maritalStatus || prev.maritalStatus || '',
+        occupation: patientData.personalInfo?.occupation || patientData.occupation || prev.occupation || '',
+        income: patientData.personalInfo?.income || patientData.income || prev.income || '',
+        religion: patientData.personalInfo?.religion || patientData.religion || prev.religion || '',
+        address: patientData.personalInfo?.address || patientData.address || prev.address || '',
         preferredLanguage: preferredLanguage ? (isOtherLanguage ? 'Other' : preferredLanguage) : prev.preferredLanguage,
         otherLanguage: preferredLanguage ? (isOtherLanguage ? preferredLanguage : '') : prev.otherLanguage,
         chiefComplaint: patientData.medicalInfo?.chiefComplaint || patientData.chiefComplaint || prev.chiefComplaint || '',
@@ -2125,6 +2133,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
             age: parseInt(formData.age) || 0,
             gender: formData.gender,
             maritalStatus: formData.maritalStatus,
+            occupation: formData.occupation || '',
+            income: formData.income || '',
+            religion: formData.religion || '',
+            address: formData.address || '',
             preferredLanguage: formData.preferredLanguage === 'Other' ? formData.otherLanguage : formData.preferredLanguage
           },
           medicalInfo: {
@@ -2142,6 +2154,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
             age: parseInt(formData.age) || 0,
             gender: formData.gender,
             maritalStatus: formData.maritalStatus,
+            occupation: formData.occupation || '',
+            income: formData.income || '',
+            religion: formData.religion || '',
+            address: formData.address || '',
             preferredLanguage: formData.preferredLanguage === 'Other' ? formData.otherLanguage : formData.preferredLanguage
           },
           medicalInfo: {
@@ -2588,6 +2604,30 @@ const PGDashboard = ({ brandTitleOverride }) => {
                             {fieldErrors.pregnancyStatus && <div className="error-message">{fieldErrors.pregnancyStatus}</div>}
                           </div>
                         )}
+
+                        {/* Additional Information */}
+                        <h3>Additional Information</h3>
+                        <div className="form-row">
+                          <div className="input-group">
+                            <label htmlFor="occupation">Occupation</label>
+                            <input type="text" id="occupation" name="occupation" value={formData.occupation} onChange={handleInputChange} placeholder="e.g. Teacher, Engineer" />
+                          </div>
+                          <div className="input-group">
+                            <label htmlFor="income">Income</label>
+                            <input type="text" id="income" name="income" value={formData.income} onChange={handleInputChange} placeholder="e.g. 30,000 / month" />
+                          </div>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="input-group">
+                            <label htmlFor="religion">Religion</label>
+                            <input type="text" id="religion" name="religion" value={formData.religion} onChange={handleInputChange} placeholder="e.g. Hindu, Christian" />
+                          </div>
+                          <div className="input-group">
+                            <label htmlFor="address">Address</label>
+                            <input type="text" id="address" name="address" value={formData.address} onChange={handleInputChange} placeholder="Full address" />
+                          </div>
+                        </div>
 
                         {/* Preferred Language */}
                         <div className="input-group">

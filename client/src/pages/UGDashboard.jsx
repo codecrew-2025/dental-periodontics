@@ -2585,28 +2585,7 @@ const UGDashboard = () => {
                       </div>
                     )}
 
-                    {/* Preferred Language — not required for PHD */}
-                    {!isPublicHealthDentistry && (
-                    <div className="input-group">
-                      <label htmlFor="preferred-language">Preferred Language <span style={{ color: 'red' }}>*</span></label>
-                      <select id="preferred-language" name="preferredLanguage" value={formData.preferredLanguage} onChange={handleInputChange}>
-                        <option value="">Select</option>
-                        <option value="English">English</option>
-                        <option value="Hindi">Hindi</option>
-                        <option value="Tamil">Tamil</option>
-                        <option value="Other">Other</option>
-                      </select>
-                      {fieldErrors.preferredLanguage && <div className="error-message">{fieldErrors.preferredLanguage}</div>}
-                    </div>
-                    )}
 
-                    {!isPublicHealthDentistry && formData.preferredLanguage === 'Other' && (
-                      <div className="input-group">
-                        <label htmlFor="other-language">Specify Language <span style={{ color: 'red' }}>*</span></label>
-                        <input type="text" id="other-language" name="otherLanguage" value={formData.otherLanguage} onChange={handleInputChange} placeholder="Enter preferred language" />
-                        {fieldErrors.otherLanguage && <div className="error-message">{fieldErrors.otherLanguage}</div>}
-                      </div>
-                    )}
                     {/* ── PHD-specific: Diagnosis & Treatment Plan ── */}
                     {isPublicHealthDentistry && (
                       <>
@@ -2643,33 +2622,43 @@ const UGDashboard = () => {
                     <>
                     {/* ── VITALS ── */}
                     <h3>Vitals</h3>
-                    <div className="ug-vitals-grid">
-                      {[
-                        { name: 'vitalBP',       icon: '🩺', label: 'Blood Pressure', placeholder: '120/80', unit: 'mmHg' },
-                        { name: 'vitalPulse',     icon: '💓', label: 'Pulse Rate',     placeholder: '72',     unit: 'bpm' },
-                        { name: 'vitalRespRate',  icon: '🫁', label: 'Resp. Rate',     placeholder: '16',     unit: '/min' },
-                        { name: 'vitalTemp',      icon: '🌡️', label: 'Temperature',   placeholder: '37.0',   unit: '°C' },
-                        { name: 'vitalSpO2',      icon: '🩸', label: 'SpO₂',          placeholder: '98',     unit: '%' },
-                        { name: 'vitalWeight',    icon: '⚖️', label: 'Weight',        placeholder: '65',     unit: 'kg' },
-                        { name: 'vitalHeight',    icon: '📏', label: 'Height',        placeholder: '165',    unit: 'cm' },
-                      ].map(({ name, icon, label, placeholder, unit }) => (
-                        <div className="ug-vital-card" key={name}>
-                          <span className="ug-vital-icon">{icon}</span>
-                          <label className="ug-vital-label">{label}</label>
-                          <div className="ug-vital-input-wrap">
-                            <input
-                              className="ug-vital-input"
-                              type="text"
-                              name={name}
-                              placeholder={placeholder}
-                              value={formData[name]}
-                              onChange={handleInputChange}
-                            />
-                            <span className="ug-vital-unit">{unit}</span>
-                          </div>
+                    <div className="form-row">
+                      <div className="input-group">
+                        <label>Blood Pressure</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input type="text" name="vitalBP" placeholder="120/80"
+                            value={formData.vitalBP} onChange={handleInputChange} />
+                          <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>mmHg</span>
                         </div>
-                      ))}
+                      </div>
+                      <div className="input-group">
+                        <label>Temperature</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input type="text" name="vitalTemp" placeholder="37.0"
+                            value={formData.vitalTemp} onChange={handleInputChange} />
+                          <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>°C</span>
+                        </div>
+                      </div>
                     </div>
+                    <div className="form-row">
+                      <div className="input-group">
+                        <label>Weight</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input type="text" name="vitalWeight" placeholder="65"
+                            value={formData.vitalWeight} onChange={handleInputChange} />
+                          <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>kg</span>
+                        </div>
+                      </div>
+                      <div className="input-group">
+                        <label>Height</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input type="text" name="vitalHeight" placeholder="165"
+                            value={formData.vitalHeight} onChange={handleInputChange} />
+                          <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>cm</span>
+                        </div>
+                      </div>
+                    </div>
+
 
                     <h3>Additional Information</h3>
 
@@ -2694,6 +2683,27 @@ const UGDashboard = () => {
                         <input type="text" id="address" name="address" value={formData.address} onChange={handleInputChange} placeholder="Full address" />
                       </div>
                     </div>
+
+                    {/* Preferred Language */}
+                    <div className="input-group">
+                      <label htmlFor="preferred-language">Preferred Language <span style={{ color: 'red' }}>*</span></label>
+                      <select id="preferred-language" name="preferredLanguage" value={formData.preferredLanguage} onChange={handleInputChange}>
+                        <option value="">Select</option>
+                        <option value="English">English</option>
+                        <option value="Hindi">Hindi</option>
+                        <option value="Tamil">Tamil</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      {fieldErrors.preferredLanguage && <div className="error-message">{fieldErrors.preferredLanguage}</div>}
+                    </div>
+
+                    {formData.preferredLanguage === 'Other' && (
+                      <div className="input-group">
+                        <label htmlFor="other-language">Specify Language <span style={{ color: 'red' }}>*</span></label>
+                        <input type="text" id="other-language" name="otherLanguage" value={formData.otherLanguage} onChange={handleInputChange} placeholder="Enter preferred language" />
+                        {fieldErrors.otherLanguage && <div className="error-message">{fieldErrors.otherLanguage}</div>}
+                      </div>
+                    )}
                     <h3>Patient Case Entry - Chief Complaint &amp; History</h3>
 
                     {/* Chief Complaint */}
@@ -2705,33 +2715,7 @@ const UGDashboard = () => {
                       {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
                     </div>
 
-                    <div className="input-group">
-                      <label htmlFor="history-of-present-illness">History of Presenting Illness</label>
-                      <textarea id="history-of-present-illness" name="historyOfPresentIllness" rows={3}
-                        value={formData.historyOfPresentIllness} onChange={handleInputChange}
-                        placeholder="Describe the history of the presenting illness..." />
-                    </div>
 
-                    <div className="input-group">
-                      <label htmlFor="past-medical-history-text">Past Medical History</label>
-                      <textarea id="past-medical-history-text" name="pastMedicalHistoryText" rows={3}
-                        value={formData.pastMedicalHistoryText} onChange={handleInputChange}
-                        placeholder="e.g. Diabetes, Hypertension, previous illnesses..." />
-                    </div>
-
-                    <div className="input-group">
-                      <label htmlFor="past-surgical-history">Past Surgical History</label>
-                      <textarea id="past-surgical-history" name="pastSurgicalHistory" rows={2}
-                        value={formData.pastSurgicalHistory} onChange={handleInputChange}
-                        placeholder="e.g. Previous surgeries, procedures..." />
-                    </div>
-
-                    <div className="input-group">
-                      <label htmlFor="past-dental-history">Past Dental History</label>
-                      <textarea id="past-dental-history" name="pastDentalHistory" rows={2}
-                        value={formData.pastDentalHistory} onChange={handleInputChange}
-                        placeholder="e.g. Previous dental treatments, extractions..." />
-                    </div>
 
                     {/* Medical History — hidden for Oral Medicine department (captured in the oral case sheet) */}
                     {!String(ugDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') && (<>

@@ -214,7 +214,7 @@ const CaseHistory = () => {
               <th>Department</th>
               <th>Doctor</th>
               <th>Case Sheet</th>
-              <th>Prescription</th>
+              {!(patientInfo?.id && /^C/i.test(patientInfo.id)) && <th>Prescription</th>}
             </tr>
           </thead>
           <tbody>
@@ -229,15 +229,17 @@ const CaseHistory = () => {
                     <td>
                       <button onClick={() => viewCaseSheet(c)}>View</button>
                     </td>
-                    <td>
-                      <button onClick={() => viewPrescription(c)}>View</button>
-                    </td>
+                    {!(patientInfo?.id && /^C/i.test(patientInfo.id)) && (
+                      <td>
+                        <button onClick={() => viewPrescription(c)}>View</button>
+                      </td>
+                    )}
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan="6">No cases found</td>
+                <td colSpan={!(patientInfo?.id && /^C/i.test(patientInfo.id)) ? 6 : 5}>No cases found</td>
               </tr>
             )}
           </tbody>
