@@ -1994,6 +1994,8 @@ const UGDashboard = () => {
       setShowUserIdDisplay(true);
       setShowForm(true);
       setCanNavigateCases(true);
+      localStorage.setItem('CurrentpatientId', enteredId);
+      localStorage.setItem('CurrentpatientName', 'Camp Patient');
       showMessage(`Camp Patient ID verified locally: ${enteredId}`, 'success');
       return;
     }

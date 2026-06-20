@@ -1051,6 +1051,8 @@ const DoctorDashboard = () => {
       setShowForm(true);
       setStoredPatientId(enteredId);
       setCanNavigateCases(true);
+      localStorage.setItem('CurrentpatientId', enteredId);
+      localStorage.setItem('CurrentpatientName', 'Camp Patient');
       showMessage(`Camp Patient verified locally: ${enteredId}`, 'success');
       return;
     }
