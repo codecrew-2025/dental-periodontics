@@ -629,8 +629,8 @@ router.get('/patient/:patientId', auth, async (req, res) => {
       });
     }
 
-    // Count total records for pagination
-    const total = await GeneralCase.countDocuments({ patientId });
+    // Skip the count query when only 1 record is needed (preview/button mode)
+    const total = limit === 1 ? null : await GeneralCase.countDocuments({ patientId });
 
     // Fetch only essential fields for list view, excluding large text fields
     const cases = await GeneralCase.find({ patientId })
@@ -647,7 +647,7 @@ router.get('/patient/:patientId', auth, async (req, res) => {
       .limit(limit)
       .lean();
 
-    console.log('[General Case] Found', cases.length, 'cases for patientId:', patientId, 'Total:', total);
+    console.log('[General Case] Found', cases.length, 'cases for patientId:', patientId);
 
     res.json({
       success: true,
@@ -656,7 +656,7 @@ router.get('/patient/:patientId', auth, async (req, res) => {
         total,
         page,
         limit,
-        pages: Math.ceil(total / limit)
+        pages: total != null ? Math.ceil(total / limit) : null
       }
     });
   } catch (error) {

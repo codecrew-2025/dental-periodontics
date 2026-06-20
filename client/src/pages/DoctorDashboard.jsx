@@ -245,7 +245,7 @@ const DoctorDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(
-        buildApiUrl(`/api/general/patient/${encodeURIComponent(resolvedPatientId)}`),
+        buildApiUrl(`/api/general/patient/${encodeURIComponent(resolvedPatientId)}?limit=1`),
         {
           signal: controller.signal,
           headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },

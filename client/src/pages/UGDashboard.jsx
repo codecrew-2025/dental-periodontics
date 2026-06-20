@@ -861,7 +861,7 @@ const UGDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(
-        buildApiUrl(`/api/general/patient/${encodeURIComponent(resolvedPatientId)}`),
+        buildApiUrl(`/api/general/patient/${encodeURIComponent(resolvedPatientId)}?limit=1`),
         {
           headers: token
             ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
