@@ -101,6 +101,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   const [messageBox, setMessageBox] = useState({ show: false, title: '', message: '' });
   const [showConsentPrompt, setShowConsentPrompt] = useState(false);
   const [consentRedirectTarget, setConsentRedirectTarget] = useState('');
+  const [referralPickerValue, setReferralPickerValue] = useState('');
   
 
   // General Doctor Algorithm recommendations
