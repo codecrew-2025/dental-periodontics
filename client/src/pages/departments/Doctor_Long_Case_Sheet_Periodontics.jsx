@@ -486,7 +486,7 @@ function Page10() {
   );
 }
 
-function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewSrc, setSignaturePreviewSrc, readOnly, appointmentDate, appointmentTime, setAppointmentDate, setAppointmentTime, patientEmail, appointmentMessage }) {
+function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewSrc, setSignaturePreviewSrc, readOnly, appointmentDate, appointmentTime, setAppointmentDate, setAppointmentTime, patientEmail, appointmentMessage, bookedSlots = {}, maxSlotsPerTime = 1 }) {
   function handleSignatureChange(e) {
     const file = e.target.files[0];
     if (file) {
@@ -581,7 +581,24 @@ function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewS
               id="appointmentDate"
               value={appointmentDate}
               min={new Date().toISOString().slice(0, 10)}
-              onChange={(e) => setAppointmentDate(e.target.value)}
+              onChange={(e) => {
+                const selected = e.target.value;
+                if (!selected) {
+                  setAppointmentDate('');
+                  setAppointmentTime('');
+                  return;
+                }
+                const dateObj = new Date(selected);
+                const day = dateObj.getDay();
+                if (day === 0 || day === 6) {
+                  alert("Weekend slots are not available. Please select a weekday.");
+                  setAppointmentDate('');
+                  setAppointmentTime('');
+                } else {
+                  setAppointmentDate(selected);
+                  setAppointmentTime('');
+                }
+              }}
               disabled={readOnly}
             />
           </div>
@@ -595,9 +612,14 @@ function Page11({ doctorName, setDoctorName, setSignatureFile, signaturePreviewS
               style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'white', color: '#111827' }}
             >
               <option value="">Select time</option>
-              {ALLOWED_APPOINTMENT_TIMES.map((time) => (
-                <option key={time} value={time}>{time}</option>
-              ))}
+              {ALLOWED_APPOINTMENT_TIMES.map((time) => {
+                const isBooked = (bookedSlots[time] || 0) >= maxSlotsPerTime;
+                return (
+                  <option key={time} value={time} disabled={isBooked}>
+                    {time} {isBooked ? '(Booked)' : ''}
+                  </option>
+                );
+              })}
             </select>
           </div>
           {patientEmail ? (
@@ -670,11 +692,19 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
   const [allergyMessage, setAllergyMessage] = useState('Loading allergies...');
   const [showAllergy, setShowAllergy] = useState(true);
   const [criticalCondition, setCriticalCondition] = useState('');
-  const [appointmentDate, setAppointmentDate] = useState(getTodayIso());
-  const [appointmentTime, setAppointmentTime] = useState('');
+  const [appointmentDate, setAppointmentDate] = useState(() => {
+    if (initialCaseData?.appointmentDate) return initialCaseData.appointmentDate;
+    return getTodayIso();
+  });
+  const [appointmentTime, setAppointmentTime] = useState(() => {
+    if (initialCaseData?.appointmentTime) return initialCaseData.appointmentTime;
+    return '';
+  });
   const [patientEmail, setPatientEmail] = useState('');
   const [appointmentMessage, setAppointmentMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookedSlots, setBookedSlots] = useState({});
+  const [maxSlotsPerTime, setMaxSlotsPerTime] = useState(1);
   const formRef = useRef(null);
 
   const fetchPatientEmail = async () => {
@@ -706,6 +736,31 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
     }, 50);
     return () => clearTimeout(timer);
   }, [readOnly, initialCaseData, currentPage]);
+
+  useEffect(() => {
+    if (!appointmentDate) {
+      setBookedSlots({});
+      return;
+    }
+    const fetchBookedSlots = async () => {
+      try {
+        const url = `${API_BASE_URL}/api/appointment/booked-slots/${encodeURIComponent(appointmentDate)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.success) {
+          setBookedSlots(data.bookedSlots || {});
+          setMaxSlotsPerTime(1); // Hardcoded to 1 as per user request
+        } else {
+          setBookedSlots({});
+          setMaxSlotsPerTime(1);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch booked slots', error);
+        setBookedSlots({});
+      }
+    };
+    fetchBookedSlots();
+  }, [appointmentDate]);
 
   const isFirstPage = currentPage === 0;
   const isLastPage = currentPage === TOTAL_PAGES - 1;
@@ -862,6 +917,8 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
         finalDiagnosis: formFields.final_diagnosis || formFields.provisional_diagnosis || '',
         digitalSignature: signaturePreviewSrc,
         caseType: 'long',
+        appointmentDate,
+        appointmentTime,
         // Appointment scheduling fields are handled separately below
         ...formFields,
       };
@@ -980,6 +1037,8 @@ export default function Digital_Doctor_Case_Sheet_Periodontics({ initialCaseData
       setAppointmentTime={setAppointmentTime}
       patientEmail={patientEmail}
       appointmentMessage={appointmentMessage}
+      bookedSlots={bookedSlots}
+      maxSlotsPerTime={maxSlotsPerTime}
     />,
   ];
 

@@ -84,8 +84,15 @@ const AssignUG = ({
       return;
     }
 
-    if ((!isEditMode && !staffId.trim()) || !ugName.trim() || !ugEmail.trim() || !departmentToSubmit) {
+    if ((!isEditMode && !staffId.trim()) || !ugName.trim() || !ugEmail.trim() || !departmentToSubmit || !ugPhone.trim()) {
       showMessage('Please fill in all required fields', 'error');
+      return;
+    }
+
+    // Validate phone number (10 digits)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(ugPhone.trim())) {
+      showMessage('Please enter a valid 10-digit phone number', 'error');
       return;
     }
 
@@ -251,13 +258,14 @@ const AssignUG = ({
               )}
 
               <div className="form-group">
-                <label htmlFor="ugPhone">Phone Number</label>
+                <label htmlFor="ugPhone">Phone Number *</label>
                 <input
                   type="tel"
                   id="ugPhone"
                   value={ugPhone}
                   onChange={(e) => setUGPhone(e.target.value)}
-                  placeholder="Enter Phone Number"
+                  placeholder="Enter 10-digit Phone Number"
+                  required
                   disabled={isLoading}
                 />
               </div>

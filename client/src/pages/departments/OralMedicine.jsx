@@ -101,11 +101,8 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
   const [messageBox, setMessageBox] = useState({ show: false, title: '', message: '' });
   const [showConsentPrompt, setShowConsentPrompt] = useState(false);
   const [consentRedirectTarget, setConsentRedirectTarget] = useState('');
-  const [referralPickerValue, setReferralPickerValue] = useState('');
-  const [deptAppointments, setDeptAppointments] = useState([]);
-  const [deptLoading, setDeptLoading] = useState(false);
-  const [deptError, setDeptError] = useState('');
   
+
   // General Doctor Algorithm recommendations
   const [clinicalIssues, setClinicalIssues] = useState([]);
   const [recommendedInvestigations, setRecommendedInvestigations] = useState([]);
@@ -330,41 +327,6 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
     if (shared?.dataUrl) setXrayPreview(prev => prev || shared.dataUrl);
   }, []); // end of Xray preview effect
 
-  // Fetch PG appointments for department view
-  const fetchDeptAppointments = async () => {
-    try {
-      setDeptLoading(true);
-      setDeptError('');
-      const token = localStorage.getItem('token');
-      const url = buildApiUrl('/api/appointment/pg-appointments');
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (res.status === 401) {
-        await ensureActiveSession(res, 'Token expired');
-        return;
-      }
-      const json = await res.json();
-      if (!res.ok || !json?.success) {
-        throw new Error(json?.message || 'Failed to load appointments');
-      }
-      setDeptAppointments(Array.isArray(json.appointments) ? json.appointments : []);
-    } catch (error) {
-      console.error('Failed to fetch PG appointments', error);
-      setDeptError(error.message || 'Failed to load appointments');
-      setDeptAppointments([]);
-    } finally {
-      setDeptLoading(false);
-    }
-  };
-
-  // Load PG appointments on component mount
-  useEffect(() => {
-    fetchDeptAppointments();
-  }, []);
 
 
   useEffect(() => { 
@@ -1197,10 +1159,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
         </div>
 
         <div className="omr-sheet">
-          {/* Department Appointments */}
-          {deptLoading && <p className="omr-loading">Loading appointments...</p>}
-          {deptError && <p className="omr-error">{deptError}</p>}
-          
+          {/* Department Appointments Removed */}
           
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
             <img src="/images/logo.png" alt="SRM Dental College Logo" style={{ maxWidth: 110, height: 'auto', marginBottom: 10 }} />

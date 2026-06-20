@@ -297,8 +297,8 @@ const DoctorSchedule = () => {
           <thead>
             <tr>
               <th>S.No</th>
-              <th>Patient Name</th>
               <th>Patient ID</th>
+              <th>Patient Name</th>
               <th>Email</th>
               <th>Date & Time</th>
               <th>Complaint</th>
@@ -319,14 +319,15 @@ const DoctorSchedule = () => {
             {appointments.map((a, i) => (
               <tr key={a.bookingId}>
                 <td>{i + 1}</td>
-                <td>{a.patientName}</td>
                 <td>{a.patientId}</td>
+                <td>{a.patientName}</td>
                 <td>{a.patientEmail || "-"}</td>
 
                 {/* ✅ DATE & TIME — CLEAN ALIGNMENT */}
-                <td className="date-time-cell">
-                  <div className="date-line">{a.appointmentDate || "-"}</div>
-                  <div className="time-line">{a.appointmentTime || "-"}</div>
+                <td className="date-time-cell" style={{ whiteSpace: "nowrap" }}>
+                  <span className="date-line">{a.appointmentDate || "-"}</span>
+                  <span style={{ margin: "0 6px" }}></span>
+                  <span className="time-line">{a.appointmentTime || "-"}</span>
                 </td>
 
                 <td>

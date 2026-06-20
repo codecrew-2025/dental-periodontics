@@ -40,10 +40,18 @@ const App = ({ initialCaseData, readOnly = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allergyMessage, setAllergyMessage] = useState('Loading allergies...');
   const [showAllergy, setShowAllergy] = useState(true);
-  const [appointmentDate, setAppointmentDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [appointmentTime, setAppointmentTime] = useState('');
+  const [appointmentDate, setAppointmentDate] = useState(() => {
+    if (initialCaseData?.appointmentDate) return initialCaseData.appointmentDate;
+    return new Date().toISOString().slice(0, 10);
+  });
+  const [appointmentTime, setAppointmentTime] = useState(() => {
+    if (initialCaseData?.appointmentTime) return initialCaseData.appointmentTime;
+    return '';
+  });
   const [patientEmail, setPatientEmail] = useState('');
   const [criticalCondition, setCriticalCondition] = useState('');
+  const [bookedSlots, setBookedSlots] = useState({});
+  const [maxSlotsPerTime, setMaxSlotsPerTime] = useState(1);
 
   const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -157,6 +165,31 @@ const App = ({ initialCaseData, readOnly = false }) => {
     return () => { isMounted = false; };
   }, [patientId]);
 
+  useEffect(() => {
+    if (!appointmentDate) {
+      setBookedSlots({});
+      return;
+    }
+    const fetchBookedSlots = async () => {
+      try {
+        const url = `${API_BASE_URL}/api/appointment/booked-slots/${encodeURIComponent(appointmentDate)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.success) {
+          setBookedSlots(data.bookedSlots || {});
+          setMaxSlotsPerTime(1); // Hardcoded to 1 as per user request
+        } else {
+          setBookedSlots({});
+          setMaxSlotsPerTime(1);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch booked slots', error);
+        setBookedSlots({});
+      }
+    };
+    fetchBookedSlots();
+  }, [appointmentDate]);
+
   const checkRequiredFields = (nameVal, fileVal) => {
     const n = nameVal !== undefined ? nameVal : doctorName;
     const f = fileVal !== undefined ? fileVal : signatureFile;
@@ -251,6 +284,8 @@ const App = ({ initialCaseData, readOnly = false }) => {
         finalDiagnosis: 'Pending doctor approval',
         digitalSignature: signaturePreviewSrc,
         caseType: 'short',
+        appointmentDate,
+        appointmentTime,
         doctorId,
         doctorName
       };
@@ -956,7 +991,24 @@ const App = ({ initialCaseData, readOnly = false }) => {
                         id="appointmentDate"
                         value={appointmentDate}
                         min={getTodayIso()}
-                        onChange={(e) => setAppointmentDate(e.target.value)}
+                        onChange={(e) => {
+                          const selected = e.target.value;
+                          if (!selected) {
+                            setAppointmentDate('');
+                            setAppointmentTime('');
+                            return;
+                          }
+                          const dateObj = new Date(selected);
+                          const day = dateObj.getDay();
+                          if (day === 0 || day === 6) {
+                            alert("Weekend slots are not available. Please select a weekday.");
+                            setAppointmentDate('');
+                            setAppointmentTime('');
+                          } else {
+                            setAppointmentDate(selected);
+                            setAppointmentTime('');
+                          }
+                        }}
                         disabled={readOnly}
                         style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
                       />
@@ -971,9 +1023,14 @@ const App = ({ initialCaseData, readOnly = false }) => {
                         style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ccc' }}
                       >
                         <option value="">Select time</option>
-                        {ALLOWED_APPOINTMENT_TIMES.map((time) => (
-                          <option key={time} value={time}>{time}</option>
-                        ))}
+                        {ALLOWED_APPOINTMENT_TIMES.map((time) => {
+                          const isBooked = (bookedSlots[time] || 0) >= maxSlotsPerTime;
+                          return (
+                            <option key={time} value={time} disabled={isBooked}>
+                              {time} {isBooked ? '(Booked)' : ''}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                     {patientEmail ? (

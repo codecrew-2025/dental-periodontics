@@ -123,16 +123,16 @@
   width: 125px;
 }
 
-/* Column 3: Patient Name */
+/* Column 3: Patient ID */
 .appointments-table td:nth-child(3),
 .appointments-table th:nth-child(3) {
-  width: 150px;
+  width: 100px;
 }
 
-/* Column 4: Patient ID */
+/* Column 4: Patient Name */
 .appointments-table td:nth-child(4),
 .appointments-table th:nth-child(4) {
-  width: 100px;
+  width: 150px;
 }
 
 /* Column 5: Email */

@@ -69,8 +69,15 @@ const AssignDoctor = ({
     }
 
     // Validate required fields
-    if ((!isEditMode && !staffId.trim()) || !doctorName.trim() || !doctorEmail.trim() || !departmentToSubmit) {
+    if ((!isEditMode && !staffId.trim()) || !doctorName.trim() || !doctorEmail.trim() || !departmentToSubmit || !doctorPhone.trim()) {
       showMessage('Please fill in all required fields', 'error');
+      return;
+    }
+
+    // Validate phone number (10 digits)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(doctorPhone.trim())) {
+      showMessage('Please enter a valid 10-digit phone number', 'error');
       return;
     }
 
@@ -296,13 +303,14 @@ const AssignDoctor = ({
               )}
 
               <div className="form-group">
-                <label htmlFor="doctorPhone">Phone Number</label>
+                <label htmlFor="doctorPhone">Phone Number *</label>
                 <input
                   type="tel"
                   id="doctorPhone"
                   value={doctorPhone}
                   onChange={(e) => setDoctorPhone(e.target.value)}
-                  placeholder="Enter Phone Number"
+                  placeholder="Enter 10-digit Phone Number"
+                  required
                   disabled={isLoading}
                 />
               </div>

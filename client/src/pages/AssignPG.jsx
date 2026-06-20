@@ -84,8 +84,15 @@ const AssignPG = ({
     }
 
     // Validate required fields
-    if ((!isEditMode && !staffId.trim()) || !pgName.trim() || !pgEmail.trim() || !departmentToSubmit) {
+    if ((!isEditMode && !staffId.trim()) || !pgName.trim() || !pgEmail.trim() || !departmentToSubmit || !pgPhone.trim()) {
       showMessage('Please fill in all required fields', 'error');
+      return;
+    }
+
+    // Validate phone number (10 digits)
+    const phoneRegex = /^[0-9]{10}$/;
+    if (!phoneRegex.test(pgPhone.trim())) {
+      showMessage('Please enter a valid 10-digit phone number', 'error');
       return;
     }
 
@@ -276,13 +283,14 @@ const AssignPG = ({
               )}
 
               <div className="form-group">
-                <label htmlFor="pgPhone">Phone Number</label>
+                <label htmlFor="pgPhone">Phone Number *</label>
                 <input
                   type="tel"
                   id="pgPhone"
                   value={pgPhone}
                   onChange={(e) => setPGPhone(e.target.value)}
-                  placeholder="Enter Phone Number"
+                  placeholder="Enter 10-digit Phone Number"
+                  required
                   disabled={isLoading}
                 />
               </div>

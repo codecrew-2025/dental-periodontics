@@ -183,6 +183,7 @@ const DoctorDashboard = () => {
   const [doctorPgAnalyticsReport, setDoctorPgAnalyticsReport] = useState(null);
   const [doctorPgAnalyticsLoading, setDoctorPgAnalyticsLoading] = useState(false);
   const [doctorPgAnalyticsError, setDoctorPgAnalyticsError] = useState('');
+  const [reportStudentSearch, setReportStudentSearch] = useState('');
 
   // Case Management State
   const [cases, setCases] = useState([]);
@@ -570,6 +571,7 @@ const DoctorDashboard = () => {
     doctorDepartmentKey.includes('publichealthdentistry') ||
     doctorDepartmentKey.includes('publichealth') ||
     doctorDepartmentKey.includes('communitydentistry');
+  const isCampPatient = patientIdForCheck.toLowerCase().startsWith('c');
   const currentRoleKey = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
   const isSpecialistDoctor = Boolean(
     doctorDepartmentKey && doctorDepartmentKey !== 'general' && doctorDepartmentKey !== 'generaldentistry'
@@ -908,6 +910,10 @@ const DoctorDashboard = () => {
   };
   //validate
   const validateForm = () => {
+    if (isCampPatient) {
+      setFieldErrors({});
+      return true;
+    }
     const errors = {};
     const requiredFields = isPublicHealthDentistry
       ? {
@@ -994,6 +1000,16 @@ const DoctorDashboard = () => {
 
     if (!enteredId) {
       showMessage('Please enter the Patient ID registered in Admin Patient Registration.', 'error');
+      return;
+    }
+
+    if (enteredId.toLowerCase().startsWith('c')) {
+      setGeneratedUserId(enteredId);
+      setShowUserIdDisplay(true);
+      setShowForm(true);
+      setStoredPatientId(enteredId);
+      setCanNavigateCases(true);
+      showMessage(`Camp Patient verified locally: ${enteredId}`, 'success');
       return;
     }
 
@@ -2990,7 +3006,7 @@ const DoctorDashboard = () => {
           {activeView === 'reports' && (
             <section className="chief-section-card">
               <div className="chief-section-header-row">
-                <h2>Assigned Students Reports</h2>
+                <h2>Assigned Doctors Reports</h2>
                 <div className="chief-analytics-actions">
                   <button
                     type="button"
@@ -3031,6 +3047,17 @@ const DoctorDashboard = () => {
                     onChange={(e) => setAnalyticsToDate(e.target.value)}
                   />
                 </div>
+
+                <div className="chief-analytics-control">
+                  <label>Doctor Name</label>
+                  <input
+                    className="chief-select"
+                    type="text"
+                    placeholder="Search by doctor name..."
+                    value={reportStudentSearch}
+                    onChange={(e) => setReportStudentSearch(e.target.value)}
+                  />
+                </div>
               </div>
 
               {doctorPgAnalyticsError && <div className="error-message">{doctorPgAnalyticsError}</div>}
@@ -3040,173 +3067,192 @@ const DoctorDashboard = () => {
               ) : !doctorPgAnalyticsReport || !Array.isArray(doctorPgAnalyticsReport.pgs) ? (
                 <div className="chief-empty-state">Select a date range and click View.</div>
               ) : doctorPgAnalyticsReport.pgs.length === 0 ? (
-                <div className="chief-empty-state">No report data available for assigned students.</div>
-              ) : (
-                <>
-                  <div className="chief-summary-grid" style={{ marginBottom: 16 }}>
-                    <div className="chief-summary-card">
-                      <h3>PGs</h3>
-                      <p>{doctorPgAnalyticsReport.assignedPGCount || 0}</p>
-                    </div>
-                    <div className="chief-summary-card">
-                      <h3>UGs</h3>
-                      <p>{doctorPgAnalyticsReport.assignedUGCount ?? assignedUGs.length}</p>
-                    </div>
-                    <div className="chief-summary-card">
-                      <h3>Total Patients</h3>
-                      <p>{doctorPgAnalyticsReport.totals?.uniquePatients || 0}</p>
-                    </div>
-                    <div className="chief-summary-card">
-                      <h3>Approved</h3>
-                      <p>{doctorPgAnalyticsReport.totals?.approvalCounts?.approved || 0}</p>
-                    </div>
-                    <div className="chief-summary-card">
-                      <h3>Redo</h3>
-                      <p>{doctorPgAnalyticsReport.totals?.approvalCounts?.rejected || 0}</p>
-                    </div>
-                  </div>
+                <div className="chief-empty-state">No report data available for assigned doctors.</div>
+              ) : (() => {
+                  const search = reportStudentSearch.toLowerCase().trim();
+                  const filteredPgs = doctorPgAnalyticsReport.pgs.filter((row) => {
+                    if (!search) return true;
+                    return (
+                      (row.name || '').toLowerCase().includes(search) ||
+                      (row.pgName || '').toLowerCase().includes(search) ||
+                      (row.identity || '').toLowerCase().includes(search) ||
+                      (row.pgIdentity || '').toLowerCase().includes(search)
+                    );
+                  });
 
-                  <div className="chief-analytics-charts">
-                    {/* Patients by PG Pie Chart */}
-                    <div className="chief-chart-container">
-                      <h3>Patients Distribution by Student</h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={doctorPgAnalyticsReport.pgs.map((d) => ({
-                              name: d.pgName || d.pgIdentity,
-                              value: d.uniquePatients || 0,
-                            }))}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            label={(entry) => `${entry.name}: ${entry.value}`}
-                          >
-                            {doctorPgAnalyticsReport.pgs.map((_, index) => (
-                              <Cell key={`cell-${index}`} fill={`hsl(${index * 137.5}, 70%, 50%)`} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
+                  // Calculate filtered totals
+                  const filteredPGCount = filteredPgs.filter(row => row.role === 'pg').length;
+                  const filteredUGCount = filteredPgs.filter(row => row.role === 'ug').length;
+                  const filteredTotalPatients = filteredPgs.reduce((sum, d) => sum + (d.uniquePatients || 0), 0);
+                  const filteredApproved = filteredPgs.reduce((sum, d) => sum + (d.approvalCounts?.approved || 0), 0);
+                  const filteredRedo = filteredPgs.reduce((sum, d) => sum + (d.approvalCounts?.rejected || 0), 0);
+                  const filteredMale = filteredPgs.reduce((sum, d) => sum + (d.malePatients || 0), 0);
+                  const filteredFemale = filteredPgs.reduce((sum, d) => sum + (d.femalePatients || 0), 0);
+                  const filteredNew = filteredPgs.reduce((sum, d) => sum + (d.newPatients || 0), 0);
+                  const filteredOld = filteredPgs.reduce((sum, d) => sum + (d.oldPatients || 0), 0);
 
-                    {/* Gender Distribution Pie Chart */}
-                    <div className="chief-chart-container">
-                      <h3>Gender Distribution</h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={[
-                              {
-                                name: 'Male',
-                                value: doctorPgAnalyticsReport.pgs.reduce(
-                                  (sum, d) => sum + (d.malePatients || 0),
-                                  0
-                                ),
-                              },
-                              {
-                                name: 'Female',
-                                value: doctorPgAnalyticsReport.pgs.reduce(
-                                  (sum, d) => sum + (d.femalePatients || 0),
-                                  0
-                                ),
-                              },
-                            ]}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            label={(entry) => `${entry.name}: ${entry.value}`}
-                          >
-                            <Cell fill="#3b82f6" />
-                            <Cell fill="#ec4899" />
-                          </Pie>
-                          <Tooltip />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
+                  return (
+                    <>
+                      <div className="chief-summary-grid" style={{ marginBottom: 16 }}>
+                        <div className="chief-summary-card">
+                          <h3>PGs</h3>
+                          <p>{filteredPGCount}</p>
+                        </div>
+                        <div className="chief-summary-card">
+                          <h3>UGs</h3>
+                          <p>{filteredUGCount}</p>
+                        </div>
+                        <div className="chief-summary-card">
+                          <h3>Total Patients</h3>
+                          <p>{filteredTotalPatients}</p>
+                        </div>
+                        <div className="chief-summary-card">
+                          <h3>Approved</h3>
+                          <p>{filteredApproved}</p>
+                        </div>
+                        <div className="chief-summary-card">
+                          <h3>Redo</h3>
+                          <p>{filteredRedo}</p>
+                        </div>
+                      </div>
 
-                    {/* New vs Old Patients Pie Chart */}
-                    <div className="chief-chart-container">
-                      <h3>Old vs New Patients</h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={[
-                              {
-                                name: 'New Patients',
-                                value: doctorPgAnalyticsReport.pgs.reduce(
-                                  (sum, d) => sum + (d.newPatients || 0),
-                                  0
-                                ),
-                              },
-                              {
-                                name: 'Old Patients',
-                                value: doctorPgAnalyticsReport.pgs.reduce(
-                                  (sum, d) => sum + (d.oldPatients || 0),
-                                  0
-                                ),
-                              },
-                            ]}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            outerRadius={80}
-                            label={(entry) => `${entry.name}: ${entry.value}`}
-                          >
-                            <Cell fill="#10b981" />
-                            <Cell fill="#f59e0b" />
-                          </Pie>
-                          <Tooltip />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
+                      <div className="chief-analytics-charts">
+                        {/* Patients by PG Pie Chart */}
+                        <div className="chief-chart-container">
+                          <h3>Patients Distribution</h3>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={filteredPgs.map((d) => ({
+                                  name: d.pgName || d.pgIdentity,
+                                  value: d.uniquePatients || 0,
+                                }))}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={(entry) => `${entry.name}: ${entry.value}`}
+                              >
+                                {filteredPgs.map((_, index) => (
+                                  <Cell key={`cell-${index}`} fill={`hsl(${index * 137.5}, 70%, 50%)`} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
 
-                  <table className="chief-simple-table" style={{ marginTop: 16 }}>
-                    <thead>
-                      <tr>
-                        <th>S.No</th>
-                        <th>Student</th>
-                        <th>Patients</th>
-                        <th>Male</th>
-                        <th>Female</th>
-                        <th>New</th>
-                        <th>Old</th>
-                        <th>Case Sheets</th>
-                        <th>Approved</th>
-                        <th>Redo</th>
-                        <th>Pending</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {doctorPgAnalyticsReport.pgs.map((row, index) => (
-                        <tr key={row.pgIdentity}>
-                          <td>{index + 1}</td>
-                          <td>{row.pgName || row.pgIdentity}</td>
-                          <td>{row.uniquePatients || 0}</td>
-                          <td>{row.malePatients || 0}</td>
-                          <td>{row.femalePatients || 0}</td>
-                          <td>{row.newPatients || 0}</td>
-                          <td>{row.oldPatients || 0}</td>
-                          <td>{row.totalCaseSheets || 0}</td>
-                          <td>{row.approvalCounts?.approved || 0}</td>
-                          <td>{row.approvalCounts?.rejected || 0}</td>
-                          <td>{row.approvalCounts?.pending || 0}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </>
-              )}
+                        {/* Gender Distribution Pie Chart */}
+                        <div className="chief-chart-container">
+                          <h3>Gender Distribution</h3>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={[
+                                  { name: 'Male', value: filteredMale },
+                                  { name: 'Female', value: filteredFemale },
+                                ]}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={(entry) => `${entry.name}: ${entry.value}`}
+                              >
+                                <Cell fill="#3b82f6" />
+                                <Cell fill="#ec4899" />
+                              </Pie>
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        {/* New vs Old Patients Pie Chart */}
+                        <div className="chief-chart-container">
+                          <h3>Old vs New Patients</h3>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={[
+                                  { name: 'New Patients', value: filteredNew },
+                                  { name: 'Old Patients', value: filteredOld },
+                                ]}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                                label={(entry) => `${entry.name}: ${entry.value}`}
+                              >
+                                <Cell fill="#10b981" />
+                                <Cell fill="#f59e0b" />
+                              </Pie>
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      <table className="chief-simple-table" style={{ marginTop: 16 }}>
+                        <thead>
+                          <tr>
+                            <th>S.No</th>
+                            <th>Doctor Name</th>
+                            <th>Patients</th>
+                            <th>Male</th>
+                            <th>Female</th>
+                            <th>New</th>
+                            <th>Old</th>
+                            <th>Case Sheets</th>
+                            <th>Approved</th>
+                            <th>Redo</th>
+                            <th>Pending</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredPgs.map((row, index) => (
+                            <tr key={row.pgIdentity}>
+                              <td>{index + 1}</td>
+                              <td>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                  {row.pgName || row.pgIdentity}
+                                  {row.role && (
+                                    <span style={{
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      padding: '2px 7px',
+                                      borderRadius: '4px',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: '0.5px',
+                                      background: row.role === 'pg' ? '#e0edff' : '#e6f9f0',
+                                      color: row.role === 'pg' ? '#1a5ccc' : '#1a7f50',
+                                      border: row.role === 'pg' ? '1px solid #b3d0ff' : '1px solid #a3dfc0',
+                                    }}>
+                                      {row.role.toUpperCase()}
+                                    </span>
+                                  )}
+                                </span>
+                              </td>
+                              <td>{row.uniquePatients || 0}</td>
+                              <td>{row.malePatients || 0}</td>
+                              <td>{row.femalePatients || 0}</td>
+                              <td>{row.newPatients || 0}</td>
+                              <td>{row.oldPatients || 0}</td>
+                              <td>{row.totalCaseSheets || 0}</td>
+                              <td>{row.approvalCounts?.approved || 0}</td>
+                              <td>{row.approvalCounts?.rejected || 0}</td>
+                              <td>{row.approvalCounts?.pending || 0}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  );
+                })()}
             </section>
           )}
 
@@ -3648,7 +3694,9 @@ const DoctorDashboard = () => {
               {/* Form Section */}
               {showForm && (
                 <div className="patient-form">
-                  <h3>Personal Information</h3>
+                  {!isCampPatient && (
+                    <>
+                      <h3>Personal Information</h3>
 
                   {/* Name fields */}
                   <div className="form-row">
@@ -4089,16 +4137,20 @@ const DoctorDashboard = () => {
                       />
                     </div>
                   </div>
+                    </>
+                  )}
 
                   {/* Navigation buttons */}
                   <div className="form-actions">
-                    <button
-                      className="save-btn"
-                      onClick={handleSavePatient}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? '...Saved...' : 'Save Patient Details'}
-                    </button>
+                    {!isCampPatient && (
+                      <button
+                        className="save-btn"
+                        onClick={handleSavePatient}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? '...Saved...' : 'Save Patient Details'}
+                      </button>
+                    )}
                     <button
                       className="case-files-btn"
                       onClick={goToDepartmentCaseSheet}

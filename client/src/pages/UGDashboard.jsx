@@ -1604,7 +1604,7 @@ const UGDashboard = () => {
       normalizedDept.includes('publichealth') ||
       normalizedDept.includes('communitydentistry');
 
-    if (currentPatientId.toLowerCase().startsWith('c') && normalizedDept === 'periodontics') {
+    if (currentPatientId.toLowerCase().startsWith('c') && normalizedDept.includes('periodont')) {
       window.open(`/camp-periodontics-case-sheet?patientId=${encodeURIComponent(currentPatientId)}&new=true`, '_blank', 'noopener,noreferrer');
       return;
     }
@@ -1842,17 +1842,21 @@ const UGDashboard = () => {
   //validate
   const validateForm = () => {
     const errors = {};
+    const isCampPatient = String(formData.uniqueId || '').trim().toLowerCase().startsWith('c');
 
-    // PHD doctors have a simpler, camp-focused form
-    const requiredFields = isPublicHealthDentistry
-      ? {
+    let requiredFields;
+    if (isCampPatient) {
+      requiredFields = {};
+    } else if (isPublicHealthDentistry) {
+      requiredFields = {
           firstName: 'First Name',
           dob: 'Date of Birth',
           gender: 'Gender',
           diagnosis: 'Diagnosis',
           treatmentPlan: 'Treatment Plan',
-        }
-      : {
+        };
+    } else {
+      requiredFields = {
           firstName: 'First Name',
           lastName: 'Last Name',
           dob: 'Date of Birth',
@@ -1862,6 +1866,7 @@ const UGDashboard = () => {
           chiefComplaint: 'Chief Complaint',
           bloodGroup: 'Blood Group',
         };
+    }
 
     for (const [field, label] of Object.entries(requiredFields)) {
       if (!formData[field] || formData[field].trim() === '') {
@@ -1870,12 +1875,12 @@ const UGDashboard = () => {
     }
 
     // Non-PHD only: preferred language "Other" must be specified
-    if (!isPublicHealthDentistry && formData.preferredLanguage === 'Other' && (!formData.otherLanguage || formData.otherLanguage.trim() === '')) {
+    if (!isPublicHealthDentistry && !isCampPatient && formData.preferredLanguage === 'Other' && (!formData.otherLanguage || formData.otherLanguage.trim() === '')) {
       errors.otherLanguage = 'This field must be filled';
     }
 
     // Non-PHD only: pregnancy status when applicable
-    if (!isPublicHealthDentistry) {
+    if (!isPublicHealthDentistry && !isCampPatient) {
       const showPregnancyStatus = formData.gender === 'Female' && formData.maritalStatus === 'Married';
       if (showPregnancyStatus && (!formData.pregnancyStatus || formData.pregnancyStatus.trim() === '')) {
         errors.pregnancyStatus = 'This field must be filled';
@@ -1918,6 +1923,15 @@ const UGDashboard = () => {
 
     if (!enteredId) {
       showMessage('Please enter the Patient ID registered in Admin Patient Registration.', 'error');
+      return;
+    }
+
+    if (enteredId.toLowerCase().startsWith('c')) {
+      setGeneratedUserId(enteredId);
+      setShowUserIdDisplay(true);
+      setShowForm(true);
+      setCanNavigateCases(true);
+      showMessage(`Camp Patient ID verified locally: ${enteredId}`, 'success');
       return;
     }
 
@@ -2505,7 +2519,9 @@ const UGDashboard = () => {
                 {/* Form Section */}
                 {showForm && (
                   <div className="patient-form">
-                    <h3>Personal Information</h3>
+                    {!String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
+                      <>
+                        <h3>Personal Information</h3>
 
                     {/* Name fields */}
                     <div className="form-row">
@@ -2780,12 +2796,16 @@ const UGDashboard = () => {
                     </div>
                     </>
                     )}
+                    </>
+                    )}
 
                     {/* Navigation buttons */}
                     <div className="form-actions">
-                      <button className="save-btn" onClick={handleSavePatient} disabled={isLoading}>
-                        {isLoading ? '...Saving...' : 'Save Patient Details'}
-                      </button>
+                      {!String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
+                        <button className="save-btn" onClick={handleSavePatient} disabled={isLoading}>
+                          {isLoading ? '...Saving...' : 'Save Patient Details'}
+                        </button>
+                      )}
                       <button
                         className="case-files-btn"
                         onClick={openAssignedCaseRoute}
