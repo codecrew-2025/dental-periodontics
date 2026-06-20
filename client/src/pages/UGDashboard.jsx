@@ -2884,7 +2884,8 @@ const UGDashboard = () => {
                           onClick={() => {
                             if (formData.uniqueId) {
                               localStorage.setItem('CurrentpatientId', formData.uniqueId);
-                              localStorage.setItem('CurrentpatientName', `${formData.firstName} ${formData.lastName}`.trim());
+                              const pName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || 'Patient';
+                              localStorage.setItem('CurrentpatientName', pName);
                               window.open('/case-history', '_blank');
                             }
                           }}

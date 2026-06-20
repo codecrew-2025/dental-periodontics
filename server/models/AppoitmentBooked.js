@@ -191,7 +191,7 @@ const appointmentSchema = new mongoose.Schema(
         default: 0,
       },
     },
-    
+
     needsGeneralApproval: {
       type: Boolean,
       default: false,

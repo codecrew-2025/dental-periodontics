@@ -196,13 +196,15 @@ const CaseHistory = () => {
         {error && (
           <div className="error-message">
             {error}
-            <button
-              onClick={() =>
-                fetchDoctorPatientCases(patientInfo.id, user?.id)
-              }
-            >
-              Retry
-            </button>
+            {patientInfo && (
+              <button
+                onClick={() =>
+                  fetchDoctorPatientCases(patientInfo.id, user?.id)
+                }
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
 
