@@ -723,6 +723,45 @@ const PGDashboard = ({ brandTitleOverride }) => {
     return bookedCount < maxSlotsPerTime;
   };
 
+  const acceptPatientRescheduleRequest = async (appointment) => {
+    const resolvedBookingId = String(appointment?.bookingId || '').trim();
+    if (!resolvedBookingId) return;
+
+    try {
+      setRescheduleSubmittingBookingId(resolvedBookingId);
+      const token = localStorage.getItem('token');
+      const res = await fetch(buildApiUrl('/api/appointment/pg-reschedule-action'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          appointmentId: resolvedBookingId,
+          action: 'accept',
+        }),
+      });
+
+      if (res.status === 401) {
+        await ensureActiveSession(res, 'Token expired');
+        return;
+      }
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.message || 'Failed to accept patient reschedule request');
+      }
+
+      showMessage('Patient reschedule request accepted.', 'success');
+      fetchPgAppointments();
+    } catch (error) {
+      console.error('Accept patient reschedule failed', error);
+      showMessage(error.message || 'Failed to accept request', 'error');
+    } finally {
+      setRescheduleSubmittingBookingId('');
+    }
+  };
+
   const submitRescheduleForBooking = async (bookingId) => {
     const resolvedBookingId = String(bookingId || '').trim();
     if (!resolvedBookingId) return;
@@ -3090,7 +3129,8 @@ const PGDashboard = ({ brandTitleOverride }) => {
                           const actionableStatuses = ['pending', 'assigned', 'confirmed', 'in_progress', 'rescheduled'];
                           const isActionable = actionableStatuses.includes(appointmentStatus);
                           const isAccepted = ['assigned', 'confirmed', 'in_progress'].includes(appointmentStatus);
-                          const canApproveAppointment = ['pending', 'rescheduled'].includes(appointmentStatus);
+                          const isPatientRescheduleRequested = appointmentStatus === 'patient_reschedule_requested';
+                          const canApproveAppointment = ['pending', 'rescheduled', 'patient_reschedule_requested'].includes(appointmentStatus);
                           const canRescheduleAppointment = !['rejected', 'cancelled', 'completed', 'closed'].includes(appointmentStatus);
 
                           return (
@@ -3158,7 +3198,13 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                       <button
                                         type="button"
                                         className="view-button"
-                                        onClick={() => approveAppointment(appointment)}
+                                        onClick={() => {
+                                          if (isPatientRescheduleRequested) {
+                                            acceptPatientRescheduleRequest(appointment);
+                                          } else {
+                                            approveAppointment(appointment);
+                                          }
+                                        }}
                                         disabled={isSubmitting}
                                         style={{
                                           background: '#2f855a',
@@ -3175,6 +3221,21 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                         Accept
                                       </button>
                                     ) : null}
+
+                                    {/* Show distinct badge for patient reschedule requests */}
+                                    {isPatientRescheduleRequested && (
+                                      <span style={{ 
+                                        background: '#d69e2e', 
+                                        color: '#fff', 
+                                        borderRadius: '12px', 
+                                        padding: '4px 10px', 
+                                        fontSize: '12px', 
+                                        fontWeight: 600,
+                                        display: 'inline-block'
+                                      }}>
+                                        Patient Requested Reschedule
+                                      </span>
+                                    )}
 
                                     <button
                                       type="button"

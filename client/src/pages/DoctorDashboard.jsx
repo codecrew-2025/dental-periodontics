@@ -1457,13 +1457,27 @@ const DoctorDashboard = () => {
     }
   };
 
-  const handleApproveReschedule = async (bookingId) => {
+  const handleApproveReschedule = async (appointment) => {
+    const bookingId = appointment?.bookingId;
+    if (!bookingId) return;
     try {
       setRescheduleActionLoadingId(bookingId);
       const token = user?.token || localStorage.getItem('token');
-      const res = await fetch(buildApiUrl(`/api/appointment/${encodeURIComponent(bookingId)}/reschedule/approve`), {
-        method: 'PUT',
+      
+      let url = buildApiUrl(`/api/appointment/${encodeURIComponent(bookingId)}/reschedule/approve`);
+      let method = 'PUT';
+      let body = null;
+
+      if (appointment?.status === 'pg_counter_reschedule_pending_doc') {
+        url = buildApiUrl('/api/appointment/doc-confirm-reschedule');
+        method = 'POST';
+        body = JSON.stringify({ appointmentId: appointment._id || bookingId, action: 'approve' });
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        ...(body && { body }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.success) throw new Error(json?.message || 'Failed to approve');
@@ -1484,10 +1498,23 @@ const DoctorDashboard = () => {
     try {
       setRescheduleActionLoadingId(bookingId);
       const token = user?.token || localStorage.getItem('token');
-      const res = await fetch(buildApiUrl(`/api/appointment/${encodeURIComponent(bookingId)}/reschedule/reject`), {
-        method: 'PUT',
+      
+      const appointment = rescheduleRequests.find(req => req.bookingId === bookingId);
+      
+      let url = buildApiUrl(`/api/appointment/${encodeURIComponent(bookingId)}/reschedule/reject`);
+      let method = 'PUT';
+      let body = JSON.stringify({ reason: rejectReasonText });
+
+      if (appointment?.status === 'pg_counter_reschedule_pending_doc') {
+        url = buildApiUrl('/api/appointment/doc-confirm-reschedule');
+        method = 'POST';
+        body = JSON.stringify({ appointmentId: appointment._id || bookingId, action: 'reject', reason: rejectReasonText });
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: rejectReasonText }),
+        body,
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json?.success) throw new Error(json?.message || 'Failed to reject');
@@ -2840,13 +2867,13 @@ const DoctorDashboard = () => {
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
-                                <button
-                                  type="button"
-                                  title="Approve"
-                                  disabled={isActing}
-                                  onClick={() => handleApproveReschedule(req.bookingId)}
-                                  style={{ background: '#38a169', color: '#fff', border: 'none', borderRadius: '50%', width: '32px', height: '32px', fontSize: '16px', cursor: isActing ? 'not-allowed' : 'pointer', opacity: isActing ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                                >
+                                  <button
+                                    type="button"
+                                    title="Approve"
+                                    disabled={isActing}
+                                    onClick={() => handleApproveReschedule(req)}
+                                    style={{ background: '#38a169', color: '#fff', border: 'none', borderRadius: '50%', width: '32px', height: '32px', fontSize: '16px', cursor: isActing ? 'not-allowed' : 'pointer', opacity: isActing ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                  >
                                   ✓
                                 </button>
                                 <button

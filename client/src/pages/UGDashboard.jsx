@@ -726,9 +726,54 @@ const UGDashboard = () => {
     return bookedCount < maxSlotsPerTime;
   };
 
+  const acceptPatientRescheduleRequest = async (appointment) => {
+    const resolvedBookingId = String(appointment?.bookingId || '').trim();
+    if (!resolvedBookingId) return;
+
+    try {
+      setRescheduleSubmittingBookingId(resolvedBookingId);
+      const token = localStorage.getItem('token');
+      const res = await fetch(buildApiUrl('/api/appointment/pg-reschedule-action'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          appointmentId: resolvedBookingId,
+          action: 'accept',
+        }),
+      });
+
+      if (res.status === 401) {
+        await ensureActiveSession(res, 'Token expired');
+        return;
+      }
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.success) {
+        throw new Error(json?.message || 'Failed to accept patient reschedule request');
+      }
+
+      showMessage('Patient reschedule request accepted.', 'success');
+      fetchPgAppointments();
+    } catch (error) {
+      console.error('Accept patient reschedule failed', error);
+      showMessage(error.message || 'Failed to accept request', 'error');
+    } finally {
+      setRescheduleSubmittingBookingId('');
+    }
+  };
+
   const submitRescheduleForBooking = async (bookingId) => {
     const resolvedBookingId = String(bookingId || '').trim();
     if (!resolvedBookingId) return;
+    
+    // Find the appointment to check its status
+    const appointment = myUpcomingAppointments.find(
+      (a) => String(a.bookingId || '').trim() === resolvedBookingId
+    );
+    const appointmentStatus = String(appointment?.status || '').trim().toLowerCase();
     
     // Use calendar-based selection
     const appointmentDate = rescheduleSelectedDate;
@@ -742,13 +787,30 @@ const UGDashboard = () => {
     try {
       setRescheduleSubmittingBookingId(resolvedBookingId);
       const token = localStorage.getItem('token');
-      const res = await fetch(buildApiUrl(`/api/appointment/${encodeURIComponent(resolvedBookingId)}/reschedule`), {
-        method: 'PUT',
+      
+      let url = buildApiUrl(`/api/appointment/${encodeURIComponent(resolvedBookingId)}/reschedule`);
+      let method = 'PUT';
+      let body = { appointmentDate, appointmentTime };
+
+      // If the patient requested a reschedule, the PG is making a counter-proposal
+      if (appointmentStatus === 'patient_reschedule_requested') {
+        url = buildApiUrl('/api/appointment/pg-reschedule-action');
+        method = 'POST';
+        body = {
+          appointmentId: resolvedBookingId,
+          action: 'counter',
+          proposedDate: appointmentDate,
+          proposedTime: appointmentTime,
+        };
+      }
+
+      const res = await fetch(url, {
+        method,
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ appointmentDate, appointmentTime }),
+        body: JSON.stringify(body),
       });
 
       if (res.status === 401) {
@@ -3129,10 +3191,11 @@ const UGDashboard = () => {
                           const hasPendingReschedule = rescheduleReqStatus === 'pending';
                           const hasApprovedReschedule = rescheduleReqStatus === 'approved';
                           const isAssignedAppointment = appointmentStatus === 'assigned' || appointmentStatus === 'in_progress';
+                          const isPatientRescheduleRequested = appointmentStatus === 'patient_reschedule_requested';
                           
                           // Accept button only shows for truly pending/rescheduled appointments
                           const isAccepted = ['confirmed', 'assigned', 'in_progress'].includes(appointmentStatus);
-                          const canApproveAppointment = ['pending', 'rescheduled'].includes(appointmentStatus);
+                          const canApproveAppointment = ['pending', 'rescheduled', 'patient_reschedule_requested'].includes(appointmentStatus);
                           const canRescheduleAppointment = !['rejected', 'cancelled', 'completed', 'closed'].includes(appointmentStatus);
 
                           return (
@@ -3195,12 +3258,19 @@ const UGDashboard = () => {
                                       </span>
                                     )}
 
-                                    {/* Show Accept button only for pending/rescheduled */}
+                                    {/* Show Accept button only for pending/rescheduled/patient_reschedule_requested */}
                                     {canApproveAppointment && (
                                       <button
                                         type="button"
                                         className="view-button"
-                                        onClick={() => approveAppointment(appointment)}
+                                        onClick={() => {
+                                          if (isPatientRescheduleRequested) {
+                                            // Handle patient reschedule request directly here
+                                            acceptPatientRescheduleRequest(appointment);
+                                          } else {
+                                            approveAppointment(appointment);
+                                          }
+                                        }}
                                         disabled={isSubmitting}
                                         style={{
                                           background: '#2f855a',
@@ -3230,6 +3300,21 @@ const UGDashboard = () => {
                                         display: 'inline-block'
                                       }}>
                                         Pending
+                                      </span>
+                                    )}
+
+                                    {/* Show distinct badge for patient reschedule requests */}
+                                    {isPatientRescheduleRequested && (
+                                      <span style={{ 
+                                        background: '#d69e2e', 
+                                        color: '#fff', 
+                                        borderRadius: '12px', 
+                                        padding: '4px 10px', 
+                                        fontSize: '12px', 
+                                        fontWeight: 600,
+                                        display: 'inline-block'
+                                      }}>
+                                        Patient Requested Reschedule
                                       </span>
                                     )}
 
