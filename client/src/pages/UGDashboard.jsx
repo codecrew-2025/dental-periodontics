@@ -2902,9 +2902,10 @@ const UGDashboard = () => {
                           const caseId = String(generalCasePreview?._id || '').trim();
                           if (caseId) {
                             window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
+                          } else {
+                            showMessage('No General Case Sheet has been created for this patient.', 'error');
                           }
                         }}
-                        disabled={!generalCasePreview?._id}
                       >
                         View Full General Case Sheet
                       </button>

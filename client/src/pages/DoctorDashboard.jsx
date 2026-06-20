@@ -214,6 +214,11 @@ const DoctorDashboard = () => {
   const [referredActionCaseId, setReferredActionCaseId] = useState('');
   const [referredActionType, setReferredActionType] = useState('');
 
+  // General Case Sheet preview for patient
+  const [generalCasePreview, setGeneralCasePreview] = useState(null);
+  const [generalCasePreviewLoading, setGeneralCasePreviewLoading] = useState(false);
+  const [generalCasePreviewError, setGeneralCasePreviewError] = useState('');
+
   // Reschedule Requests State
   const [rescheduleRequests, setRescheduleRequests] = useState([]);
   const [rescheduleRequestsLoading, setRescheduleRequestsLoading] = useState(false);
@@ -225,6 +230,43 @@ const DoctorDashboard = () => {
 
   const buildApiUrl = (path) =>
     `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+
+  const fetchGeneralCasePreview = async (patientId) => {
+    const resolvedPatientId = String(patientId || '').trim();
+    if (!resolvedPatientId) {
+      setGeneralCasePreview(null);
+      return;
+    }
+    setGeneralCasePreviewLoading(true);
+    setGeneralCasePreviewError('');
+    setGeneralCasePreview(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(
+        buildApiUrl(`/api/general/patient/${encodeURIComponent(resolvedPatientId)}`),
+        {
+          signal: controller.signal,
+          headers: token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' },
+        }
+      );
+      clearTimeout(timeoutId);
+      const json = await res.json();
+      if (!res.ok || !json?.success) throw new Error(json?.message || 'Failed to load General Case Sheet');
+      const cases = Array.isArray(json.data) ? json.data : [];
+      const latest = [...cases].sort((a, b) => {
+        return new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime();
+      })[0] || null;
+      setGeneralCasePreview(latest);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      setGeneralCasePreview(null);
+      setGeneralCasePreviewError(error.name === 'AbortError' ? 'Request timed out' : (error.message || 'Failed to load General Case Sheet'));
+    } finally {
+      setGeneralCasePreviewLoading(false);
+    }
+  };
 
   // ================= MY APPOINTMENTS FUNCTIONS =================
   const fetchMyAppointments = async ({ silent = false } = {}) => {
@@ -1131,6 +1173,9 @@ const DoctorDashboard = () => {
 
       // Fetch case statuses for this patient
       await fetchCaseStatuses(resolvedPatientId);
+
+      // Fetch General Case Sheet preview for this patient
+      fetchGeneralCasePreview(resolvedPatientId);
 
       setShowUserIdDisplay(true);
       setShowForm(true);
@@ -4194,6 +4239,27 @@ const DoctorDashboard = () => {
                     >
                       Case History
                     </button>
+                    {!isCampPatient && (
+                      <button
+                        type="button"
+                        className="case-files-btn"
+                        onClick={() => {
+                          const caseId = String(generalCasePreview?._id || '').trim();
+                          if (caseId) {
+                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
+                          } else {
+                            showMessage(
+                              generalCasePreviewLoading
+                                ? 'Loading General Case Sheet, please wait...'
+                                : 'No General Case Sheet has been created for this patient.',
+                              'error'
+                            );
+                          }
+                        }}
+                      >
+                        View Full General Case Sheet
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
