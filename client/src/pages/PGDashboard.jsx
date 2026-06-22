@@ -3240,7 +3240,7 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                       disabled={isSubmitting || !canRescheduleAppointment}
                                       title={hasPendingReschedule ? 'Reschedule request is pending approval' : 'Open reschedule options'}
                                       style={{
-                                        background: '#3182ce',
+                                        background: hasPendingReschedule ? '#ed8936' : '#3182ce',
                                         color: '#fff',
                                         padding: '6px 12px',
                                         fontSize: '0.8em',
@@ -3251,10 +3251,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
                                         opacity: isSubmitting || !canRescheduleAppointment ? 0.6 : 1,
                                       }}
                                     >
-                                      Reschedule
+                                      {hasPendingReschedule ? 'Reschedule Pending' : 'Reschedule'}
                                     </button>
 
-                                    {!['confirmed', 'assigned', 'in_progress', 'rescheduled'].includes(appointmentStatus) && appointmentStatus !== 'pending' && (
+                                    {!['confirmed', 'assigned', 'in_progress', 'rescheduled'].includes(appointmentStatus) && appointmentStatus !== 'pending' && !hasPendingReschedule && (
                                       <span style={{
                                         background: '#ed8936',
                                         color: '#fff',
