@@ -17,6 +17,7 @@ const AssignUG = ({
   const [ugPhone, setUGPhone] = useState('');
   const [department, setDepartment] = useState(allowedDepartment || '');
   const [specialization, setSpecialization] = useState('');
+  const [registerNumber, setRegisterNumber] = useState('');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' | 'error'
   const [isLoading, setIsLoading] = useState(false);
@@ -53,10 +54,12 @@ const AssignUG = ({
       setUGPhone(String(initialUG?.phone || '').trim());
       setDepartment(String(seededDepartment).trim());
       setSpecialization(String(initialUG?.specialization || '').trim());
+      setRegisterNumber(String(initialUG?.registerNumber || '').trim());
       return;
     }
 
     setDepartment(allowedDepartment || '');
+    setRegisterNumber('');
   }, [allowedDepartment, isOpen, isEditMode, initialUG]);
 
   const showMessage = (msg, type = 'error') => {
@@ -84,7 +87,7 @@ const AssignUG = ({
       return;
     }
 
-    if ((!isEditMode && !staffId.trim()) || !ugName.trim() || !ugEmail.trim() || !departmentToSubmit || !ugPhone.trim()) {
+    if ((!isEditMode && !staffId.trim()) || !ugName.trim() || !ugEmail.trim() || !departmentToSubmit || !ugPhone.trim() || !registerNumber.trim()) {
       showMessage('Please fill in all required fields', 'error');
       return;
     }
@@ -118,6 +121,7 @@ const AssignUG = ({
               email: ugEmail,
               phone: ugPhone || '',
               department: departmentToSubmit,
+              registerNumber: registerNumber.trim(),
             },
             {
               headers: {
@@ -134,6 +138,7 @@ const AssignUG = ({
               ugPhone: ugPhone || '',
               department: departmentToSubmit,
               specialization: specialization || '',
+              registerNumber: registerNumber.trim(),
             },
             {
               headers: {
@@ -159,6 +164,7 @@ const AssignUG = ({
         setUGPhone('');
         setDepartment(allowedDepartment || '');
         setSpecialization('');
+        setRegisterNumber('');
 
         onClose?.();
       }
@@ -213,13 +219,13 @@ const AssignUG = ({
               </div>
 
               <div className="form-group">
-                <label htmlFor="staffId">Staff ID *</label>
+                <label htmlFor="staffId">Register Number *</label>
                 <input
                   type="text"
                   id="staffId"
                   value={staffId}
-                  onChange={(e) => setStaffId(e.target.value)}
-                  placeholder="Enter Staff ID"
+                  onChange={(e) => { setStaffId(e.target.value); setRegisterNumber(e.target.value); }}
+                  placeholder="Enter Register Number"
                   required={!isEditMode}
                   disabled={isLoading || isEditMode}
                 />

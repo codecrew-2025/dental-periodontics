@@ -13,6 +13,7 @@ const UserSchema = new mongoose.Schema({
   isDeptDoctor: { type: Boolean, default: false },
   specialization: { type: String, default: null },
   staffId: { type: String, unique: true, sparse: true }, // For doctors created by chief doctors
+  registerNumber: { type: String, default: null }, // For PG/UG register number
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // Chief doctor who created this doctor
   createdAt: { type: Date, default: Date.now }
 });

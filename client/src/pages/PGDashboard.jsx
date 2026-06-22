@@ -1980,17 +1980,6 @@ const PGDashboard = ({ brandTitleOverride }) => {
       return;
     }
 
-    if (enteredId.toLowerCase().startsWith('c')) {
-      setGeneratedUserId(enteredId);
-      setShowUserIdDisplay(true);
-      setShowForm(true);
-      setCanNavigateCases(true);
-      localStorage.setItem('CurrentpatientId', enteredId);
-      localStorage.setItem('CurrentpatientName', 'Camp Patient');
-      showMessage(`Camp Patient ID verified locally: ${enteredId}`, 'success');
-      return;
-    }
-
     try {
       setIsLoading(true);
 
@@ -2275,6 +2264,10 @@ const PGDashboard = ({ brandTitleOverride }) => {
         // Refresh case-sheet status panel for this patient
         fetchCaseStatuses(id);
         fetchPgCaseSheetHistory();
+
+        if (String(formData.uniqueId || '').trim().toLowerCase().startsWith('c')) {
+          openAssignedCaseRoute();
+        }
       } else {
         const error = await response.json();
         showMessage(`Error saving patient: ${error.message}`, 'error');
@@ -2582,8 +2575,6 @@ const PGDashboard = ({ brandTitleOverride }) => {
                 {/* Form Section */}
                 {showForm && (
                   <div className="patient-form">
-                    {!String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
-                      <>
                         <h3>Personal Information</h3>
 
                     {/* Name fields */}
@@ -2818,40 +2809,41 @@ const PGDashboard = ({ brandTitleOverride }) => {
                         </div>
                       </>
                     )}
-                    </>
-                    )}
 
                     {/* Navigation buttons */}
                     <div className="form-actions">
-                      {!String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
-                        <button className="save-btn" onClick={handleSavePatient} disabled={isLoading}>
-                          {isLoading ? '...Saving...' : 'Save Patient Details'}
-                        </button>
-                      )}
-                      <button
-                        className="case-files-btn"
-                        onClick={openAssignedCaseRoute}
-                        type="button"
-                        disabled={!canNavigateCases}
-                      >
-                        Go to Department Case Sheet
+                      <button className="save-btn" onClick={handleSavePatient} disabled={isLoading}>
+                        {isLoading ? '...Saving...' : 'Save Patient Details'}
                       </button>
-                      {(pgDepartmentKey.includes('oral') || pgDepartmentKey.includes('periodont')) && (
-                        <button
-                          type="button"
-                          className="case-files-btn"
-                          onClick={() => {
-                            if (formData.uniqueId) {
-                              localStorage.setItem('CurrentpatientId', formData.uniqueId);
-                              const pName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || 'Patient';
-                              localStorage.setItem('CurrentpatientName', pName);
-                              window.open('/case-history', '_blank');
-                            }
-                          }}
-                          disabled={!canNavigateCases}
-                        >
-                          Case History
-                        </button>
+
+                      {!String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
+                        <>
+                          <button
+                            className="case-files-btn"
+                            onClick={openAssignedCaseRoute}
+                            type="button"
+                            disabled={!canNavigateCases}
+                          >
+                            Go to Department Case Sheet
+                          </button>
+                          {(pgDepartmentKey.includes('oral') || pgDepartmentKey.includes('periodont')) && (
+                            <button
+                              type="button"
+                              className="case-files-btn"
+                              onClick={() => {
+                                if (formData.uniqueId) {
+                                  localStorage.setItem('CurrentpatientId', formData.uniqueId);
+                                  const pName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || 'Patient';
+                                  localStorage.setItem('CurrentpatientName', pName);
+                                  window.open('/case-history', '_blank');
+                                }
+                              }}
+                              disabled={!canNavigateCases}
+                            >
+                              Case History
+                            </button>
+                          )}
+                        </>
                       )}
                       {!pgDepartmentKey.includes('oral') && !(formData.uniqueId || '').toLowerCase().startsWith('c') && (
                         <button

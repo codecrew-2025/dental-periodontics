@@ -7,7 +7,7 @@ const CaseSheetViewer = () => {
   const { caseId } = useParams();
   const [caseMeta, setCaseMeta] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [attempts, setAttempts] = useState([]);
+  const [attempts, ] = useState([]);
   const [authError, setAuthError] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -21,7 +21,7 @@ const CaseSheetViewer = () => {
   }, [caseId]);
 
   const loadCaseMeta = async () => {
-    setLoading(true);
+    setLoading(true);setAttempts
 
     try {
       const token = localStorage.getItem("token");

@@ -676,17 +676,17 @@ router.post('/create-doctor', auth, requireRole(['chief', 'chief-doctor']), asyn
 
 // ➤ Route: POST /auth/create-pg (Doctor assigns a new PG student)
 router.post('/create-pg', auth, requireRole(['doctor']), async (req, res) => {
-  const { staffId, pgName, pgEmail, pgPhone, department, specialization } = req.body;
+  const { staffId, pgName, pgEmail, pgPhone, department, specialization, registerNumber } = req.body;
 
-  console.log('📝 Create PG Request:', { staffId, pgName, pgEmail, department, doctorId: req.user?._id });
+  console.log('📝 Create PG Request:', { staffId, pgName, pgEmail, department, registerNumber, doctorId: req.user?._id });
 
   try {
     // Validate required fields
-    if (!staffId || !pgName || !pgEmail || !department) {
-      console.log('❌ Missing fields:', { staffId, pgName, pgEmail, department });
+    if (!staffId || !pgName || !pgEmail || !department || !registerNumber) {
+      console.log('❌ Missing fields:', { staffId, pgName, pgEmail, department, registerNumber });
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: staffId, pgName, pgEmail, department'
+        message: 'Missing required fields: staffId, pgName, pgEmail, department, registerNumber'
       });
     }
 
@@ -737,6 +737,7 @@ router.post('/create-pg', auth, requireRole(['doctor']), async (req, res) => {
       department: department,
       specialization: String(specialization || '').trim() || null,
       staffId: staffId,
+      registerNumber: String(registerNumber).trim(),
       createdBy: supervisor._id,
       supervisingDoctor: supervisor._id
     });
@@ -757,6 +758,7 @@ router.post('/create-pg', auth, requireRole(['doctor']), async (req, res) => {
         department: newPG.department,
         specialization: newPG.specialization,
         role: newPG.role,
+        registerNumber: newPG.registerNumber,
         generatedPassword: generatedPassword // Send password to doctor to share with PG
       }
     });
@@ -772,15 +774,15 @@ router.post('/create-pg', auth, requireRole(['doctor']), async (req, res) => {
 
 // ➤ Route: POST /auth/create-ug (Doctor assigns a new UG student)
 router.post('/create-ug', auth, requireRole(['doctor']), async (req, res) => {
-  const { staffId, ugName, ugEmail, ugPhone, department, specialization } = req.body;
+  const { staffId, ugName, ugEmail, ugPhone, department, specialization, registerNumber } = req.body;
 
-  console.log('📝 Create UG Request:', { staffId, ugName, ugEmail, department, doctorId: req.user?._id });
+  console.log('📝 Create UG Request:', { staffId, ugName, ugEmail, department, registerNumber, doctorId: req.user?._id });
 
   try {
-    if (!staffId || !ugName || !ugEmail || !department) {
+    if (!staffId || !ugName || !ugEmail || !department || !registerNumber) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: staffId, ugName, ugEmail, department'
+        message: 'Missing required fields: staffId, ugName, ugEmail, department, registerNumber'
       });
     }
 
@@ -821,6 +823,7 @@ router.post('/create-ug', auth, requireRole(['doctor']), async (req, res) => {
       department: department,
       specialization: String(specialization || '').trim() || null,
       staffId: staffId,
+      registerNumber: String(registerNumber).trim(),
       createdBy: supervisor._id,
     });
 
@@ -838,6 +841,7 @@ router.post('/create-ug', auth, requireRole(['doctor']), async (req, res) => {
         department: newUG.department,
         specialization: newUG.specialization,
         role: newUG.role,
+        registerNumber: newUG.registerNumber,
         generatedPassword,
       },
     });
@@ -1000,7 +1004,7 @@ router.get('/doctor/assigned-ugs', auth, requireRole(['doctor']), async (req, re
   try {
     const ugs = await User.find(
       { role: 'ug', createdBy: req.user._id },
-      { _id: 1, name: 1, email: 1, phone: 1, Identity: 1, staffId: 1, department: 1, createdAt: 1 }
+      { _id: 1, name: 1, email: 1, phone: 1, Identity: 1, staffId: 1, department: 1, registerNumber: 1, createdAt: 1 }
     )
       .sort({ createdAt: -1 })
       .lean();
@@ -1016,7 +1020,7 @@ router.get('/doctor/assigned-ugs', auth, requireRole(['doctor']), async (req, re
 router.patch('/doctor/assigned-ugs/:ugId/update', auth, requireRole(['doctor']), async (req, res) => {
   try {
     const { ugId } = req.params;
-    const { name, email, phone, department } = req.body || {};
+    const { name, email, phone, department, registerNumber } = req.body || {};
 
     const ug = await User.findOne({
       _id: ugId,
@@ -1043,6 +1047,12 @@ router.patch('/doctor/assigned-ugs/:ugId/update', auth, requireRole(['doctor']),
     if (email !== undefined) ug.email = String(email).trim();
     if (phone !== undefined) ug.phone = String(phone).trim();
     if (department !== undefined) ug.department = String(department).trim();
+    if (registerNumber !== undefined) {
+      if (!String(registerNumber).trim()) {
+        return res.status(400).json({ success: false, message: 'Register Number is required' });
+      }
+      ug.registerNumber = String(registerNumber).trim();
+    }
 
     await ug.save();
 
@@ -1056,6 +1066,7 @@ router.patch('/doctor/assigned-ugs/:ugId/update', auth, requireRole(['doctor']),
         phone: ug.phone,
         Identity: ug.Identity,
         department: ug.department,
+        registerNumber: ug.registerNumber,
       },
     });
   } catch (err) {
@@ -1105,7 +1116,7 @@ router.get('/doctor/assigned-pgs', auth, requireRole(['doctor']), async (req, re
   try {
     const pgs = await User.find(
       { role: 'pg', createdBy: req.user._id },
-      { _id: 1, name: 1, email: 1, phone: 1, Identity: 1, staffId: 1, department: 1, createdAt: 1 }
+      { _id: 1, name: 1, email: 1, phone: 1, Identity: 1, staffId: 1, department: 1, registerNumber: 1, createdAt: 1 }
     )
       .sort({ createdAt: -1 })
       .lean();
@@ -1123,7 +1134,7 @@ router.get('/doctor/assigned-pgs/overview', auth, requireRole(['doctor']), async
     // Fast path: just return the list of assigned PGs without complex case/appointment enrichment
     const assignedPGs = await User.find(
       { role: 'pg', createdBy: req.user._id },
-      { _id: 1, name: 1, Identity: 1, email: 1, phone: 1, department: 1, createdBy: 1, createdAt: 1 }
+      { _id: 1, name: 1, Identity: 1, email: 1, phone: 1, department: 1, registerNumber: 1, createdBy: 1, createdAt: 1 }
     )
       .sort({ createdAt: -1 })
       .lean()
@@ -1146,7 +1157,7 @@ router.get('/doctor/assigned-pgs/overview', auth, requireRole(['doctor']), async
 router.patch('/doctor/assigned-pgs/:pgId/update', auth, requireRole(['doctor']), async (req, res) => {
   try {
     const { pgId } = req.params;
-    const { name, email, phone, department } = req.body || {};
+    const { name, email, phone, department, registerNumber } = req.body || {};
 
     const pg = await User.findOne({
       _id: pgId,
@@ -1174,6 +1185,12 @@ router.patch('/doctor/assigned-pgs/:pgId/update', auth, requireRole(['doctor']),
     if (email !== undefined) pg.email = String(email).trim();
     if (phone !== undefined) pg.phone = String(phone).trim();
     if (department !== undefined) pg.department = String(department).trim();
+    if (registerNumber !== undefined) {
+      if (!String(registerNumber).trim()) {
+        return res.status(400).json({ success: false, message: 'Register Number is required' });
+      }
+      pg.registerNumber = String(registerNumber).trim();
+    }
 
     await pg.save();
 
@@ -1187,6 +1204,7 @@ router.patch('/doctor/assigned-pgs/:pgId/update', auth, requireRole(['doctor']),
         phone: pg.phone,
         Identity: pg.Identity,
         department: pg.department,
+        registerNumber: pg.registerNumber,
       },
     });
   } catch (err) {

@@ -1045,18 +1045,6 @@ const DoctorDashboard = () => {
       return;
     }
 
-    if (enteredId.toLowerCase().startsWith('c')) {
-      setGeneratedUserId(enteredId);
-      setShowUserIdDisplay(true);
-      setShowForm(true);
-      setStoredPatientId(enteredId);
-      setCanNavigateCases(true);
-      localStorage.setItem('CurrentpatientId', enteredId);
-      localStorage.setItem('CurrentpatientName', 'Camp Patient');
-      showMessage(`Camp Patient verified locally: ${enteredId}`, 'success');
-      return;
-    }
-
     try {
       setIsLoading(true);
 
@@ -1377,13 +1365,24 @@ const DoctorDashboard = () => {
         localStorage.setItem('CurrentpatientName', name);
         setStoredPatientId(id);
         showMessage('Patient details saved successfully!', 'success');
-        console.log('Patient data from localStorage:', {
-        });
         triggerSuccessToast('Patient Details Saved Successfully');
         // Allow navigation to case files / history only after successful save
         setCanNavigateCases(true);
         // Refresh case-sheet status panel for this patient
         fetchCaseStatuses(id);
+
+        // If this is a camp patient (ID starts with 'c'), redirect to the appropriate camp case sheet
+        const savedId = String(id || generatedUserId || formData.uniqueId || '').trim();
+        if (savedId.toLowerCase().startsWith('c')) {
+          const deptKey = String(localStorage.getItem('doctorDepartment') || user?.department || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+          if (deptKey === 'periodontics') {
+            navigate(`/camp-periodontics-case-sheet?patientId=${encodeURIComponent(savedId)}&new=true`);
+          } else {
+            // For other departments, use the general camp case sheet flow
+            goToDepartmentCaseSheet();
+          }
+          return;
+        }
       } else {
         const error = await response.json();
         showMessage(`Error saving patient: ${error.message}`, 'error');
@@ -2619,9 +2618,9 @@ const DoctorDashboard = () => {
                     <tr>
                       <th>S.No</th>
                       <th>Name</th>
+                      <th>Register Number</th>
                       <th>Number</th>
                       <th>Mail</th>
-                      <th>PG ID</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -2635,12 +2634,14 @@ const DoctorDashboard = () => {
                           {pg.name || '-'}
                         </td>
                         <td>
+                          {pg.staffId || pg.Identity || pg.registerNumber || '-'}
+                        </td>
+                        <td>
                           {pg.phone || '-'}
                         </td>
                         <td>
                           {pg.email || '-'}
                         </td>
-                        <td>{pg.Identity || '-'}</td>
                         <td>
                           <div className="chief-manage-actions">
                             <button
@@ -2691,9 +2692,9 @@ const DoctorDashboard = () => {
                     <tr>
                       <th>S.No</th>
                       <th>Name</th>
+                      <th>Register Number</th>
                       <th>Number</th>
                       <th>Mail</th>
-                      <th>UG ID</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -2702,9 +2703,9 @@ const DoctorDashboard = () => {
                       <tr key={ug._id}>
                         <td>{index + 1}</td>
                         <td>{ug.name || '-'}</td>
+                        <td>{ug.staffId || ug.Identity || ug.registerNumber || '-'}</td>
                         <td>{ug.phone || '-'}</td>
                         <td>{ug.email || '-'}</td>
-                        <td>{ug.Identity || '-'}</td>
                         <td>
                           <div className="chief-manage-actions">
                             <button
@@ -2759,28 +2760,6 @@ const DoctorDashboard = () => {
                       onChange={(e) => setPGSearchTerm(e.target.value)}
                       className="chief-select pg-select-doctor"
                     />
-                    <select
-                      id="pg-select"
-                      value={selectedAppointmentPG}
-                      onChange={(e) => setSelectedAppointmentPG(e.target.value)}
-                      className="chief-select pg-select-doctor"
-                    >
-                      <option value="">All PGs</option>
-                      {assignedPGs
-                        .filter((pg) => {
-                          if (!pgSearchTerm.trim()) return true;
-                          const searchLower = pgSearchTerm.toLowerCase();
-                          return (
-                            (pg.name || '').toLowerCase().includes(searchLower) ||
-                            (pg.Identity || '').toLowerCase().includes(searchLower)
-                          );
-                        })
-                        .map((pg) => (
-                          <option key={`${pg.Identity}-${pg.department}`} value={pg.Identity}>
-                            {pg.name} ({pg.Identity})
-                          </option>
-                        ))}
-                    </select>
 
                     <label htmlFor="pg-from-date" className="pg-appointment-selector-label">From:</label>
                     <input
@@ -3768,8 +3747,6 @@ const DoctorDashboard = () => {
               {/* Form Section */}
               {showForm && (
                 <div className="patient-form">
-                  {!isCampPatient && (
-                    <>
                       <h3>Personal Information</h3>
 
                   {/* Name fields */}
@@ -3869,6 +3846,8 @@ const DoctorDashboard = () => {
                     {fieldErrors.gender && <div className="error-message">{fieldErrors.gender}</div>}
                   </div>
 
+                  {!isCampPatient && (
+                    <>
                   {/* Marital Status */}
                   <div className="input-group">
                     <label>
@@ -4216,23 +4195,24 @@ const DoctorDashboard = () => {
 
                   {/* Navigation buttons */}
                   <div className="form-actions">
-                    {!isCampPatient && (
-                      <button
-                        className="save-btn"
-                        onClick={handleSavePatient}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? '...Saved...' : 'Save Patient Details'}
-                      </button>
-                    )}
                     <button
-                      className="case-files-btn"
-                      onClick={goToDepartmentCaseSheet}
-                      type="button"
-                      disabled={!canNavigateCases}
+                      className="save-btn"
+                      onClick={handleSavePatient}
+                      disabled={isLoading}
                     >
-                      Go to Case Files
+                      {isLoading ? '...Saved...' : 'Save Patient Details'}
                     </button>
+
+                    {!isCampPatient && (
+                      <>
+                        <button
+                          className="case-files-btn"
+                          onClick={goToDepartmentCaseSheet}
+                          type="button"
+                          disabled={!canNavigateCases}
+                        >
+                          Go to Case Files
+                        </button>
                     <button
                       className="case-history-btn"
                       onClick={() => navigate('/case-history')}
@@ -4241,6 +4221,8 @@ const DoctorDashboard = () => {
                     >
                       Case History
                     </button>
+                      </>
+                    )}
                     {!isCampPatient && (
                       <button
                         type="button"

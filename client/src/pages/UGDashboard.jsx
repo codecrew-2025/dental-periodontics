@@ -1989,17 +1989,6 @@ const UGDashboard = () => {
       return;
     }
 
-    if (enteredId.toLowerCase().startsWith('c')) {
-      setGeneratedUserId(enteredId);
-      setShowUserIdDisplay(true);
-      setShowForm(true);
-      setCanNavigateCases(true);
-      localStorage.setItem('CurrentpatientId', enteredId);
-      localStorage.setItem('CurrentpatientName', 'Camp Patient');
-      showMessage(`Camp Patient ID verified locally: ${enteredId}`, 'success');
-      return;
-    }
-
     try {
       setIsLoading(true);
 
@@ -2282,6 +2271,10 @@ const UGDashboard = () => {
       // Refresh case-sheet status panel for this patient
       fetchCaseStatuses(id);
       fetchPgCaseSheetHistory();
+
+      if (String(formData.uniqueId || '').trim().toLowerCase().startsWith('c')) {
+        openAssignedCaseRoute();
+      }
     } else {
       const error = await response.json();
       showMessage(`Error saving patient: ${error.message}`, 'error');
@@ -2584,8 +2577,6 @@ const UGDashboard = () => {
                 {/* Form Section */}
                 {showForm && (
                   <div className="patient-form">
-                    {!String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
-                      <>
                         <h3>Personal Information</h3>
 
                     {/* Name fields */}
@@ -2635,7 +2626,7 @@ const UGDashboard = () => {
                     </div>
 
                     {/* Marital Status — not required for PHD */}
-                    {!isPublicHealthDentistry && (
+                    {!isPublicHealthDentistry && !String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
                     <div className="input-group">
                       <label>Marital Status <span style={{ color: 'red' }}>*</span></label>
                       <div className="radio-options">
@@ -2651,7 +2642,7 @@ const UGDashboard = () => {
                     )}
 
                     {/* Pregnancy Status */}
-                    {!isPublicHealthDentistry && formData.gender === 'Female' && formData.maritalStatus === 'Married' && (
+                    {!isPublicHealthDentistry && !String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && formData.gender === 'Female' && formData.maritalStatus === 'Married' && (
                       <div className="input-group">
                         <label>Pregnancy Status <span style={{ color: 'red' }}>*</span></label>
                         <div className="radio-options">
@@ -2699,7 +2690,7 @@ const UGDashboard = () => {
                     )}
 
                     {/* ── Non-PHD: full clinical history ── */}
-                    {!isPublicHealthDentistry && (
+                    {!isPublicHealthDentistry && !String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
                     <>
                     {/* ── VITALS ── */}
                     <h3>Vitals</h3>
@@ -2861,40 +2852,41 @@ const UGDashboard = () => {
                     </div>
                     </>
                     )}
-                    </>
-                    )}
 
                     {/* Navigation buttons */}
                     <div className="form-actions">
-                      {!String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
-                        <button className="save-btn" onClick={handleSavePatient} disabled={isLoading}>
-                          {isLoading ? '...Saving...' : 'Save Patient Details'}
-                        </button>
-                      )}
-                      <button
-                        className="case-files-btn"
-                        onClick={openAssignedCaseRoute}
-                        type="button"
-                        disabled={!canNavigateCases}
-                      >
-                        Go to Department Case Sheet
+                      <button className="save-btn" onClick={handleSavePatient} disabled={isLoading}>
+                        {isLoading ? '...Saving...' : 'Save Patient Details'}
                       </button>
-                      {(ugDepartmentKey.includes('oral') || ugDepartmentKey.includes('periodont')) && (
-                        <button
-                          type="button"
-                          className="case-files-btn"
-                          onClick={() => {
-                            if (formData.uniqueId) {
-                              localStorage.setItem('CurrentpatientId', formData.uniqueId);
-                              const pName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || 'Patient';
-                              localStorage.setItem('CurrentpatientName', pName);
-                              window.open('/case-history', '_blank');
-                            }
-                          }}
-                          disabled={!canNavigateCases}
-                        >
-                          Case History
-                        </button>
+
+                      {!String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
+                        <>
+                          <button
+                            className="case-files-btn"
+                            onClick={openAssignedCaseRoute}
+                            type="button"
+                            disabled={!canNavigateCases}
+                          >
+                            Go to Department Case Sheet
+                          </button>
+                          {(ugDepartmentKey.includes('oral') || ugDepartmentKey.includes('periodont')) && (
+                            <button
+                              type="button"
+                              className="case-files-btn"
+                              onClick={() => {
+                                if (formData.uniqueId) {
+                                  localStorage.setItem('CurrentpatientId', formData.uniqueId);
+                                  const pName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || 'Patient';
+                                  localStorage.setItem('CurrentpatientName', pName);
+                                  window.open('/case-history', '_blank');
+                                }
+                              }}
+                              disabled={!canNavigateCases}
+                            >
+                              Case History
+                            </button>
+                          )}
+                        </>
                       )}
                       {!ugDepartmentKey.includes('oral') && !(formData.uniqueId || '').toLowerCase().startsWith('c') && (
                       <button

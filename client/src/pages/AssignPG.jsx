@@ -17,6 +17,7 @@ const AssignPG = ({
   const [pgPhone, setPGPhone] = useState('');
   const [department, setDepartment] = useState(allowedDepartment || '');
   const [specialization, setSpecialization] = useState('');
+  const [registerNumber, setRegisterNumber] = useState('');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
   const [isLoading, setIsLoading] = useState(false);
@@ -53,10 +54,12 @@ const AssignPG = ({
       setPGPhone(String(initialPG?.phone || '').trim());
       setDepartment(String(seededDepartment).trim());
       setSpecialization(String(initialPG?.specialization || '').trim());
+      setRegisterNumber(String(initialPG?.registerNumber || '').trim());
       return;
     }
 
     setDepartment(allowedDepartment || '');
+    setRegisterNumber('');
   }, [allowedDepartment, isOpen, isEditMode, initialPG]);
 
   const showMessage = (msg, type = 'error') => {
@@ -84,7 +87,7 @@ const AssignPG = ({
     }
 
     // Validate required fields
-    if ((!isEditMode && !staffId.trim()) || !pgName.trim() || !pgEmail.trim() || !departmentToSubmit || !pgPhone.trim()) {
+    if ((!isEditMode && !staffId.trim()) || !pgName.trim() || !pgEmail.trim() || !departmentToSubmit || !pgPhone.trim() || !registerNumber.trim()) {
       showMessage('Please fill in all required fields', 'error');
       return;
     }
@@ -119,6 +122,7 @@ const AssignPG = ({
               email: pgEmail,
               phone: pgPhone || '',
               department: departmentToSubmit,
+              registerNumber: registerNumber.trim(),
             },
             {
               headers: {
@@ -135,6 +139,7 @@ const AssignPG = ({
               pgPhone: pgPhone || '',
               department: departmentToSubmit,
               specialization: specialization || '',
+              registerNumber: registerNumber.trim(),
             },
             {
               headers: {
@@ -164,6 +169,7 @@ const AssignPG = ({
         setPGPhone('');
         setDepartment(allowedDepartment || '');
         setSpecialization('');
+        setRegisterNumber('');
 
         onClose?.();
       }
@@ -192,6 +198,7 @@ const AssignPG = ({
     setPGPhone('');
     setDepartment(allowedDepartment || '');
     setSpecialization('');
+    setRegisterNumber('');
     clearMessage();
   };
 
@@ -238,13 +245,13 @@ const AssignPG = ({
               </div>
 
               <div className="form-group">
-                <label htmlFor="staffId">Staff ID *</label>
+                <label htmlFor="staffId">Register Number *</label>
                 <input
                   type="text"
                   id="staffId"
                   value={staffId}
-                  onChange={(e) => setStaffId(e.target.value)}
-                  placeholder="Enter Staff ID"
+                  onChange={(e) => { setStaffId(e.target.value); setRegisterNumber(e.target.value); }}
+                  placeholder="Enter Register Number"
                   required={!isEditMode}
                   disabled={isLoading || isEditMode}
                 />
