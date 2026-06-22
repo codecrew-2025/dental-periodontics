@@ -548,13 +548,13 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
           const patientUser = await User.findOne({ Identity: patientId }).lean();
           const bookingId = `${patientId}-${Date.now()}`;
           
-          const now = new Date();
-          const currentHours = now.getHours();
-          const currentMinutes = now.getMinutes();
-          const ampm = currentHours >= 12 ? 'PM' : 'AM';
-          const formattedHours = currentHours % 12 || 12;
-          const formattedMinutes = currentMinutes < 10 ? '0' + currentMinutes : currentMinutes;
-          const currentTimeStr = `${formattedHours}:${formattedMinutes} ${ampm}`;
+          const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+          const currentTimeStr = formatter.format(new Date());
           
           const newAppointment = new Appointment({
             bookingId,
