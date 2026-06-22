@@ -188,7 +188,7 @@ const UpdatePatientDetails = () => {
 
       {isLoadingDetails && <div className="message-box">Loading saved patient details...</div>}
 
-      {!otpSent ? (
+      {!otpSent && !otpVerified && (
         <button
           type="button"
           className="button"
@@ -200,7 +200,9 @@ const UpdatePatientDetails = () => {
         >
           Send OTP via Email
         </button>
-      ) : (
+      )}
+
+      {otpSent && !otpVerified && (
         <>
           <div className="form-group">
             <label htmlFor="otp">Enter OTP</label>
