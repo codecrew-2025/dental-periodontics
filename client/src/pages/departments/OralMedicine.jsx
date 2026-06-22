@@ -374,11 +374,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
       setUrgencyLevel(urgency);
       setPatientEducation(education);
 
-      // Auto-populate first referral priority if none selected
-      const currentReferral = Array.isArray(form.referralDepartments) ? form.referralDepartments : [];
-      if (departments.length > 0 && currentReferral.length === 0) {
-        setForm(prev => ({ ...prev, referralDepartments: [departments[0]] }));
-      }
+      // Recommendations are stored for display only — user must manually add departments
     }, 800);
 
     return () => clearTimeout(timer);
