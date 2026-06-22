@@ -548,6 +548,14 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
           const patientUser = await User.findOne({ Identity: patientId }).lean();
           const bookingId = `${patientId}-${Date.now()}`;
           
+          const now = new Date();
+          const currentHours = now.getHours();
+          const currentMinutes = now.getMinutes();
+          const ampm = currentHours >= 12 ? 'PM' : 'AM';
+          const formattedHours = currentHours % 12 || 12;
+          const formattedMinutes = currentMinutes < 10 ? '0' + currentMinutes : currentMinutes;
+          const currentTimeStr = `${formattedHours}:${formattedMinutes} ${ampm}`;
+          
           const newAppointment = new Appointment({
             bookingId,
             patientId,
@@ -557,7 +565,7 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
             approvedDoctorId: specialistDoctorIdStr,
             chiefComplaint: chiefComplaint || 'Referral from General Dentistry',
             appointmentDate: todayStr,
-            appointmentTime: '10:00',
+            appointmentTime: currentTimeStr,
             status: 'assigned',
             isProcessed: true,
             assignedPgUgId: assignedPg.Identity || '',
