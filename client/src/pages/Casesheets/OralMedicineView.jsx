@@ -512,7 +512,7 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
                     {caseData.clinicalFindingsPictures.map((pic, idx) => (
                       <img 
                         key={idx}
-                        src={pic} 
+                        src={normalizeXraySrc(pic)} 
                         alt={`Clinical Findings ${idx + 1}`} 
                         style={{ maxHeight: '200px', borderRadius: '4px' }} 
                       />
