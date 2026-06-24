@@ -49,18 +49,39 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const clientDistPath = path.resolve(__dirname, '../client/dist');
 
+// Setup CORS first so that even 503 error responses include CORS headers
+const corsOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: !isProduction ? true : corsOrigins.length > 0 ? corsOrigins : false,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-bypass-department-check'],
+};
+
+app.use(cors(corsOptions));
+// Express 5 (path-to-regexp v6+) does not accept "*" as a route pattern.
+app.options(/.*/, cors(corsOptions));
+
 // Connect to MongoDB
 connectDB().catch((error) => {
   dbInitError = error;
   console.error('❌ MongoDB initialization failed:', error?.message || error);
 });
 
-// If DB config is missing or initialization failed, fail fast with a helpful message.
-// (On Vercel we don't `process.exit`, so without this the API can look like random 404s/timeouts.)
-app.use('/api', async (req, res, next) => {
+// Unconditional brief request logger to aid debugging (always enabled)
+app.use((req, res, next) => {
   try {
-    console.log(`[API-MW] ${req.method} ${req.path}`);
+    console.log(`[REQ] ${req.method} ${req.originalUrl}`);
   } catch (e) {}
+  next();
+});
+
+// If DB config is missing or initialization failed, fail fast with a helpful message.
+app.use('/api', async (req, res, next) => {
   const isDebugRoute = req.path === '/debug/routes';
   const isHealthRoute = req.path === '/health';
   const isOtpDiagnosticRoute = req.path === '/otp/email-status' || req.path === '/otp/test-email';
@@ -69,79 +90,31 @@ app.use('/api', async (req, res, next) => {
   if (isDebugRoute) return next();
 
   if (!process.env.MONGO_URI) {
-    const publicMessage = isProduction
-      ? 'Service temporarily unavailable. Please try again shortly.'
-      : 'Database not configured: missing MONGO_URI environment variable.';
     return res.status(503).json({
       success: false,
-      message: publicMessage,
-      hint: isProduction
-        ? null
-        : 'Set MONGO_URI in Vercel Project Settings → Environment Variables and redeploy.',
-      timestamp: new Date().toISOString(),
+      message: 'Database not configured: missing MONGO_URI environment variable.',
     });
   }
 
   if (dbInitError || mongoose.connection.readyState !== 1) {
-    if (!dbInitError) {
-      try {
-        await connectDB();
-      } catch (error) {
-        dbInitError = error;
-      }
+    try {
+      await connectDB();
+      dbInitError = null; // Clear error if reconnection succeeds
+    } catch (error) {
+      dbInitError = error;
     }
 
     if (dbInitError || mongoose.connection.readyState !== 1) {
-      const publicMessage = isProduction
-        ? 'Service temporarily unavailable. Please try again shortly.'
-        : 'Database not connected. Check MONGO_URI and MongoDB network access.';
       return res.status(503).json({
         success: false,
-        message: publicMessage,
+        message: 'Database not connected. Check MONGO_URI and MongoDB network access.',
         error: process.env.NODE_ENV === 'development' ? (dbInitError?.message || null) : null,
-        timestamp: new Date().toISOString(),
       });
     }
   }
 
   return next();
 });
-
-// Middlewares
-// Unconditional brief request logger to aid debugging (always enabled)
-app.use((req, res, next) => {
-  try {
-    console.log(`[REQ] ${req.method} ${req.originalUrl}`);
-    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
-      // body may not be parsed yet; capture raw via a flag if needed.
-      // We'll also log after body-parsing middleware in development.
-    }
-  } catch (e) {
-    // swallow logging errors
-  }
-  next();
-});
-const corsOrigins = (process.env.CORS_ORIGIN || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-// In development, allow requests from any origin (Vite, local network testing, etc.).
-// In production, allow only explicitly configured origins (or same-origin when `origin:false`).
-const corsOptions = {
-  origin: !isProduction ? true : corsOrigins.length > 0 ? corsOrigins : false,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-};
-
-// Allow custom bypass header for selected-patient fetches used by the UI
-corsOptions.allowedHeaders.push('x-bypass-department-check');
-
-app.use(cors(corsOptions));
-// Ensure preflight (OPTIONS) requests are handled consistently.
-// Express 5 (path-to-regexp v6+) does not accept "*" as a route pattern.
-app.options(/.*/, cors(corsOptions));
 
 // Increase payload limits
 app.use(express.json({ limit: '50mb' }));
