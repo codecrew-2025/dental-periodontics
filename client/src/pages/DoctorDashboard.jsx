@@ -228,8 +228,10 @@ const DoctorDashboard = () => {
   const [rejectReasonBookingId, setRejectReasonBookingId] = useState('');
   const [rejectReasonText, setRejectReasonText] = useState('');
 
-  const buildApiUrl = (path) =>
-    `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+  const buildApiUrl = (path) => {
+    const base = API_BASE_URL === '/' ? '' : API_BASE_URL;
+    return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  };
 
   const fetchGeneralCasePreview = async (patientId) => {
     const resolvedPatientId = String(patientId || '').trim();
@@ -1384,11 +1386,19 @@ const DoctorDashboard = () => {
           return;
         }
       } else {
-        const error = await response.json();
-        showMessage(`Error saving patient: ${error.message}`, 'error');
+        const error = await response.json().catch(() => ({ message: 'Failed to parse JSON error' }));
+        console.error('SAVE PATIENT ERROR RESPONSE:', error);
+        
+        let errorMsg = `Error saving patient: ${error.message}`;
+        if (error.details) {
+          errorMsg += ` | Details: ${JSON.stringify(error.details)}`;
+        }
+        
+        showMessage(errorMsg, 'error');
       }
     } catch (error) {
-      showMessage('Error saving patient: ' + error.message, 'error');
+      console.error('SAVE PATIENT EXCEPTION:', error);
+      showMessage('Exception saving patient: ' + error.message, 'error');
     } finally {
       setIsLoading(false);
     }
