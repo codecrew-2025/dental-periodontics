@@ -901,14 +901,26 @@ router.get("/my-appointments", auth, requireRole(["doctor", "chief-doctor"]), as
 
     // Compare as ISO date string (YYYY-MM-DD)
     const todayStr = new Date().toISOString().split("T")[0];
+    
+    // Default exclusions for specialist doctors
     const excludedStatuses = ["cancelled", "completed", "closed", "pending_doctor_approval"];
+    
+    // Additional exclusions for General Doctors (to hide specialist referrals)
+    const generalExcludedStatuses = [
+      ...excludedStatuses,
+      "assigned",
+      "in_progress",
+      "patient_reschedule_requested",
+      "pg_counter_reschedule_pending_doc",
+      "pg_counter_reschedule_approved_doc"
+    ];
 
     let appointments;
     
     if (isGeneralDoctor) {
       // General doctors see all upcoming active appointments, including revisits.
       appointments = await Appointment.find({
-        status: { $nin: excludedStatuses },
+        status: { $nin: generalExcludedStatuses },
         appointmentDate: { $gte: todayStr },
         isProcessed: { $ne: true },
       }).sort({ appointmentDate: 1, appointmentTime: 1 });
