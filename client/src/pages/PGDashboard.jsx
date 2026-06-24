@@ -1933,7 +1933,8 @@ const PGDashboard = ({ brandTitleOverride }) => {
         maritalStatus: 'Marital Status',
         preferredLanguage: 'Preferred Language',
         chiefComplaint: 'Chief Complaint',
-        bloodGroup: 'Blood Group'
+        bloodGroup: 'Blood Group',
+        drugAllergies: 'Drug Allergies'
       };
     }
 
@@ -2795,8 +2796,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
                             {fieldErrors.bloodGroup && <div className="error-message">{fieldErrors.bloodGroup}</div>}
                           </div>
                           <div className="input-group">
-                            <label htmlFor="drug-allergies">Drug Allergies</label>
+                            <label htmlFor="drug-allergies">Drug Allergies <span style={{ color: 'red' }}>*</span></label>
                             <input type="text" id="drug-allergies" name="drugAllergies" value={formData.drugAllergies} onChange={handleInputChange} placeholder="Specify drug allergies" />
+                            {fieldErrors.drugAllergies && <div className="error-message">{fieldErrors.drugAllergies}</div>}
                           </div>
                           <div className="input-group">
                             <label htmlFor="diet-allergies">Diet Allergies</label>

@@ -69,10 +69,14 @@ const OralCaseSchema = new mongoose.Schema(
     facialSymmetry: { type: String, trim: true },
     facialProfile: { type: String, trim: true },
     earNoseEyes: { type: String, trim: true },
+    extraoralLesionInspection: { type: String, trim: true },
+    extraoralLesionPalpation: { type: String, trim: true },
     tmjInspection: { type: String, trim: true },
     tmjPalpation: { type: String, trim: true },
     tmjPercussionAuscultation: { type: String, trim: true },
     lymphNodeExamination: { type: String, trim: true },
+
+    clinicalPhotographs: [{ type: String }],
 
     // ── Intra Oral Examination ────────────────────────────────────────────
     siteShapeOfMouth: { type: String, trim: true },
@@ -163,18 +167,21 @@ const OralCaseSchema = new mongoose.Schema(
     // ── Chargeable Investigations ─────────────────────────────────────────
     chargeBiopsy: { type: Boolean, default: false },
     chargeExfoliativeCytology: { type: Boolean, default: false },
-    chargeIOPA: { type: Boolean, default: false },
-    chargeBitewing: { type: Boolean, default: false },
-    chargeOcclusal: { type: Boolean, default: false },
-    chargeOPGWithFilm: { type: Boolean, default: false },
-    chargeOPGWithoutFilm: { type: Boolean, default: false },
-    chargeLateralCephalogram: { type: Boolean, default: false },
-    chargeCBCT: { type: Boolean, default: false },
+    chargeIOPA: { type: Number, default: 0 },
+    chargeBitewing: { type: Number, default: 0 },
+    chargeOcclusal: { type: Number, default: 0 },
+    chargeOPGWithFilm: { type: Number, default: 0 },
+    chargeOPGWithoutFilm: { type: Number, default: 0 },
+    chargeLateralCephalogram: { type: Number, default: 0 },
+    chargeCBCT: { type: Number, default: 0 },
     chargeDescription: { type: String, trim: true },
 
     // ── Follow-up ─────────────────────────────────────────────────────────
     followUpDate: { type: Date },
     followUpNotes: { type: String, trim: true },
+
+    clinicalFindingsPictures: [{ type: String }],
+
 
     // ── Referral ──────────────────────────────────────────────────────────
     referredDepartment: { type: String, trim: true, default: '' },

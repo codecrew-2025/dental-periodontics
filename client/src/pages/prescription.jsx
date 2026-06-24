@@ -195,7 +195,7 @@ const PrintPrescription = ({
         {/* Doctor Info */}
         <div style={{ marginBottom: '12px', borderBottom: '1px solid #ccc', paddingBottom: '8px' }}>
           <h3 style={{ margin: '0 0 4px 0', fontSize: '15px' }}>
-            {doctorInfo.name || 'Dr. Parvin'}, BDS, MDS (Periodontics)
+            BDS, MDS (Periodontics)
           </h3>
           <p style={{ margin: '0', fontSize: '10px' }}>
             Reg No: DCI/93030
@@ -356,7 +356,7 @@ const PrintPrescription = ({
               minWidth: '180px',
               marginTop: '5px'
             }}>
-              (Signature of {doctorInfo.name || 'Dr. Parvin'})
+              (Signature)
             </div>
           </div>
         </div>
@@ -694,6 +694,7 @@ const Prescription = () => {
 
       // Try to fetch the latest case sheet with signature for this patient
       const endpoints = [
+        `http://localhost:5000/api/oral/patient/${patientId}`,
         `http://localhost:5000/api/casesheets/patient/${patientId}`,
         `http://localhost:5000/api/fpd/patient/${patientId}`,
         `http://localhost:5000/api/partial/patient/${patientId}`,
@@ -714,21 +715,51 @@ const Prescription = () => {
               // Get the most recent case sheet
               const latestCase = result.data[result.data.length - 1];
               
-              if (latestCase._id && latestCase.digitalSignature) {
-                // Construct signature endpoint
+              const signatureField = latestCase.digitalSignature || latestCase.doctorSignature;
+              
+              if (latestCase._id && signatureField) {
+                const toDataUrl = (s) => {
+                  if (!s) return null;
+                  if (typeof s === 'string') {
+                    if (s.startsWith('data:') || s.startsWith('http')) return s;
+                    if (s.length > 100 && !s.includes(' ')) return `data:image/png;base64,${s}`;
+                    return null;
+                  }
+                  const buf = s.data || s;
+                  const arr = buf?.data || (Array.isArray(buf) ? buf : null);
+                  if (arr && Array.isArray(arr)) {
+                    const bytes = new Uint8Array(arr);
+                    let binary = '';
+                    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                    return `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
+                  }
+                  return null;
+                };
+
+                const dataUrl = toDataUrl(signatureField);
+                if (dataUrl) {
+                  setDoctorSignature(dataUrl);
+                  return;
+                }
+                
+                // Construct signature endpoint as fallback
                 const baseRoute = endpoint.split('/patient/')[0];
                 const signatureUrl = `${baseRoute}/${latestCase._id}/signature`;
                 
-                const signatureResponse = await fetch(signatureUrl, {
-                  headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-                });
+                try {
+                  const signatureResponse = await fetch(signatureUrl, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                  });
 
-                if (signatureResponse.ok) {
-                  const blob = await signatureResponse.blob();
-                  const signatureDataUrl = URL.createObjectURL(blob);
-                  setDoctorSignature(signatureDataUrl);
-                  console.log('Doctor signature loaded successfully');
-                  return;
+                  if (signatureResponse.ok) {
+                    const blob = await signatureResponse.blob();
+                    const signatureDataUrl = URL.createObjectURL(blob);
+                    setDoctorSignature(signatureDataUrl);
+                    console.log('Doctor signature loaded successfully');
+                    return;
+                  }
+                } catch (e) {
+                  // Fallback failed, continue to next endpoint
                 }
               }
             }

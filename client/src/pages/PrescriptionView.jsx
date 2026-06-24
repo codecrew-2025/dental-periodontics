@@ -23,6 +23,7 @@ const PrescriptionView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [prescriptionId, setPrescriptionId] = useState('');
+  const [doctorSignature, setDoctorSignature] = useState(null);
   const [isPdfProcessing, setIsPdfProcessing] = useState(false);
   const [autoPreviewPdf, setAutoPreviewPdf] = useState(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -83,9 +84,11 @@ const PrescriptionView = () => {
       }
 
       const result = await response.json();
-      
       if (result.success && result.data) {
         setPrescription(result.data);
+        if (result.data.patientId) {
+          await fetchDoctorSignature(result.data.patientId);
+        }
       } else {
         throw new Error('Invalid prescription data');
       }
@@ -94,6 +97,83 @@ const PrescriptionView = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDoctorSignature = async (patientId) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!patientId) return;
+
+      const endpoints = [
+        `${API_BASE_URL}/api/oral/patient/${patientId}`,
+        `${API_BASE_URL}/api/casesheets/patient/${patientId}`,
+        `${API_BASE_URL}/api/fpd/patient/${patientId}`,
+        `${API_BASE_URL}/api/partial/patient/${patientId}`,
+        `${API_BASE_URL}/api/complete-denture/patient/${patientId}`,
+        `${API_BASE_URL}/api/implant/patient/${patientId}`,
+        `${API_BASE_URL}/api/implant-patient/patient/${patientId}`
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data && result.data.length > 0) {
+              const latestCase = result.data[result.data.length - 1];
+              const signatureField = latestCase.digitalSignature || latestCase.doctorSignature;
+              
+              if (latestCase._id && signatureField) {
+                const toDataUrl = (s) => {
+                  if (!s) return null;
+                  if (typeof s === 'string') {
+                    if (s.startsWith('data:') || s.startsWith('http')) return s;
+                    if (s.length > 100 && !s.includes(' ')) return `data:image/png;base64,${s}`;
+                    return null;
+                  }
+                  const buf = s.data || s;
+                  const arr = buf?.data || (Array.isArray(buf) ? buf : null);
+                  if (arr && Array.isArray(arr)) {
+                    const bytes = new Uint8Array(arr);
+                    let binary = '';
+                    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                    return `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
+                  }
+                  return null;
+                };
+
+                const dataUrl = toDataUrl(signatureField);
+                if (dataUrl) {
+                  setDoctorSignature(dataUrl);
+                  return;
+                }
+                
+                const baseRoute = endpoint.split('/patient/')[0];
+                const signatureUrl = `${baseRoute}/${latestCase._id}/signature`;
+                
+                const signatureResponse = await fetch(signatureUrl, {
+                  headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+
+                if (signatureResponse.ok) {
+                  const blob = await signatureResponse.blob();
+                  const signatureDataUrl = URL.createObjectURL(blob);
+                  setDoctorSignature(signatureDataUrl);
+                  return;
+                }
+              }
+            }
+          }
+        } catch (err) {
+          // ignore error for this endpoint
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching doctor signature:', error);
     }
   };
 
@@ -682,7 +762,7 @@ const PrescriptionView = () => {
           {/* Doctor Info */}
           <div style={{ marginBottom: '12px', borderBottom: '1px solid #ccc', paddingBottom: '8px' }}>
             <h3 style={{ margin: '0 0 4px 0', fontSize: '15px' }}>
-              {prescription.doctorName || prescription.doctorInfo?.name || 'Dr. Parvin'}, BDS, MDS (Periodontics)
+              BDS, MDS (Periodontics)
             </h3>
             <p style={{ margin: '0', fontSize: '10px' }}>
               Reg No: {prescription.doctorId || 'DCI/93030'}
@@ -846,10 +926,10 @@ const PrescriptionView = () => {
             alignItems: 'flex-end'
           }}>
             <div style={{ textAlign: 'right', fontSize: '11px' }}>
-              {prescription.doctorSignature && (
+              {(doctorSignature || prescription.doctorSignature) && (
                 <div style={{ marginBottom: '5px' }}>
                   <img 
-                    src={normalizeXraySrc(prescription.doctorSignature)} 
+                    src={normalizeXraySrc(doctorSignature || prescription.doctorSignature)} 
                     alt="Doctor Signature" 
                     style={{ 
                       maxWidth: '150px', 
@@ -866,7 +946,7 @@ const PrescriptionView = () => {
                 minWidth: '180px',
                 marginTop: '5px'
               }}>
-                (Signature of {prescription.doctorName || prescription.doctorInfo?.name || 'Dr. Parvin'})
+                (Signature)
               </div>
             </div>
           </div>

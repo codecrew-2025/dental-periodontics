@@ -44,8 +44,9 @@ const INITIAL_FORM = {
   cns: '', cvs: '', respiratory: '', gastrointestinal: '', genitoUrinary: '', skeletal: '',
   facialSymmetry: '', facialProfile: '', earNoseEyes: '',
   tmjInspection: '', tmjPalpation: '', tmjPercussionAuscultation: '',
+  mouthOpening: '', jawMovements: '',
   lymphNodeExamination: '',
-  siteShapeOfMouth: '', mouthOpening: '', jawMovements: '',
+  extraoralLesionInspection: '', extraoralLesionPalpation: '',
   teethPresent: '', sizeShapeColor: '',
   dentalCaries: '', missingTeeth: '', mobility: '', occlusion: '',
   recession: '', attrition: '', calculusAndStains: '', hardTissueOthers: '',
@@ -61,19 +62,20 @@ const INITIAL_FORM = {
   invSerological: false, invCytological: false, invMicrobiological: false,
   invSpecial: false, invRadiological: false, invBiopsy: false,
   invHistopathological: false, invOthers: false,
-  treatmentPlan: '', prognosis: '',
+  treatmentPlan: '',
   referralDepartments: [],
   // Chargeable investigations
   chargeBiopsy: false,
   chargeExfoliativeCytology: false,
-  chargeIOPA: false,
-  chargeBitewing: false,
-  chargeOcclusal: false,
-  chargeOPGWithFilm: false,
-  chargeOPGWithoutFilm: false,
-  chargeLateralCephalogram: false,
-  chargeCBCT: false,
+  chargeIOPA: 0,
+  chargeBitewing: 0,
+  chargeOcclusal: 0,
+  chargeOPGWithFilm: 0,
+  chargeOPGWithoutFilm: 0,
+  chargeLateralCephalogram: 0,
+  chargeCBCT: 0,
   chargeDescription: '',
+  clinicalPhotographs: [],
   digitalSignature: null,
 };
 
@@ -740,6 +742,37 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
     reader.readAsDataURL(file);
   };
 
+  const handleClinicalPhotoUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const maxSize = 5 * 1024 * 1024;
+    const validFiles = files.filter(f => f.size <= maxSize);
+    if (validFiles.length < files.length) {
+      showToast('Some files exceed the 5MB limit.', 'error');
+    }
+
+    Promise.all(validFiles.map(file => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target.result);
+      reader.readAsDataURL(file);
+    }))).then(dataUrls => {
+      setForm(prev => ({
+        ...prev,
+        clinicalPhotographs: [...(prev.clinicalPhotographs || []), ...dataUrls]
+      }));
+      showToast('Clinical photographs added successfully!', 'success');
+    });
+    e.target.value = ''; // Reset input
+  };
+
+  const removeClinicalPhoto = (index) => {
+    setForm(prev => {
+      const photos = [...(prev.clinicalPhotographs || [])];
+      photos.splice(index, 1);
+      return { ...prev, clinicalPhotographs: photos };
+    });
+  };
+
   /* ── PAGE 0 — Patient Info & History (PDF Page 1) ── */
   const renderPage0 = () => (
     <div className="omr-page-content">
@@ -755,6 +788,27 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
           <div className="xray-preview-container">
             <label className="omr-lbl" style={{ marginBottom: '8px', display: 'block' }}>Oral X-ray Preview:</label>
             <img src={xrayPreview} alt="Oral X-ray preview" className="xray-preview" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '6px' }} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '8px', marginBottom: '16px', border: '1px solid rgba(165,180,252,0.3)' }}>
+        <h3 style={{ margin: '0 0 12px', fontSize: '1rem', color: '#a5b4fc' }}>Upload Clinical Photographs (Oral Medicine Only)</h3>
+        <input 
+          type="file" 
+          accept="image/*" 
+          multiple
+          onChange={handleClinicalPhotoUpload} 
+          style={{ display: 'block', color: '#fff', marginBottom: '12px' }} 
+        />
+        {form.clinicalPhotographs && form.clinicalPhotographs.length > 0 && (
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {form.clinicalPhotographs.map((photo, i) => (
+              <div key={i} style={{ position: 'relative' }}>
+                <img src={photo} alt={`Clinical photo ${i+1}`} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '4px' }} />
+                <button type="button" onClick={() => removeClinicalPhoto(i)} style={{ position: 'absolute', top: '-6px', right: '-6px', background: 'red', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', lineHeight: '18px', padding: 0 }}>&times;</button>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -807,11 +861,13 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
       <p className="omr-item-label-indent">- Inspection:</p>{ta('tmjInspection', 2)}
       <p className="omr-item-label-indent">- Palpation:</p>{ta('tmjPalpation', 2)}
       <p className="omr-item-label-indent">- Percussion and Auscultation:</p>{ta('tmjPercussionAuscultation', 2)}
+      <p className="omr-item-label-indent">- Mouth Opening:</p>{ta('mouthOpening', 2)}
+      <p className="omr-item-label-indent">- Jaw movements:</p>{ta('jawMovements', 2)}
       <p className="omr-item-label">e) Lymph node Examination:</p>{ta('lymphNodeExamination', 3)}
+      <p className="omr-item-label">f) Examination of Lesion:</p>
+      <p className="omr-item-label-indent">- Inspection:</p>{ta('extraoralLesionInspection', 3)}
+      <p className="omr-item-label-indent">- Palpation:</p>{ta('extraoralLesionPalpation', 3)}
       <p className="omr-section-title">INTRA ORAL EXAMINATION</p>
-      <p className="omr-item-label">1. Site and Shape of the mouth:</p>{ta('siteShapeOfMouth', 2)}
-      <p className="omr-item-label">2. Mouth Opening:</p>{ta('mouthOpening', 2)}
-      <p className="omr-item-label">3. Jaw movements:</p>{ta('jawMovements', 2)}
       <p className="omr-subsection-title">Hard Tissue Examination</p>
       <p className="omr-item-label">1. Teeth present:</p>{ta('teethPresent', 2)}
       <p className="omr-item-label">2. Size, shape and color:</p>{ta('sizeShapeColor', 2)}
@@ -903,7 +959,6 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
       </div>
       <p className="omr-section-title">Clinical Diagnosis:</p>{ta('clinicalDiagnosis', 3)}
       {sectionTitle('Treatment planning:', true)}{ta('treatmentPlan', 4)}
-      <p className="omr-section-title">Prognosis:</p>{ta('prognosis', 3)}
 
       <p className="omr-section-title" style={{ marginTop: 24 }}>CHARGEABLE INVESTIGATIONS:</p>
       <div className="omr-charge-list">
@@ -926,15 +981,82 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
           ['chargeLateralCephalogram','Lateral Cephalogram','Rs. 300'],
           ['chargeCBCT',              'CBCT',               'Cost yet to be decided'],
         ].map(([field, label, rate]) => (
-          <label className="omr-inv-chk-label" key={field}>
-            <input type="checkbox" checked={!!form[field]} onChange={e => set(field, e.target.checked)} />
-            {label} — <span className="omr-charge-rate">{rate}</span>
-          </label>
+          <div className="omr-inv-chk-label" key={field} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <input 
+              type="number" 
+              min="0" 
+              value={form[field] || 0} 
+              onChange={e => set(field, Math.max(0, parseInt(e.target.value) || 0))} 
+              style={{ width: '60px', padding: '4px', borderRadius: '4px', border: '1px solid #ccc', background: 'transparent', color: '#fff' }}
+            />
+            <span>{label} — <span className="omr-charge-rate">{rate}</span></span>
+          </div>
         ))}
 
         <div style={{ marginTop: 16 }}>
           <p className="omr-item-label">Description / Remarks:</p>
           {ta('chargeDescription', 3)}
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <p className="omr-item-label">Clinical Findings Pictures:</p>
+          <input 
+            type="file" 
+            accept="image/png, image/jpeg, image/jpg"
+            multiple
+            onChange={(e) => {
+              const files = Array.from(e.target.files);
+              if (files.length > 0) {
+                const newPictures = [];
+                let loadedCount = 0;
+                files.forEach((file) => {
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    newPictures.push(ev.target.result);
+                    loadedCount++;
+                    if (loadedCount === files.length) {
+                      setForm(prev => ({ 
+                        ...prev, 
+                        clinicalFindingsPictures: [...(prev.clinicalFindingsPictures || []), ...newPictures] 
+                      }));
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                });
+              }
+            }}
+            style={{ marginTop: '8px', color: '#fff' }}
+          />
+          {form.clinicalFindingsPictures && form.clinicalFindingsPictures.length > 0 && (
+            <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              {form.clinicalFindingsPictures.map((pic, idx) => (
+                <div key={idx} style={{ position: 'relative' }}>
+                  <img 
+                    src={pic} 
+                    alt={`Clinical Findings ${idx + 1}`} 
+                    style={{ maxHeight: '150px', borderRadius: '4px' }} 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm(prev => ({
+                        ...prev,
+                        clinicalFindingsPictures: prev.clinicalFindingsPictures.filter((_, i) => i !== idx)
+                      }));
+                    }}
+                    style={{
+                      position: 'absolute', top: '5px', right: '5px',
+                      background: 'rgba(255,0,0,0.7)', color: 'white', border: 'none',
+                      borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <p className="omr-section-title" style={{ marginTop: 24 }}>Referred to Department (Priority Order):</p>
@@ -1106,9 +1228,20 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
     <>
 
 
+      {/* Critical Condition banner */}
+      {showCritical && criticalCondition && (
+        <div className="critical-alert no-print" id="patientCriticalAlert" style={{ top: 0 }}>
+          <span className="alert-icon">⚠️</span>
+          <div className="critical-flow-window">
+            <span id="criticalMessage">{formatAllergyTicker(`Critical Condition: ${criticalCondition}`)}</span>
+          </div>
+          <button onClick={() => setShowCritical(false)} className="close-btn" aria-label="Dismiss" style={{ zIndex: 100000 }}>×</button>
+        </div>
+      )}
+
       {/* Allergy banner — pushed down if critical banner is showing */}
-      {showAllergy && (
-        <div className="allergy-alert" id="patientAllergyAlert" style={{ top: 0 }}>
+      {showAllergy && allergyMessage && allergyMessage !== 'No known allergies' && (
+        <div className="allergy-alert no-print" id="patientAllergyAlert" style={{ top: (showCritical && criticalCondition) ? '44px' : 0 }}>
           <span className="alert-icon">⚠️</span>
           <div className="allergy-flow-window">
             <span id="allergyMessage">{formatAllergyTicker(allergyMessage)}</span>
@@ -1147,7 +1280,10 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
           </div>
         )}
 
-        <div className="omr-statusbar">
+        <div 
+          className="omr-statusbar" 
+          style={{ marginTop: (showCritical && criticalCondition && showAllergy && allergyMessage && allergyMessage !== 'No known allergies') ? '88px' : ((showCritical && criticalCondition) || (showAllergy && allergyMessage && allergyMessage !== 'No known allergies') ? '44px' : '0') }}
+        >
           <span className="omr-statusbar-pid">
             {patientId
               ? <>Patient: <strong>{localStorage.getItem('CurrentpatientName') || patientId}</strong> &nbsp;|&nbsp; ID: {patientId}</>
