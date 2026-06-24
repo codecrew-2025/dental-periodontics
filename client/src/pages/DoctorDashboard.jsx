@@ -4223,7 +4223,7 @@ const DoctorDashboard = () => {
                     </button>
                       </>
                     )}
-                    {!isCampPatient && (
+                    {!isCampPatient && !doctorDepartmentKey.includes('oral') && (
                       <button
                         type="button"
                         className="case-files-btn"
