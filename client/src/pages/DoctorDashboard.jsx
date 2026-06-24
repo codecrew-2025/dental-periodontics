@@ -978,7 +978,8 @@ const DoctorDashboard = () => {
         maritalStatus: 'Marital Status',
         preferredLanguage: 'Preferred Language',
         chiefComplaint: 'Chief Complaint',
-        bloodGroup: 'Blood Group'
+        bloodGroup: 'Blood Group',
+        drugAllergies: 'Drug Allergies'
       };
 
     // Check required fields
@@ -1388,12 +1389,12 @@ const DoctorDashboard = () => {
       } else {
         const error = await response.json().catch(() => ({ message: 'Failed to parse JSON error' }));
         console.error('SAVE PATIENT ERROR RESPONSE:', error);
-        
+
         let errorMsg = `Error saving patient: ${error.message}`;
         if (error.details) {
           errorMsg += ` | Details: ${JSON.stringify(error.details)}`;
         }
-        
+
         showMessage(errorMsg, 'error');
       }
     } catch (error) {
@@ -1519,7 +1520,7 @@ const DoctorDashboard = () => {
     try {
       setRescheduleActionLoadingId(bookingId);
       const token = user?.token || localStorage.getItem('token');
-      
+
       let url = buildApiUrl(`/api/appointment/${encodeURIComponent(bookingId)}/reschedule/approve`);
       let method = 'PUT';
       let body = null;
@@ -1554,9 +1555,9 @@ const DoctorDashboard = () => {
     try {
       setRescheduleActionLoadingId(bookingId);
       const token = user?.token || localStorage.getItem('token');
-      
+
       const appointment = rescheduleRequests.find(req => req.bookingId === bookingId);
-      
+
       let url = buildApiUrl(`/api/appointment/${encodeURIComponent(bookingId)}/reschedule/reject`);
       let method = 'PUT';
       let body = JSON.stringify({ reason: rejectReasonText });
@@ -2903,13 +2904,13 @@ const DoctorDashboard = () => {
                             </td>
                             <td>
                               <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center' }}>
-                                  <button
-                                    type="button"
-                                    title="Approve"
-                                    disabled={isActing}
-                                    onClick={() => handleApproveReschedule(req)}
-                                    style={{ background: '#38a169', color: '#fff', border: 'none', borderRadius: '50%', width: '32px', height: '32px', fontSize: '16px', cursor: isActing ? 'not-allowed' : 'pointer', opacity: isActing ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                                  >
+                                <button
+                                  type="button"
+                                  title="Approve"
+                                  disabled={isActing}
+                                  onClick={() => handleApproveReschedule(req)}
+                                  style={{ background: '#38a169', color: '#fff', border: 'none', borderRadius: '50%', width: '32px', height: '32px', fontSize: '16px', cursor: isActing ? 'not-allowed' : 'pointer', opacity: isActing ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                >
                                   ✓
                                 </button>
                                 <button
@@ -3132,190 +3133,190 @@ const DoctorDashboard = () => {
               ) : doctorPgAnalyticsReport.pgs.length === 0 ? (
                 <div className="chief-empty-state">No report data available for assigned doctors.</div>
               ) : (() => {
-                  const search = reportStudentSearch.toLowerCase().trim();
-                  const filteredPgs = doctorPgAnalyticsReport.pgs.filter((row) => {
-                    if (!search) return true;
-                    return (
-                      (row.name || '').toLowerCase().includes(search) ||
-                      (row.pgName || '').toLowerCase().includes(search) ||
-                      (row.identity || '').toLowerCase().includes(search) ||
-                      (row.pgIdentity || '').toLowerCase().includes(search)
-                    );
-                  });
-
-                  // Calculate filtered totals
-                  const filteredPGCount = filteredPgs.filter(row => row.role === 'pg').length;
-                  const filteredUGCount = filteredPgs.filter(row => row.role === 'ug').length;
-                  const filteredTotalPatients = filteredPgs.reduce((sum, d) => sum + (d.uniquePatients || 0), 0);
-                  const filteredApproved = filteredPgs.reduce((sum, d) => sum + (d.approvalCounts?.approved || 0), 0);
-                  const filteredRedo = filteredPgs.reduce((sum, d) => sum + (d.approvalCounts?.rejected || 0), 0);
-                  const filteredMale = filteredPgs.reduce((sum, d) => sum + (d.malePatients || 0), 0);
-                  const filteredFemale = filteredPgs.reduce((sum, d) => sum + (d.femalePatients || 0), 0);
-                  const filteredNew = filteredPgs.reduce((sum, d) => sum + (d.newPatients || 0), 0);
-                  const filteredOld = filteredPgs.reduce((sum, d) => sum + (d.oldPatients || 0), 0);
-
+                const search = reportStudentSearch.toLowerCase().trim();
+                const filteredPgs = doctorPgAnalyticsReport.pgs.filter((row) => {
+                  if (!search) return true;
                   return (
-                    <>
-                      <div className="chief-summary-grid" style={{ marginBottom: 16 }}>
-                        <div className="chief-summary-card">
-                          <h3>PGs</h3>
-                          <p>{filteredPGCount}</p>
-                        </div>
-                        <div className="chief-summary-card">
-                          <h3>UGs</h3>
-                          <p>{filteredUGCount}</p>
-                        </div>
-                        <div className="chief-summary-card">
-                          <h3>Total Patients</h3>
-                          <p>{filteredTotalPatients}</p>
-                        </div>
-                        <div className="chief-summary-card">
-                          <h3>Approved</h3>
-                          <p>{filteredApproved}</p>
-                        </div>
-                        <div className="chief-summary-card">
-                          <h3>Redo</h3>
-                          <p>{filteredRedo}</p>
-                        </div>
-                      </div>
-
-                      <div className="chief-analytics-charts">
-                        {/* Patients by PG Pie Chart */}
-                        <div className="chief-chart-container">
-                          <h3>Patients Distribution</h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={filteredPgs.map((d) => ({
-                                  name: d.pgName || d.pgIdentity,
-                                  value: d.uniquePatients || 0,
-                                }))}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                label={(entry) => `${entry.name}: ${entry.value}`}
-                              >
-                                {filteredPgs.map((_, index) => (
-                                  <Cell key={`cell-${index}`} fill={`hsl(${index * 137.5}, 70%, 50%)`} />
-                                ))}
-                              </Pie>
-                              <Tooltip />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        {/* Gender Distribution Pie Chart */}
-                        <div className="chief-chart-container">
-                          <h3>Gender Distribution</h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={[
-                                  { name: 'Male', value: filteredMale },
-                                  { name: 'Female', value: filteredFemale },
-                                ]}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                label={(entry) => `${entry.name}: ${entry.value}`}
-                              >
-                                <Cell fill="#3b82f6" />
-                                <Cell fill="#ec4899" />
-                              </Pie>
-                              <Tooltip />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-
-                        {/* New vs Old Patients Pie Chart */}
-                        <div className="chief-chart-container">
-                          <h3>Old vs New Patients</h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={[
-                                  { name: 'New Patients', value: filteredNew },
-                                  { name: 'Old Patients', value: filteredOld },
-                                ]}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                                label={(entry) => `${entry.name}: ${entry.value}`}
-                              >
-                                <Cell fill="#10b981" />
-                                <Cell fill="#f59e0b" />
-                              </Pie>
-                              <Tooltip />
-                              <Legend />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-
-                      <table className="chief-simple-table" style={{ marginTop: 16 }}>
-                        <thead>
-                          <tr>
-                            <th>S.No</th>
-                            <th>Doctor Name</th>
-                            <th>Patients</th>
-                            <th>Male</th>
-                            <th>Female</th>
-                            <th>New</th>
-                            <th>Old</th>
-                            <th>Case Sheets</th>
-                            <th>Approved</th>
-                            <th>Redo</th>
-                            <th>Pending</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredPgs.map((row, index) => (
-                            <tr key={row.pgIdentity}>
-                              <td>{index + 1}</td>
-                              <td>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                  {row.pgName || row.pgIdentity}
-                                  {row.role && (
-                                    <span style={{
-                                      fontSize: '11px',
-                                      fontWeight: 700,
-                                      padding: '2px 7px',
-                                      borderRadius: '4px',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: '0.5px',
-                                      background: row.role === 'pg' ? '#e0edff' : '#e6f9f0',
-                                      color: row.role === 'pg' ? '#1a5ccc' : '#1a7f50',
-                                      border: row.role === 'pg' ? '1px solid #b3d0ff' : '1px solid #a3dfc0',
-                                    }}>
-                                      {row.role.toUpperCase()}
-                                    </span>
-                                  )}
-                                </span>
-                              </td>
-                              <td>{row.uniquePatients || 0}</td>
-                              <td>{row.malePatients || 0}</td>
-                              <td>{row.femalePatients || 0}</td>
-                              <td>{row.newPatients || 0}</td>
-                              <td>{row.oldPatients || 0}</td>
-                              <td>{row.totalCaseSheets || 0}</td>
-                              <td>{row.approvalCounts?.approved || 0}</td>
-                              <td>{row.approvalCounts?.rejected || 0}</td>
-                              <td>{row.approvalCounts?.pending || 0}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </>
+                    (row.name || '').toLowerCase().includes(search) ||
+                    (row.pgName || '').toLowerCase().includes(search) ||
+                    (row.identity || '').toLowerCase().includes(search) ||
+                    (row.pgIdentity || '').toLowerCase().includes(search)
                   );
-                })()}
+                });
+
+                // Calculate filtered totals
+                const filteredPGCount = filteredPgs.filter(row => row.role === 'pg').length;
+                const filteredUGCount = filteredPgs.filter(row => row.role === 'ug').length;
+                const filteredTotalPatients = filteredPgs.reduce((sum, d) => sum + (d.uniquePatients || 0), 0);
+                const filteredApproved = filteredPgs.reduce((sum, d) => sum + (d.approvalCounts?.approved || 0), 0);
+                const filteredRedo = filteredPgs.reduce((sum, d) => sum + (d.approvalCounts?.rejected || 0), 0);
+                const filteredMale = filteredPgs.reduce((sum, d) => sum + (d.malePatients || 0), 0);
+                const filteredFemale = filteredPgs.reduce((sum, d) => sum + (d.femalePatients || 0), 0);
+                const filteredNew = filteredPgs.reduce((sum, d) => sum + (d.newPatients || 0), 0);
+                const filteredOld = filteredPgs.reduce((sum, d) => sum + (d.oldPatients || 0), 0);
+
+                return (
+                  <>
+                    <div className="chief-summary-grid" style={{ marginBottom: 16 }}>
+                      <div className="chief-summary-card">
+                        <h3>PGs</h3>
+                        <p>{filteredPGCount}</p>
+                      </div>
+                      <div className="chief-summary-card">
+                        <h3>UGs</h3>
+                        <p>{filteredUGCount}</p>
+                      </div>
+                      <div className="chief-summary-card">
+                        <h3>Total Patients</h3>
+                        <p>{filteredTotalPatients}</p>
+                      </div>
+                      <div className="chief-summary-card">
+                        <h3>Approved</h3>
+                        <p>{filteredApproved}</p>
+                      </div>
+                      <div className="chief-summary-card">
+                        <h3>Redo</h3>
+                        <p>{filteredRedo}</p>
+                      </div>
+                    </div>
+
+                    <div className="chief-analytics-charts">
+                      {/* Patients by PG Pie Chart */}
+                      <div className="chief-chart-container">
+                        <h3>Patients Distribution</h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={filteredPgs.map((d) => ({
+                                name: d.pgName || d.pgIdentity,
+                                value: d.uniquePatients || 0,
+                              }))}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.value}`}
+                            >
+                              {filteredPgs.map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={`hsl(${index * 137.5}, 70%, 50%)`} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* Gender Distribution Pie Chart */}
+                      <div className="chief-chart-container">
+                        <h3>Gender Distribution</h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Male', value: filteredMale },
+                                { name: 'Female', value: filteredFemale },
+                              ]}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.value}`}
+                            >
+                              <Cell fill="#3b82f6" />
+                              <Cell fill="#ec4899" />
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+
+                      {/* New vs Old Patients Pie Chart */}
+                      <div className="chief-chart-container">
+                        <h3>Old vs New Patients</h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'New Patients', value: filteredNew },
+                                { name: 'Old Patients', value: filteredOld },
+                              ]}
+                              dataKey="value"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              label={(entry) => `${entry.name}: ${entry.value}`}
+                            >
+                              <Cell fill="#10b981" />
+                              <Cell fill="#f59e0b" />
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    <table className="chief-simple-table" style={{ marginTop: 16 }}>
+                      <thead>
+                        <tr>
+                          <th>S.No</th>
+                          <th>Doctor Name</th>
+                          <th>Patients</th>
+                          <th>Male</th>
+                          <th>Female</th>
+                          <th>New</th>
+                          <th>Old</th>
+                          <th>Case Sheets</th>
+                          <th>Approved</th>
+                          <th>Redo</th>
+                          <th>Pending</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredPgs.map((row, index) => (
+                          <tr key={row.pgIdentity}>
+                            <td>{index + 1}</td>
+                            <td>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                {row.pgName || row.pgIdentity}
+                                {row.role && (
+                                  <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    padding: '2px 7px',
+                                    borderRadius: '4px',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    background: row.role === 'pg' ? '#e0edff' : '#e6f9f0',
+                                    color: row.role === 'pg' ? '#1a5ccc' : '#1a7f50',
+                                    border: row.role === 'pg' ? '1px solid #b3d0ff' : '1px solid #a3dfc0',
+                                  }}>
+                                    {row.role.toUpperCase()}
+                                  </span>
+                                )}
+                              </span>
+                            </td>
+                            <td>{row.uniquePatients || 0}</td>
+                            <td>{row.malePatients || 0}</td>
+                            <td>{row.femalePatients || 0}</td>
+                            <td>{row.newPatients || 0}</td>
+                            <td>{row.oldPatients || 0}</td>
+                            <td>{row.totalCaseSheets || 0}</td>
+                            <td>{row.approvalCounts?.approved || 0}</td>
+                            <td>{row.approvalCounts?.rejected || 0}</td>
+                            <td>{row.approvalCounts?.pending || 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                );
+              })()}
             </section>
           )}
 
@@ -3757,7 +3758,7 @@ const DoctorDashboard = () => {
               {/* Form Section */}
               {showForm && (
                 <div className="patient-form">
-                      <h3>Personal Information</h3>
+                  <h3>Personal Information</h3>
 
                   {/* Name fields */}
                   <div className="form-row">
@@ -3858,348 +3859,349 @@ const DoctorDashboard = () => {
 
                   {!isCampPatient && (
                     <>
-                  {/* Marital Status */}
-                  <div className="input-group">
-                    <label>
-                      Marital Status <span style={{ color: "red" }}>*</span>
-                    </label>
-                    <div className="radio-options">
-                      {['Single', 'Married', 'Other'].map((status) => (
-                        <label key={status} className="radio-option">
-                          <input
-                            type="radio"
-                            name="maritalStatus"
-                            value={status}
-                            checked={formData.maritalStatus === status}
-                            onChange={handleInputChange}
-                          />
-                          <span>{status}</span>
+                      {/* Marital Status */}
+                      <div className="input-group">
+                        <label>
+                          Marital Status <span style={{ color: "red" }}>*</span>
                         </label>
-                      ))}
-                    </div>
-                    {fieldErrors.maritalStatus && <div className="error-message">{fieldErrors.maritalStatus}</div>}
-                  </div>
+                        <div className="radio-options">
+                          {['Single', 'Married', 'Other'].map((status) => (
+                            <label key={status} className="radio-option">
+                              <input
+                                type="radio"
+                                name="maritalStatus"
+                                value={status}
+                                checked={formData.maritalStatus === status}
+                                onChange={handleInputChange}
+                              />
+                              <span>{status}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {fieldErrors.maritalStatus && <div className="error-message">{fieldErrors.maritalStatus}</div>}
+                      </div>
 
-                  {/* Pregnancy Status - Show only when Female and Married */}
-                  {formData.gender === 'Female' && formData.maritalStatus === 'Married' && (
-                    <div className="input-group">
-                      <label>
-                        Pregnancy Status <span style={{ color: "red" }}>*</span>
-                      </label>
-                      <div className="radio-options">
-                        {['No', 'Yes', 'N/A'].map((status) => (
-                          <label key={status} className="radio-option">
+                      {/* Pregnancy Status - Show only when Female and Married */}
+                      {formData.gender === 'Female' && formData.maritalStatus === 'Married' && (
+                        <div className="input-group">
+                          <label>
+                            Pregnancy Status <span style={{ color: "red" }}>*</span>
+                          </label>
+                          <div className="radio-options">
+                            {['No', 'Yes', 'N/A'].map((status) => (
+                              <label key={status} className="radio-option">
+                                <input
+                                  type="radio"
+                                  name="pregnancyStatus"
+                                  value={status}
+                                  checked={formData.pregnancyStatus === status}
+                                  onChange={handleInputChange}
+                                />
+                                <span>{status}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {fieldErrors.pregnancyStatus && <div className="error-message">{fieldErrors.pregnancyStatus}</div>}
+                        </div>
+                      )}
+
+                      {/* Vitals — right after Marital Status */}
+                      <h3>Vitals</h3>
+                      <div className="form-row">
+                        <div className="input-group">
+                          <label>Blood Pressure</label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input type="text" name="vitalBP" placeholder="120/80"
+                              value={formData.vitalBP} onChange={handleInputChange} />
+                            <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>mmHg</span>
+                          </div>
+                        </div>
+                        <div className="input-group">
+                          <label>Temperature</label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input type="text" name="vitalTemp" placeholder="37.0"
+                              value={formData.vitalTemp} onChange={handleInputChange} />
+                            <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>°C</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <div className="input-group">
+                          <label>Weight</label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input type="text" name="vitalWeight" placeholder="65"
+                              value={formData.vitalWeight} onChange={handleInputChange} />
+                            <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>kg</span>
+                          </div>
+                        </div>
+                        <div className="input-group">
+                          <label>Height</label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <input type="text" name="vitalHeight" placeholder="165"
+                              value={formData.vitalHeight} onChange={handleInputChange} />
+                            <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>cm</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Information */}
+                      <h3>Additional Information</h3>
+                      <div className="form-row">
+                        <div className="input-group">
+                          <label htmlFor="occupation">Occupation</label>
+                          <input type="text" id="occupation" name="occupation"
+                            value={formData.occupation} onChange={handleInputChange}
+                            placeholder="e.g. Teacher, Engineer" />
+                        </div>
+                        <div className="input-group">
+                          <label htmlFor="income">Income</label>
+                          <input type="text" id="income" name="income"
+                            value={formData.income} onChange={handleInputChange}
+                            placeholder="e.g. 30,000 / month" />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <div className="input-group">
+                          <label htmlFor="religion">Religion</label>
+                          <input type="text" id="religion" name="religion"
+                            value={formData.religion} onChange={handleInputChange}
+                            placeholder="e.g. Hindu, Christian" />
+                        </div>
+                        <div className="input-group">
+                          <label htmlFor="address">Address</label>
+                          <input type="text" id="address" name="address"
+                            value={formData.address} onChange={handleInputChange}
+                            placeholder="Full address" />
+                        </div>
+                      </div>
+
+                      {/* Preferred Language */}
+                      <div className="input-group">
+                        <label htmlFor="preferred-language">
+                          Preferred Language <span style={{ color: "red" }}>*</span>
+                        </label>
+                        <select id="preferred-language" name="preferredLanguage"
+                          value={formData.preferredLanguage} onChange={handleInputChange}>
+                          <option value="">Select</option>
+                          <option value="English">English</option>
+                          <option value="Hindi">Hindi</option>
+                          <option value="Tamil">Tamil</option>
+                          <option value="Other">Other</option>
+                        </select>
+                        {fieldErrors.preferredLanguage && <div className="error-message">{fieldErrors.preferredLanguage}</div>}
+                      </div>
+
+                      {formData.preferredLanguage === 'Other' && (
+                        <div className="input-group">
+                          <label htmlFor="other-language">Specify Language <span style={{ color: "red" }}>*</span></label>
+                          <input type="text" id="other-language" name="otherLanguage"
+                            value={formData.otherLanguage} onChange={handleInputChange}
+                            placeholder="Enter preferred language" />
+                          {fieldErrors.otherLanguage && <div className="error-message">{fieldErrors.otherLanguage}</div>}
+                        </div>
+                      )}
+
+                      {isPublicHealthDentistry && (
+                        <div className="input-group" style={{ marginBottom: '1.5rem' }}>
+                          <h3>Public Health Dentistry: Diagnosis & Treatment Plan</h3>
+                          <p style={{ marginTop: 0, opacity: 0.85 }}>
+                            For this department, only personal information plus diagnosis and treatment plan are stored.
+                          </p>
+
+                          <div className="input-group">
+                            <label htmlFor="diagnosis">
+                              Diagnosis <span style={{ color: 'red' }}>*</span>
+                            </label>
+                            <textarea
+                              id="diagnosis"
+                              name="diagnosis"
+                              value={formData.diagnosis}
+                              onChange={handleInputChange}
+                              rows="3"
+                              placeholder="Enter diagnosis"
+                            />
+                            {fieldErrors.diagnosis && <div className="error-message">{fieldErrors.diagnosis}</div>}
+                          </div>
+
+                          <div className="input-group">
+                            <label htmlFor="treatment-plan">
+                              Treatment Plan <span style={{ color: 'red' }}>*</span>
+                            </label>
+                            <textarea
+                              id="treatment-plan"
+                              name="treatmentPlan"
+                              value={formData.treatmentPlan}
+                              onChange={handleInputChange}
+                              rows="4"
+                              placeholder="Enter treatment plan"
+                            />
+                            {fieldErrors.treatmentPlan && <div className="error-message">{fieldErrors.treatmentPlan}</div>}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Patient Case Entry Section */}
+                      <h3>Patient Case Entry - Chief Complaint & History</h3>
+
+                      {/* Chief Complaint */}
+                      <div className="input-group">
+                        <label htmlFor="chief-complaint">
+                          Chief Complaint <span style={{ color: "red" }}>*</span>
+                        </label>
+                        <textarea id="chief-complaint" name="chiefComplaint" rows={2}
+                          value={formData.chiefComplaint} onChange={handleInputChange}
+                          placeholder="Describe the chief complaint..." />
+                        {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
+                      </div>
+
+
+
+                      {/* HPI, Past Medical History, Personal Habits, Medical History
+                — hidden for Oral Medicine and Endodontics departments */}
+                      {!String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') &&
+                        !String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('endo') && (<>
+
+                          {/* Text areas for additional information */}
+                          <div className="input-group">
+                            <h3>Medical history</h3>
+                            <label htmlFor="current-medications">
+                              Current Medications
+                            </label>
+                            <textarea
+                              id="current-medications"
+                              name="currentMedications"
+                              value={formData.currentMedications}
+                              onChange={handleInputChange}
+                              rows="2"
+                            />
+                          </div>
+
+                          <div className="input-group">
+                            <label htmlFor="known-allergies">
+                              Known Allergies (e.g., latex, medications, anesthetics)
+                            </label>
+                            <textarea
+                              id="known-allergies"
+                              name="knownAllergies"
+                              value={formData.knownAllergies}
+                              onChange={handleInputChange}
+                              rows="2"
+                            />
+                          </div>
+
+                          <div className="input-group">
+                            <label htmlFor="chronic-conditions">
+                              Chronic Conditions (e.g., diabetes, heart disease)
+                            </label>
+                            <textarea
+                              id="chronic-conditions"
+                              name="chronicConditions"
+                              value={formData.chronicConditions}
+                              onChange={handleInputChange}
+                              rows="2"
+                            />
+                          </div>
+
+                          <div className="input-group">
+                            <label htmlFor="past-surgeries">
+                              Past Surgeries
+                            </label>
+                            <textarea
+                              id="past-surgeries"
+                              name="pastSurgeries"
+                              value={formData.pastSurgeries}
+                              onChange={handleInputChange}
+                              rows="2"
+                            />
+                          </div>
+
+                          <div className="input-group">
+                            <label htmlFor="primary-dental-concerns">
+                              Primary Dental Concerns (e.g., pain, sensitivity, bleeding gums)
+                            </label>
+                            <textarea
+                              id="primary-dental-concerns"
+                              name="primaryDentalConcerns"
+                              value={formData.primaryDentalConcerns}
+                              onChange={handleInputChange}
+                              rows="2"
+                            />
+                          </div>
+
+                          <div className="input-group">
+                            <label htmlFor="last-dental-visit">
+                              Date of Last Dental Visit
+                            </label>
                             <input
-                              type="radio"
-                              name="pregnancyStatus"
-                              value={status}
-                              checked={formData.pregnancyStatus === status}
+                              type="date"
+                              id="last-dental-visit"
+                              name="lastDentalVisit"
+                              value={formData.lastDentalVisit}
                               onChange={handleInputChange}
                             />
-                            <span>{status}</span>
-                          </label>
-                        ))}
+                          </div>
+
+                        </>)}
+
+                      {/* Vitals Section */}
+                      <h3>Other Information</h3>
+
+                      <div className="form-grid">
+                        <div className="input-group">
+                          <label htmlFor="blood-group">Blood Group <span style={{ color: "red" }}>*</span></label>
+                          <select
+                            id="blood-group"
+                            name="bloodGroup"
+                            value={formData.bloodGroup}
+                            onChange={handleInputChange}
+                          >
+                            <option value="">Select Blood Group</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                          </select>
+                          {fieldErrors.bloodGroup && <div className="error-message">{fieldErrors.bloodGroup}</div>}
+                        </div>
+                        <div className="input-group">
+                          <label htmlFor="drug-allergies">Drug Allergies <span style={{ color: "red" }}>*</span></label>
+                          <input
+                            type="text"
+                            id="drug-allergies"
+                            name="drugAllergies"
+                            value={formData.drugAllergies}
+                            onChange={handleInputChange}
+                            placeholder="Specify drug allergies"
+                          />
+                          {fieldErrors.drugAllergies && <div className="error-message">{fieldErrors.drugAllergies}</div>}
+                        </div>
+                        <div className="input-group">
+                          <label htmlFor="diet-allergies">Diet Allergies</label>
+                          <input
+                            type="text"
+                            id="diet-allergies"
+                            name="dietAllergies"
+                            value={formData.dietAllergies}
+                            onChange={handleInputChange}
+                            placeholder="Specify diet allergies"
+                          />
+                        </div>
+                        <div className="input-group">
+                          <label htmlFor="critical-condition">Critical Condition</label>
+                          <input
+                            type="text"
+                            id="critical-condition"
+                            name="criticalCondition"
+                            value={formData.criticalCondition}
+                            onChange={handleInputChange}
+                            placeholder="e.g. Cardiac arrest risk, Severe allergy, Haemophilia..."
+                          />
+                        </div>
                       </div>
-                      {fieldErrors.pregnancyStatus && <div className="error-message">{fieldErrors.pregnancyStatus}</div>}
-                    </div>
-                  )}
-
-                  {/* Vitals — right after Marital Status */}
-                  <h3>Vitals</h3>
-                  <div className="form-row">
-                    <div className="input-group">
-                      <label>Blood Pressure</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input type="text" name="vitalBP" placeholder="120/80"
-                          value={formData.vitalBP} onChange={handleInputChange} />
-                        <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>mmHg</span>
-                      </div>
-                    </div>
-                    <div className="input-group">
-                      <label>Temperature</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input type="text" name="vitalTemp" placeholder="37.0"
-                          value={formData.vitalTemp} onChange={handleInputChange} />
-                        <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>°C</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <div className="input-group">
-                      <label>Weight</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input type="text" name="vitalWeight" placeholder="65"
-                          value={formData.vitalWeight} onChange={handleInputChange} />
-                        <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>kg</span>
-                      </div>
-                    </div>
-                    <div className="input-group">
-                      <label>Height</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input type="text" name="vitalHeight" placeholder="165"
-                          value={formData.vitalHeight} onChange={handleInputChange} />
-                        <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>cm</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Additional Information */}
-                  <h3>Additional Information</h3>
-                  <div className="form-row">
-                    <div className="input-group">
-                      <label htmlFor="occupation">Occupation</label>
-                      <input type="text" id="occupation" name="occupation"
-                        value={formData.occupation} onChange={handleInputChange}
-                        placeholder="e.g. Teacher, Engineer" />
-                    </div>
-                    <div className="input-group">
-                      <label htmlFor="income">Income</label>
-                      <input type="text" id="income" name="income"
-                        value={formData.income} onChange={handleInputChange}
-                        placeholder="e.g. 30,000 / month" />
-                    </div>
-                  </div>
-                  <div className="form-row">
-                    <div className="input-group">
-                      <label htmlFor="religion">Religion</label>
-                      <input type="text" id="religion" name="religion"
-                        value={formData.religion} onChange={handleInputChange}
-                        placeholder="e.g. Hindu, Christian" />
-                    </div>
-                    <div className="input-group">
-                      <label htmlFor="address">Address</label>
-                      <input type="text" id="address" name="address"
-                        value={formData.address} onChange={handleInputChange}
-                        placeholder="Full address" />
-                    </div>
-                  </div>
-
-                  {/* Preferred Language */}
-                  <div className="input-group">
-                    <label htmlFor="preferred-language">
-                      Preferred Language <span style={{ color: "red" }}>*</span>
-                    </label>
-                    <select id="preferred-language" name="preferredLanguage"
-                      value={formData.preferredLanguage} onChange={handleInputChange}>
-                      <option value="">Select</option>
-                      <option value="English">English</option>
-                      <option value="Hindi">Hindi</option>
-                      <option value="Tamil">Tamil</option>
-                      <option value="Other">Other</option>
-                    </select>
-                    {fieldErrors.preferredLanguage && <div className="error-message">{fieldErrors.preferredLanguage}</div>}
-                  </div>
-
-                  {formData.preferredLanguage === 'Other' && (
-                    <div className="input-group">
-                      <label htmlFor="other-language">Specify Language <span style={{ color: "red" }}>*</span></label>
-                      <input type="text" id="other-language" name="otherLanguage"
-                        value={formData.otherLanguage} onChange={handleInputChange}
-                        placeholder="Enter preferred language" />
-                      {fieldErrors.otherLanguage && <div className="error-message">{fieldErrors.otherLanguage}</div>}
-                    </div>
-                  )}
-
-                  {isPublicHealthDentistry && (
-                    <div className="input-group" style={{ marginBottom: '1.5rem' }}>
-                      <h3>Public Health Dentistry: Diagnosis & Treatment Plan</h3>
-                      <p style={{ marginTop: 0, opacity: 0.85 }}>
-                        For this department, only personal information plus diagnosis and treatment plan are stored.
-                      </p>
-
-                      <div className="input-group">
-                        <label htmlFor="diagnosis">
-                          Diagnosis <span style={{ color: 'red' }}>*</span>
-                        </label>
-                        <textarea
-                          id="diagnosis"
-                          name="diagnosis"
-                          value={formData.diagnosis}
-                          onChange={handleInputChange}
-                          rows="3"
-                          placeholder="Enter diagnosis"
-                        />
-                        {fieldErrors.diagnosis && <div className="error-message">{fieldErrors.diagnosis}</div>}
-                      </div>
-
-                      <div className="input-group">
-                        <label htmlFor="treatment-plan">
-                          Treatment Plan <span style={{ color: 'red' }}>*</span>
-                        </label>
-                        <textarea
-                          id="treatment-plan"
-                          name="treatmentPlan"
-                          value={formData.treatmentPlan}
-                          onChange={handleInputChange}
-                          rows="4"
-                          placeholder="Enter treatment plan"
-                        />
-                        {fieldErrors.treatmentPlan && <div className="error-message">{fieldErrors.treatmentPlan}</div>}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Patient Case Entry Section */}
-                  <h3>Patient Case Entry - Chief Complaint & History</h3>
-
-                  {/* Chief Complaint */}
-                  <div className="input-group">
-                    <label htmlFor="chief-complaint">
-                      Chief Complaint <span style={{ color: "red" }}>*</span>
-                    </label>
-                    <textarea id="chief-complaint" name="chiefComplaint" rows={2}
-                      value={formData.chiefComplaint} onChange={handleInputChange}
-                      placeholder="Describe the chief complaint..." />
-                    {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
-                  </div>
-
-
-
-                  {/* HPI, Past Medical History, Personal Habits, Medical History
-                — hidden for Oral Medicine and Endodontics departments */}
-                  {!String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') &&
-                    !String(doctorDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('endo') && (<>
-
-                      {/* Text areas for additional information */}
-                      <div className="input-group">
-                        <h3>Medical history</h3>
-                        <label htmlFor="current-medications">
-                          Current Medications
-                        </label>
-                        <textarea
-                          id="current-medications"
-                          name="currentMedications"
-                          value={formData.currentMedications}
-                          onChange={handleInputChange}
-                          rows="2"
-                        />
-                      </div>
-
-                      <div className="input-group">
-                        <label htmlFor="known-allergies">
-                          Known Allergies (e.g., latex, medications, anesthetics)
-                        </label>
-                        <textarea
-                          id="known-allergies"
-                          name="knownAllergies"
-                          value={formData.knownAllergies}
-                          onChange={handleInputChange}
-                          rows="2"
-                        />
-                      </div>
-
-                      <div className="input-group">
-                        <label htmlFor="chronic-conditions">
-                          Chronic Conditions (e.g., diabetes, heart disease)
-                        </label>
-                        <textarea
-                          id="chronic-conditions"
-                          name="chronicConditions"
-                          value={formData.chronicConditions}
-                          onChange={handleInputChange}
-                          rows="2"
-                        />
-                      </div>
-
-                      <div className="input-group">
-                        <label htmlFor="past-surgeries">
-                          Past Surgeries
-                        </label>
-                        <textarea
-                          id="past-surgeries"
-                          name="pastSurgeries"
-                          value={formData.pastSurgeries}
-                          onChange={handleInputChange}
-                          rows="2"
-                        />
-                      </div>
-
-                      <div className="input-group">
-                        <label htmlFor="primary-dental-concerns">
-                          Primary Dental Concerns (e.g., pain, sensitivity, bleeding gums)
-                        </label>
-                        <textarea
-                          id="primary-dental-concerns"
-                          name="primaryDentalConcerns"
-                          value={formData.primaryDentalConcerns}
-                          onChange={handleInputChange}
-                          rows="2"
-                        />
-                      </div>
-
-                      <div className="input-group">
-                        <label htmlFor="last-dental-visit">
-                          Date of Last Dental Visit
-                        </label>
-                        <input
-                          type="date"
-                          id="last-dental-visit"
-                          name="lastDentalVisit"
-                          value={formData.lastDentalVisit}
-                          onChange={handleInputChange}
-                        />
-                      </div>
-
-                    </>)}
-
-                  {/* Vitals Section */}
-                  <h3>Other Information</h3>
-
-                  <div className="form-grid">
-                    <div className="input-group">
-                      <label htmlFor="blood-group">Blood Group <span style={{ color: "red" }}>*</span></label>
-                      <select
-                        id="blood-group"
-                        name="bloodGroup"
-                        value={formData.bloodGroup}
-                        onChange={handleInputChange}
-                      >
-                        <option value="">Select Blood Group</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                      </select>
-                      {fieldErrors.bloodGroup && <div className="error-message">{fieldErrors.bloodGroup}</div>}
-                    </div>
-                    <div className="input-group">
-                      <label htmlFor="drug-allergies">Drug Allergies <span style={{ color: "red" }}>*</span></label>
-                      <input
-                        type="text"
-                        id="drug-allergies"
-                        name="drugAllergies"
-                        value={formData.drugAllergies}
-                        onChange={handleInputChange}
-                        placeholder="Specify drug allergies"
-                      />
-                    </div>
-                    <div className="input-group">
-                      <label htmlFor="diet-allergies">Diet Allergies <span style={{ color: "red" }}>*</span></label>
-                      <input
-                        type="text"
-                        id="diet-allergies"
-                        name="dietAllergies"
-                        value={formData.dietAllergies}
-                        onChange={handleInputChange}
-                        placeholder="Specify diet allergies"
-                      />
-                    </div>
-                    <div className="input-group">
-                      <label htmlFor="critical-condition">Critical Condition</label>
-                      <input
-                        type="text"
-                        id="critical-condition"
-                        name="criticalCondition"
-                        value={formData.criticalCondition}
-                        onChange={handleInputChange}
-                        placeholder="e.g. Cardiac arrest risk, Severe allergy, Haemophilia..."
-                      />
-                    </div>
-                  </div>
                     </>
                   )}
 
@@ -4223,14 +4225,14 @@ const DoctorDashboard = () => {
                         >
                           Go to Case Files
                         </button>
-                    <button
-                      className="case-history-btn"
-                      onClick={() => navigate('/case-history')}
-                      type="button"
-                      disabled={!canNavigateCases}
-                    >
-                      Case History
-                    </button>
+                        <button
+                          className="case-history-btn"
+                          onClick={() => navigate('/case-history')}
+                          type="button"
+                          disabled={!canNavigateCases}
+                        >
+                          Case History
+                        </button>
                       </>
                     )}
                     {!isCampPatient && !doctorDepartmentKey.includes('oral') && (

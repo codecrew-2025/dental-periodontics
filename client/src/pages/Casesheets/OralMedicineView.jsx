@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
@@ -22,6 +22,15 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
   const [loading, setLoading] = useState(!propCaseData);
   const [currentPage, setCurrentPage] = useState(0);
   const totalPages = 8;
+  const [allergyMessage, setAllergyMessage] = useState('');
+  const [criticalMessage, setCriticalMessage] = useState('');
+  const [showAllergy, setShowAllergy] = useState(true);
+  const [showCritical, setShowCritical] = useState(true);
+
+  const formatAllergyTicker = (raw) => {
+    if (!raw) return '';
+    return Array(15).fill(raw).join(' •\u00A0\u00A0\u00A0\u00A0');
+  };
 
   const roleKey = String(user?.role || localStorage.getItem('role') || '').trim().toLowerCase();
   const handleClickReferredDepartment = () => {
@@ -48,6 +57,33 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
         if (response.ok) {
           const data = await response.json();
           setCaseData(data.data);
+          
+          if (data.data?.patientId) {
+            const patientRes = await fetch(`${API_BASE_URL}/api/patient-details/by-patient-id/${data.data.patientId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (patientRes.ok) {
+              const patientJson = await patientRes.json();
+              const patient = patientJson?.data || patientJson?.patient;
+              if (patient) {
+                const toListString = (val) => {
+                  if (!val) return '';
+                  if (Array.isArray(val)) return val.join(', ');
+                  return String(val).trim();
+                };
+                const drug = toListString(patient.vitals?.drugAllergies);
+                const known = toListString(patient.medicalInfo?.knownAllergies);
+                const diet = toListString(patient.vitals?.dietAllergies);
+                const critical = toListString(patient.vitals?.criticalCondition);
+
+                if (critical) setCriticalMessage(`Critical Condition: ${critical}`);
+
+                if (drug && drug !== 'None') setAllergyMessage(`Drug Allergies: ${drug}`);
+                else if (known && known !== 'None') setAllergyMessage(`Known Allergies: ${known}`);
+                else if (diet && diet !== 'None') setAllergyMessage(`Diet Allergies: ${diet}`);
+              }
+            }
+          }
         } else {
           console.error('Failed to fetch case data');
         }
@@ -94,7 +130,29 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
 
   return (
     <div className="digital-doctor-case-sheet">
-      <div className="case-sheet-header">
+      {/* Critical Condition banner */}
+      {showCritical && criticalMessage && (
+        <div className="critical-alert no-print" id="patientCriticalAlert" style={{ top: 0 }}>
+          <span className="alert-icon">⚠️</span>
+          <div className="critical-flow-window">
+            <span id="criticalMessage">{formatAllergyTicker(criticalMessage)}</span>
+          </div>
+          <button onClick={() => setShowCritical(false)} className="close-btn" aria-label="Dismiss" style={{ zIndex: 100000 }}>×</button>
+        </div>
+      )}
+
+      {/* Allergy banner — pushed down if critical banner is showing */}
+      {showAllergy && allergyMessage && (
+        <div className="allergy-alert no-print" id="patientAllergyAlert" style={{ top: (showCritical && criticalMessage) ? '44px' : 0 }}>
+          <span className="alert-icon">⚠️</span>
+          <div className="allergy-flow-window">
+            <span id="allergyMessage">{formatAllergyTicker(allergyMessage)}</span>
+          </div>
+          <button onClick={() => setShowAllergy(false)} className="close-btn" aria-label="Dismiss" style={{ zIndex: 100000 }}>×</button>
+        </div>
+      )}
+
+      <div className="case-sheet-header" style={{ marginTop: (showCritical && criticalMessage && showAllergy && allergyMessage) ? '88px' : ((showCritical && criticalMessage) || (showAllergy && allergyMessage) ? '44px' : '0') }}>
         <a href="/" className="logo-main">
           <img src="/logo.png" alt="SRM Dental College Logo" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = 'https://placehold.co/40x40/E0F2F7/2C3E50?text=LOGO'; }} />
           <span>SRM Dental College</span>
@@ -109,6 +167,16 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
         {/* ── Page 1: Patient Information & History ── */}
         {currentPage === 0 && (
           <div className="page active">
+            {caseData.clinicalPhotographs && caseData.clinicalPhotographs.length > 0 && (
+              <div style={{ marginBottom: '20px' }}>
+                <h3>Clinical Photographs:</h3>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {caseData.clinicalPhotographs.map((photo, i) => (
+                    <img key={i} src={normalizeXraySrc(photo)} alt={`Clinical photo ${i+1}`} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '6px' }} />
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="form-row-wide">
               {field('CASE SHEET:', caseData.caseSheetNumber)}
               {field('DATE:', caseData.date ? new Date(caseData.date).toLocaleDateString() : '')}
@@ -204,6 +272,10 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
               {area('', caseData.tmjPalpation)}
               <h5>- Percussion and Auscultation:</h5>
               {area('', caseData.tmjPercussionAuscultation || caseData.tmjPercussion)}
+              <h5>- Mouth Opening:</h5>
+              {area('', caseData.mouthOpening)}
+              <h5>- Jaw movements:</h5>
+              {area('', caseData.jawMovements)}
             </div>
 
             <h4>e) Lymph Node Examination:</h4>
@@ -214,6 +286,14 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
               caseData.preauricular  && `Preauricular: ${caseData.preauricular}`,
               caseData.postauricular && `Postauricular: ${caseData.postauricular}`,
             ].filter(Boolean).join('\n'))}
+
+            <h4>f) Examination of Lesion:</h4>
+            <div style={{ marginLeft: '20px' }}>
+              <h5>- Inspection:</h5>
+              {area('', caseData.extraoralLesionInspection)}
+              <h5>- Palpation:</h5>
+              {area('', caseData.extraoralLesionPalpation)}
+            </div>
           </div>
         )}
 
@@ -221,13 +301,6 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
         {currentPage === 3 && (
           <div className="page active">
             <h2>INTRA ORAL EXAMINATION</h2>
-            <h3>1. Site and Shape of the mouth:</h3>
-            {area('', caseData.siteShapeOfMouth)}
-            <h3>2. Mouth Opening:</h3>
-            {area('', caseData.mouthOpening)}
-            <h3>3. Jaw movements:</h3>
-            {area('', caseData.jawMovements)}
-
             <h2>Hard Tissue Examination</h2>
             <h3>1. Teeth present:</h3>
             {area('', caseData.teethPresent)}
@@ -352,8 +425,6 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
             <h2>Treatment planning:</h2>
             <h3>Treatment Plan:</h3>
             {area('', caseData.treatmentPlan)}
-            <h3>Prognosis:</h3>
-            {area('', caseData.prognosis)}
             <h3>Follow-up Date:</h3>
             {field('', caseData.followUpDate ? new Date(caseData.followUpDate).toLocaleDateString() : '')}
             <h3>Follow-up Notes:</h3>
@@ -410,7 +481,7 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
                 ['chargeOPGWithoutFilm',    'OPG without film',   'Rs. 200'],
                 ['chargeLateralCephalogram','Lateral Cephalogram','Rs. 300'],
                 ['chargeCBCT',              'CBCT',               'Cost yet to be decided'],
-              ].some(([key]) => caseData[key]) && (
+              ].some(([key]) => caseData[key] > 0) && (
                 <p style={{ margin: '8px 0 4px', fontWeight: 600 }}>X-ray Taken:</p>
               )}
               {[
@@ -421,9 +492,9 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
                 ['chargeOPGWithoutFilm',    'OPG without film',   'Rs. 200'],
                 ['chargeLateralCephalogram','Lateral Cephalogram','Rs. 300'],
                 ['chargeCBCT',              'CBCT',               'Cost yet to be decided'],
-              ].map(([key, label, rate]) => caseData[key] && (
+              ].map(([key, label, rate]) => caseData[key] > 0 && (
                 <p key={key} style={{ margin: '4px 0', marginLeft: 16 }}>
-                  ✓ <strong>{label}</strong> — {rate}
+                  ✓ <strong>{label}</strong> — {rate} (Quantity: {caseData[key]})
                 </p>
               ))}
 
@@ -431,6 +502,22 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
                 <>
                   <h3 style={{ marginTop: 12 }}>Description / Remarks:</h3>
                   {area('', caseData.chargeDescription)}
+                </>
+              )}
+
+              {caseData.clinicalFindingsPictures && caseData.clinicalFindingsPictures.length > 0 && (
+                <>
+                  <h3 style={{ marginTop: 12 }}>Clinical Findings Pictures:</h3>
+                  <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                    {caseData.clinicalFindingsPictures.map((pic, idx) => (
+                      <img 
+                        key={idx}
+                        src={pic} 
+                        alt={`Clinical Findings ${idx + 1}`} 
+                        style={{ maxHeight: '200px', borderRadius: '4px' }} 
+                      />
+                    ))}
+                  </div>
                 </>
               )}
 

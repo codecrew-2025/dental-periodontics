@@ -20,6 +20,7 @@ const CaseSheetPrescription = () => {
   const [selectedPrescription, setSelectedPrescription] = useState(null);
   const [loading, setLoading] = useState(false);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [doctorSignature, setDoctorSignature] = useState(null);
 
   const buildApiUrl = (path) =>
     `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
@@ -58,9 +59,86 @@ const CaseSheetPrescription = () => {
     }
   };
 
-  const viewPrescriptionDetails = (prescription) => {
+  const viewPrescriptionDetails = async (prescription) => {
     setSelectedPrescription(prescription);
     setShowPrescriptionModal(true);
+    setDoctorSignature(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      const patientId = prescription.patientId || patientId;
+      if (!patientId) return;
+
+      const endpoints = [
+        `${API_BASE_URL}/api/oral/patient/${patientId}`,
+        `${API_BASE_URL}/api/casesheets/patient/${patientId}`,
+        `${API_BASE_URL}/api/fpd/patient/${patientId}`,
+        `${API_BASE_URL}/api/partial/patient/${patientId}`,
+        `${API_BASE_URL}/api/complete-denture/patient/${patientId}`,
+        `${API_BASE_URL}/api/implant/patient/${patientId}`,
+        `${API_BASE_URL}/api/implant-patient/patient/${patientId}`
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data && result.data.length > 0) {
+              const latestCase = result.data[result.data.length - 1];
+              const signatureField = latestCase.digitalSignature || latestCase.doctorSignature;
+              
+              if (latestCase._id && signatureField) {
+                const toDataUrl = (s) => {
+                  if (!s) return null;
+                  if (typeof s === 'string') {
+                    if (s.startsWith('data:') || s.startsWith('http')) return s;
+                    if (s.length > 100 && !s.includes(' ')) return `data:image/png;base64,${s}`;
+                    return null;
+                  }
+                  const buf = s.data || s;
+                  const arr = buf?.data || (Array.isArray(buf) ? buf : null);
+                  if (arr && Array.isArray(arr)) {
+                    const bytes = new Uint8Array(arr);
+                    let binary = '';
+                    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                    return `data:${s.contentType || 'image/png'};base64,${btoa(binary)}`;
+                  }
+                  return null;
+                };
+
+                const dataUrl = toDataUrl(signatureField);
+                if (dataUrl) {
+                  setDoctorSignature(dataUrl);
+                  return;
+                }
+                
+                const baseRoute = endpoint.split('/patient/')[0];
+                const signatureUrl = `${baseRoute}/${latestCase._id}/signature`;
+                
+                const signatureResponse = await fetch(signatureUrl, {
+                  headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+
+                if (signatureResponse.ok) {
+                  const blob = await signatureResponse.blob();
+                  const signatureDataUrl = URL.createObjectURL(blob);
+                  setDoctorSignature(signatureDataUrl);
+                  return;
+                }
+              }
+            }
+          }
+        } catch (err) {
+          // ignore error for this endpoint
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching doctor signature:', error);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -618,10 +696,10 @@ const CaseSheetPrescription = () => {
               alignItems: 'flex-end'
             }}>
               <div style={{ textAlign: 'right', fontSize: '11px' }}>
-                {selectedPrescription.doctorSignature && (
+                {(doctorSignature || selectedPrescription.doctorSignature) && (
                   <div style={{ marginBottom: '5px' }}>
                     <img 
-                      src={normalizeXraySrc(selectedPrescription.doctorSignature)} 
+                      src={normalizeXraySrc(doctorSignature || selectedPrescription.doctorSignature)} 
                       alt="Doctor Signature" 
                       style={{ 
                         maxWidth: '150px', 
@@ -638,7 +716,7 @@ const CaseSheetPrescription = () => {
                   minWidth: '180px',
                   marginTop: '5px'
                 }}>
-                  (Signature of {selectedPrescription.doctorName || 'Dr. Parvin'})
+                  (Signature)
                 </div>
               </div>
             </div>

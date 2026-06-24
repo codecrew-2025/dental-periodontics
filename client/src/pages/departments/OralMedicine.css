@@ -106,6 +106,53 @@
   100% { transform: translateX(100vw); }
 }
 
+.critical-alert {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100vw;
+  transform: none;
+  background: #ffffff;
+  color: #111827;
+  padding: 10px 24px;
+  border-radius: 0;
+  box-sizing: border-box;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
+  z-index: 9999;
+  border-bottom: 2px solid #ef4444; /* red border */
+}
+
+.critical-alert .alert-icon {
+  font-size: 18px;
+  color: #dc2626; /* red icon */
+  flex-shrink: 0;
+}
+
+.critical-alert .critical-flow-window {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.critical-alert #criticalMessage {
+  display: inline-block;
+  white-space: nowrap;
+  padding-right: 2rem;
+  color: #b91c1c; /* red text */
+  font-weight: 700;
+  font-size: 0.9rem;
+  animation: allergyTextFlow 10s linear infinite;
+}
+
+.critical-alert .close-btn,
 .allergy-alert .close-btn {
   margin-left: auto;
   background: transparent;

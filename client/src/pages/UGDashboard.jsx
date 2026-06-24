@@ -768,13 +768,13 @@ const UGDashboard = () => {
   const submitRescheduleForBooking = async (bookingId) => {
     const resolvedBookingId = String(bookingId || '').trim();
     if (!resolvedBookingId) return;
-    
+
     // Find the appointment to check its status
     const appointment = myUpcomingAppointments.find(
       (a) => String(a.bookingId || '').trim() === resolvedBookingId
     );
     const appointmentStatus = String(appointment?.status || '').trim().toLowerCase();
-    
+
     // Use calendar-based selection
     const appointmentDate = rescheduleSelectedDate;
     const appointmentTime = String(rescheduleDrafts[resolvedBookingId]?.appointmentTime || '').trim();
@@ -787,7 +787,7 @@ const UGDashboard = () => {
     try {
       setRescheduleSubmittingBookingId(resolvedBookingId);
       const token = localStorage.getItem('token');
-      
+
       let url = buildApiUrl(`/api/appointment/${encodeURIComponent(resolvedBookingId)}/reschedule`);
       let method = 'PUT';
       let body = { appointmentDate, appointmentTime };
@@ -984,7 +984,7 @@ const UGDashboard = () => {
     );
   };
   const handleLogout = () => {
-    logout(); 
+    logout();
   };
 
   const toggleLogoutDropdown = () => {
@@ -1066,9 +1066,9 @@ const UGDashboard = () => {
             const res = await fetch(url, {
               headers: token
                 ? {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                  }
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                }
                 : { 'Content-Type': 'application/json' },
             });
 
@@ -1191,9 +1191,9 @@ const UGDashboard = () => {
         const patientRes = await fetch(buildApiUrl('/api/patient-details'), {
           headers: token
             ? {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              }
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            }
             : { 'Content-Type': 'application/json' },
         });
 
@@ -1312,7 +1312,7 @@ const UGDashboard = () => {
       console.debug('[UGDashboard] /api/casesheets/pg/history response:', { status: res.status, ok: res.ok, json });
       // Debug: log raw rows for troubleshooting department filtering
       try {
-        console.debug('[UGDashboard:DEBUG] raw rows sample:', Array.isArray(json?.data) ? json.data.slice(0,5) : json?.data);
+        console.debug('[UGDashboard:DEBUG] raw rows sample:', Array.isArray(json?.data) ? json.data.slice(0, 5) : json?.data);
       } catch (e) {
         console.debug('[UGDashboard:DEBUG] failed to log rows', e);
       }
@@ -1690,9 +1690,9 @@ const UGDashboard = () => {
     const separator = departmentRoute.includes('?') ? '&' : '?';
     const caseIdParam = ensuredCaseId ? `&caseId=${encodeURIComponent(ensuredCaseId)}` : '';
     const patientRouteUrl = `${departmentRoute}${separator}patientId=${encodeURIComponent(currentPatientId)}&patientName=${encodeURIComponent(currentPatientName || currentPatientId)}&department=${encodeURIComponent(resolvedDepartmentLabel)}${caseIdParam}`;
-    
+
     console.debug('[UGDashboard] openAssignedCaseRoute ->', { currentPatientId, currentPatientName, resolvedDepartmentLabel, departmentRoute, patientRouteUrl });
-    
+
     // If the department is Oral (or any other department that requires consent), route to consent form first
     let finalUrl = patientRouteUrl;
     const isOralDept = normalizedDept.includes('oral');
@@ -1844,10 +1844,10 @@ const UGDashboard = () => {
   const populateFormWithPatientData = (patientData) => {
     const preferredLanguage = patientData.personalInfo?.preferredLanguage || 'Unknown';
     const isOtherLanguage = !['English', 'Hindi', 'Tamil'].includes(preferredLanguage);
-    
+
     const dob = patientData.personalInfo?.dateOfBirth ? new Date(patientData.personalInfo.dateOfBirth).toISOString().split('T')[0] : '';
     const age = dob ? calculateAge(dob) : (patientData.personalInfo?.age || '');
-    
+
     setFormData({
       ...formData,
       firstName: patientData.personalInfo?.firstName || '',
@@ -1912,23 +1912,24 @@ const UGDashboard = () => {
       requiredFields = {};
     } else if (isPublicHealthDentistry) {
       requiredFields = {
-          firstName: 'First Name',
-          dob: 'Date of Birth',
-          gender: 'Gender',
-          diagnosis: 'Diagnosis',
-          treatmentPlan: 'Treatment Plan',
-        };
+        firstName: 'First Name',
+        dob: 'Date of Birth',
+        gender: 'Gender',
+        diagnosis: 'Diagnosis',
+        treatmentPlan: 'Treatment Plan',
+      };
     } else {
       requiredFields = {
-          firstName: 'First Name',
-          lastName: 'Last Name',
-          dob: 'Date of Birth',
-          gender: 'Gender',
-          maritalStatus: 'Marital Status',
-          preferredLanguage: 'Preferred Language',
-          chiefComplaint: 'Chief Complaint',
-          bloodGroup: 'Blood Group',
-        };
+        firstName: 'First Name',
+        lastName: 'Last Name',
+        dob: 'Date of Birth',
+        gender: 'Gender',
+        maritalStatus: 'Marital Status',
+        preferredLanguage: 'Preferred Language',
+        chiefComplaint: 'Chief Complaint',
+        bloodGroup: 'Blood Group',
+        drugAllergies: 'Drug Allergies',
+      };
     }
 
     for (const [field, label] of Object.entries(requiredFields)) {
@@ -2082,7 +2083,7 @@ const UGDashboard = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
+
     if (type === 'checkbox') {
       if (name === 'hpi') {
         if (checked && value === 'None') {
@@ -2090,7 +2091,7 @@ const UGDashboard = () => {
         } else if (!checked && value === 'None') {
           setHpiSelections([]);
         } else if (checked) {
-          setHpiSelections(prev => 
+          setHpiSelections(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -2102,7 +2103,7 @@ const UGDashboard = () => {
         } else if (!checked && value === 'None') {
           setPastMedicalHistory([]);
         } else if (checked) {
-          setPastMedicalHistory(prev => 
+          setPastMedicalHistory(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -2114,7 +2115,7 @@ const UGDashboard = () => {
         } else if (!checked && value === 'None') {
           setPersonalHabits([]);
         } else if (checked) {
-          setPersonalHabits(prev => 
+          setPersonalHabits(prev =>
             prev.includes('None') ? [value] : [...prev, value]
           );
         } else {
@@ -2127,31 +2128,31 @@ const UGDashboard = () => {
           ...prev,
           [name]: value
         };
-        
+
         // Auto-calculate age when DOB changes
         if (name === 'dob') {
           const age = calculateAge(value);
           newData.age = age;
         }
-        
+
         // Handle pregnancy status logic
         if (name === 'gender' || name === 'maritalStatus') {
-          const showPregnancyStatus = (name === 'gender' ? value : newData.gender) === 'Female' && 
-                                    (name === 'maritalStatus' ? value : newData.maritalStatus) === 'Married';
+          const showPregnancyStatus = (name === 'gender' ? value : newData.gender) === 'Female' &&
+            (name === 'maritalStatus' ? value : newData.maritalStatus) === 'Married';
           if (!showPregnancyStatus) {
             // Must be a valid enum value in the backend schema when not applicable
             newData.pregnancyStatus = 'N/A';
           }
         }
-        
+
         // Handle preferred language logic
         if (name === 'preferredLanguage' && value !== 'Other') {
           newData.otherLanguage = '';
         }
-        
+
         return newData;
       });
-      
+
       // Clear field errors when user starts typing
       if (fieldErrors[name]) {
         setFieldErrors(prev => ({
@@ -2236,55 +2237,55 @@ const UGDashboard = () => {
         }
       };
       // Send data to backend
-    const response = await fetch(buildApiUrl('/api/doctor-patient'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(patientData)
-    });
+      const response = await fetch(buildApiUrl('/api/doctor-patient'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(patientData)
+      });
 
-    if (response.status === 401) {
-      await ensureActiveSession(response, 'Token expired');
-      return;
-    }
+      if (response.status === 401) {
+        await ensureActiveSession(response, 'Token expired');
+        return;
+      }
 
-    if (response.ok) {
-      const result = await response.json();
-      const id = result.patientId;
-      const name = result.patientName;
-      localStorage.setItem('CurrentpatientName', name);
-      localStorage.setItem('CurrentpatientId', id);
+      if (response.ok) {
+        const result = await response.json();
+        const id = result.patientId;
+        const name = result.patientName;
+        localStorage.setItem('CurrentpatientName', name);
+        localStorage.setItem('CurrentpatientId', id);
 
-      // For PHD: also persist the case sheet immediately so the table reflects the new status
-      if (isPublicHealthDentistry) {
-        try {
-          await ensurePublicHealthCaseSheetGenerated({ patientId: id, patientName: name });
-        } catch (caseError) {
-          showMessage(`Patient saved, but case sheet generation failed: ${caseError.message}`, 'error');
+        // For PHD: also persist the case sheet immediately so the table reflects the new status
+        if (isPublicHealthDentistry) {
+          try {
+            await ensurePublicHealthCaseSheetGenerated({ patientId: id, patientName: name });
+          } catch (caseError) {
+            showMessage(`Patient saved, but case sheet generation failed: ${caseError.message}`, 'error');
+          }
         }
-      }
 
-      showMessage('Patient details saved successfully!', 'success');
-      // Allow navigation to case files / history only after successful save
-      setCanNavigateCases(true);
-      // Refresh case-sheet status panel for this patient
-      fetchCaseStatuses(id);
-      fetchPgCaseSheetHistory();
+        showMessage('Patient details saved successfully!', 'success');
+        // Allow navigation to case files / history only after successful save
+        setCanNavigateCases(true);
+        // Refresh case-sheet status panel for this patient
+        fetchCaseStatuses(id);
+        fetchPgCaseSheetHistory();
 
-      if (String(formData.uniqueId || '').trim().toLowerCase().startsWith('c')) {
-        openAssignedCaseRoute();
+        if (String(formData.uniqueId || '').trim().toLowerCase().startsWith('c')) {
+          openAssignedCaseRoute();
+        }
+      } else {
+        const error = await response.json();
+        showMessage(`Error saving patient: ${error.message}`, 'error');
       }
-    } else {
-      const error = await response.json();
-      showMessage(`Error saving patient: ${error.message}`, 'error');
+    } catch (error) {
+      showMessage('Error saving patient: ' + error.message, 'error');
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    showMessage('Error saving patient: ' + error.message, 'error');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleNavigation = (url) => {
     // In a real app, you would use React Router
@@ -2319,9 +2320,9 @@ const UGDashboard = () => {
             aria-label={isSideNavOpen ? 'Collapse navigation' : 'Expand navigation'}
             title="Menu"
             onClick={() => setIsSideNavOpen((v) => !v)}
-            >
-              <i className="fas fa-bars"></i>
-            </button>
+          >
+            <i className="fas fa-bars"></i>
+          </button>
 
           <div className="chief-brand">
             <img
@@ -2422,7 +2423,7 @@ const UGDashboard = () => {
                 }}
               >
                 <span className="chief-nav-icon"><i className="fas fa-user-injured"></i></span>
-                  <span>Patient Management</span>
+                <span>Patient Management</span>
               </button>
 
               <button
@@ -2435,8 +2436,8 @@ const UGDashboard = () => {
                 }}
               >
                 <span className="chief-nav-icon"><i className="fas fa-file-medical"></i></span>
-                  <span className="pg-nav-label">
-                    Case Sheet
+                <span className="pg-nav-label">
+                  Case Sheet
                   <span className="pg-nav-alert-dot" data-status={assignedCasesAlertStatus} />
                 </span>
               </button>
@@ -2451,7 +2452,7 @@ const UGDashboard = () => {
                 }}
               >
                 <span className="chief-nav-icon"><i className="fas fa-calendar-check"></i></span>
-                  <span>My Appointments</span>
+                <span>My Appointments</span>
               </button>
 
               <button
@@ -2464,7 +2465,7 @@ const UGDashboard = () => {
                 }}
               >
                 <span className="chief-nav-icon"><i className="fas fa-chart-line"></i></span>
-                  <span>Analytics</span>
+                <span>Analytics</span>
               </button>
             </div>
           </aside>
@@ -2472,33 +2473,33 @@ const UGDashboard = () => {
 
         <main className="chief-main" aria-label="UG content">
           <div className="doctor-dashboard-content">
-              {/* Message boxes */}
-              {message && <div className="error-message">{message}</div>}
-              {successMessage && (
-                <div className="success-message" style={{ position: 'relative', paddingRight: 40 }}>
-                  <button
-                    type="button"
-                    onClick={() => setSuccessMessage('')}
-                    aria-label="Close"
-                    title="Close"
-                    style={{
-                      position: 'absolute',
-                      top: 8,
-                      right: 10,
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      fontSize: 16,
-                      fontWeight: 700,
-                      lineHeight: 1,
-                      color: 'inherit',
-                    }}
-                  >
-                      &times;
-                  </button>
-                  {successMessage}
-                </div>
-              )}
+            {/* Message boxes */}
+            {message && <div className="error-message">{message}</div>}
+            {successMessage && (
+              <div className="success-message" style={{ position: 'relative', paddingRight: 40 }}>
+                <button
+                  type="button"
+                  onClick={() => setSuccessMessage('')}
+                  aria-label="Close"
+                  title="Close"
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 10,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    color: 'inherit',
+                  }}
+                >
+                  &times;
+                </button>
+                {successMessage}
+              </div>
+            )}
 
             {activeView === 'patient' && (
               <div className="doctor-dashboard-content">
@@ -2577,7 +2578,7 @@ const UGDashboard = () => {
                 {/* Form Section */}
                 {showForm && (
                   <div className="patient-form">
-                        <h3>Personal Information</h3>
+                    <h3>Personal Information</h3>
 
                     {/* Name fields */}
                     <div className="form-row">
@@ -2627,18 +2628,18 @@ const UGDashboard = () => {
 
                     {/* Marital Status — not required for PHD */}
                     {!isPublicHealthDentistry && !String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
-                    <div className="input-group">
-                      <label>Marital Status <span style={{ color: 'red' }}>*</span></label>
-                      <div className="radio-options">
-                        {['Single', 'Married', 'Other'].map((status) => (
-                          <label key={status} className="radio-option">
-                            <input type="radio" name="maritalStatus" value={status} checked={formData.maritalStatus === status} onChange={handleInputChange} />
-                            <span>{status}</span>
-                          </label>
-                        ))}
+                      <div className="input-group">
+                        <label>Marital Status <span style={{ color: 'red' }}>*</span></label>
+                        <div className="radio-options">
+                          {['Single', 'Married', 'Other'].map((status) => (
+                            <label key={status} className="radio-option">
+                              <input type="radio" name="maritalStatus" value={status} checked={formData.maritalStatus === status} onChange={handleInputChange} />
+                              <span>{status}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {fieldErrors.maritalStatus && <div className="error-message">{fieldErrors.maritalStatus}</div>}
                       </div>
-                      {fieldErrors.maritalStatus && <div className="error-message">{fieldErrors.maritalStatus}</div>}
-                    </div>
                     )}
 
                     {/* Pregnancy Status */}
@@ -2691,166 +2692,167 @@ const UGDashboard = () => {
 
                     {/* ── Non-PHD: full clinical history ── */}
                     {!isPublicHealthDentistry && !String(formData.uniqueId || '').trim().toLowerCase().startsWith('c') && (
-                    <>
-                    {/* ── VITALS ── */}
-                    <h3>Vitals</h3>
-                    <div className="form-row">
-                      <div className="input-group">
-                        <label>Blood Pressure</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input type="text" name="vitalBP" placeholder="120/80"
-                            value={formData.vitalBP} onChange={handleInputChange} />
-                          <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>mmHg</span>
+                      <>
+                        {/* ── VITALS ── */}
+                        <h3>Vitals</h3>
+                        <div className="form-row">
+                          <div className="input-group">
+                            <label>Blood Pressure</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <input type="text" name="vitalBP" placeholder="120/80"
+                                value={formData.vitalBP} onChange={handleInputChange} />
+                              <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>mmHg</span>
+                            </div>
+                          </div>
+                          <div className="input-group">
+                            <label>Temperature</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <input type="text" name="vitalTemp" placeholder="37.0"
+                                value={formData.vitalTemp} onChange={handleInputChange} />
+                              <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>°C</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="input-group">
-                        <label>Temperature</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input type="text" name="vitalTemp" placeholder="37.0"
-                            value={formData.vitalTemp} onChange={handleInputChange} />
-                          <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>°C</span>
+                        <div className="form-row">
+                          <div className="input-group">
+                            <label>Weight</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <input type="text" name="vitalWeight" placeholder="65"
+                                value={formData.vitalWeight} onChange={handleInputChange} />
+                              <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>kg</span>
+                            </div>
+                          </div>
+                          <div className="input-group">
+                            <label>Height</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <input type="text" name="vitalHeight" placeholder="165"
+                                value={formData.vitalHeight} onChange={handleInputChange} />
+                              <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>cm</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    <div className="form-row">
-                      <div className="input-group">
-                        <label>Weight</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input type="text" name="vitalWeight" placeholder="65"
-                            value={formData.vitalWeight} onChange={handleInputChange} />
-                          <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>kg</span>
+
+
+                        <h3>Additional Information</h3>
+
+                        <div className="form-row">
+                          <div className="input-group">
+                            <label htmlFor="occupation">Occupation</label>
+                            <input type="text" id="occupation" name="occupation" value={formData.occupation} onChange={handleInputChange} placeholder="e.g. Teacher, Engineer" />
+                          </div>
+                          <div className="input-group">
+                            <label htmlFor="income">Income</label>
+                            <input type="text" id="income" name="income" value={formData.income} onChange={handleInputChange} placeholder="e.g. 30,000 / month" />
+                          </div>
                         </div>
-                      </div>
-                      <div className="input-group">
-                        <label>Height</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <input type="text" name="vitalHeight" placeholder="165"
-                            value={formData.vitalHeight} onChange={handleInputChange} />
-                          <span style={{ color: '#6b7280', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>cm</span>
+
+                        <div className="form-row">
+                          <div className="input-group">
+                            <label htmlFor="religion">Religion</label>
+                            <input type="text" id="religion" name="religion" value={formData.religion} onChange={handleInputChange} placeholder="e.g. Hindu, Christian" />
+                          </div>
+                          <div className="input-group">
+                            <label htmlFor="address">Address</label>
+                            <input type="text" id="address" name="address" value={formData.address} onChange={handleInputChange} placeholder="Full address" />
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
+                        {/* Preferred Language */}
+                        <div className="input-group">
+                          <label htmlFor="preferred-language">Preferred Language <span style={{ color: 'red' }}>*</span></label>
+                          <select id="preferred-language" name="preferredLanguage" value={formData.preferredLanguage} onChange={handleInputChange}>
+                            <option value="">Select</option>
+                            <option value="English">English</option>
+                            <option value="Hindi">Hindi</option>
+                            <option value="Tamil">Tamil</option>
+                            <option value="Other">Other</option>
+                          </select>
+                          {fieldErrors.preferredLanguage && <div className="error-message">{fieldErrors.preferredLanguage}</div>}
+                        </div>
 
-                    <h3>Additional Information</h3>
+                        {formData.preferredLanguage === 'Other' && (
+                          <div className="input-group">
+                            <label htmlFor="other-language">Specify Language <span style={{ color: 'red' }}>*</span></label>
+                            <input type="text" id="other-language" name="otherLanguage" value={formData.otherLanguage} onChange={handleInputChange} placeholder="Enter preferred language" />
+                            {fieldErrors.otherLanguage && <div className="error-message">{fieldErrors.otherLanguage}</div>}
+                          </div>
+                        )}
+                        <h3>Patient Case Entry - Chief Complaint &amp; History</h3>
 
-                    <div className="form-row">
-                      <div className="input-group">
-                        <label htmlFor="occupation">Occupation</label>
-                        <input type="text" id="occupation" name="occupation" value={formData.occupation} onChange={handleInputChange} placeholder="e.g. Teacher, Engineer" />
-                      </div>
-                      <div className="input-group">
-                        <label htmlFor="income">Income</label>
-                        <input type="text" id="income" name="income" value={formData.income} onChange={handleInputChange} placeholder="e.g. 30,000 / month" />
-                      </div>
-                    </div>
-
-                    <div className="form-row">
-                      <div className="input-group">
-                        <label htmlFor="religion">Religion</label>
-                        <input type="text" id="religion" name="religion" value={formData.religion} onChange={handleInputChange} placeholder="e.g. Hindu, Christian" />
-                      </div>
-                      <div className="input-group">
-                        <label htmlFor="address">Address</label>
-                        <input type="text" id="address" name="address" value={formData.address} onChange={handleInputChange} placeholder="Full address" />
-                      </div>
-                    </div>
-
-                    {/* Preferred Language */}
-                    <div className="input-group">
-                      <label htmlFor="preferred-language">Preferred Language <span style={{ color: 'red' }}>*</span></label>
-                      <select id="preferred-language" name="preferredLanguage" value={formData.preferredLanguage} onChange={handleInputChange}>
-                        <option value="">Select</option>
-                        <option value="English">English</option>
-                        <option value="Hindi">Hindi</option>
-                        <option value="Tamil">Tamil</option>
-                        <option value="Other">Other</option>
-                      </select>
-                      {fieldErrors.preferredLanguage && <div className="error-message">{fieldErrors.preferredLanguage}</div>}
-                    </div>
-
-                    {formData.preferredLanguage === 'Other' && (
-                      <div className="input-group">
-                        <label htmlFor="other-language">Specify Language <span style={{ color: 'red' }}>*</span></label>
-                        <input type="text" id="other-language" name="otherLanguage" value={formData.otherLanguage} onChange={handleInputChange} placeholder="Enter preferred language" />
-                        {fieldErrors.otherLanguage && <div className="error-message">{fieldErrors.otherLanguage}</div>}
-                      </div>
-                    )}
-                    <h3>Patient Case Entry - Chief Complaint &amp; History</h3>
-
-                    {/* Chief Complaint */}
-                    <div className="input-group">
-                      <label htmlFor="chief-complaint">Chief Complaint <span style={{ color: 'red' }}>*</span></label>
-                      <textarea id="chief-complaint" name="chiefComplaint" rows={2}
-                        value={formData.chiefComplaint} onChange={handleInputChange}
-                        placeholder="Describe the chief complaint..." />
-                      {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
-                    </div>
+                        {/* Chief Complaint */}
+                        <div className="input-group">
+                          <label htmlFor="chief-complaint">Chief Complaint <span style={{ color: 'red' }}>*</span></label>
+                          <textarea id="chief-complaint" name="chiefComplaint" rows={2}
+                            value={formData.chiefComplaint} onChange={handleInputChange}
+                            placeholder="Describe the chief complaint..." />
+                          {fieldErrors.chiefComplaint && <div className="error-message">{fieldErrors.chiefComplaint}</div>}
+                        </div>
 
 
 
-                    {/* Medical History — hidden for Oral Medicine department (captured in the oral case sheet) */}
-                    {!String(ugDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') && (<>
+                        {/* Medical History — hidden for Oral Medicine department (captured in the oral case sheet) */}
+                        {!String(ugDepartmentLabel).toLowerCase().replace(/[\s_]+/g, '').includes('oral') && (<>
 
-                    <div className="input-group">
-                      <h3>Medical history</h3>
-                      <label htmlFor="current-medications">Current Medications</label>
-                      <textarea id="current-medications" name="currentMedications" value={formData.currentMedications} onChange={handleInputChange} rows="2" />
-                    </div>
+                          <div className="input-group">
+                            <h3>Medical history</h3>
+                            <label htmlFor="current-medications">Current Medications</label>
+                            <textarea id="current-medications" name="currentMedications" value={formData.currentMedications} onChange={handleInputChange} rows="2" />
+                          </div>
 
-                    <div className="input-group">
-                      <label htmlFor="known-allergies">Known Allergies (e.g., latex, medications, anesthetics)</label>
-                      <textarea id="known-allergies" name="knownAllergies" value={formData.knownAllergies} onChange={handleInputChange} rows="2" />
-                    </div>
+                          <div className="input-group">
+                            <label htmlFor="known-allergies">Known Allergies (e.g., latex, medications, anesthetics)</label>
+                            <textarea id="known-allergies" name="knownAllergies" value={formData.knownAllergies} onChange={handleInputChange} rows="2" />
+                          </div>
 
-                    <div className="input-group">
-                      <label htmlFor="chronic-conditions">Chronic Conditions (e.g., diabetes, heart disease)</label>
-                      <textarea id="chronic-conditions" name="chronicConditions" value={formData.chronicConditions} onChange={handleInputChange} rows="2" />
-                    </div>
+                          <div className="input-group">
+                            <label htmlFor="chronic-conditions">Chronic Conditions (e.g., diabetes, heart disease)</label>
+                            <textarea id="chronic-conditions" name="chronicConditions" value={formData.chronicConditions} onChange={handleInputChange} rows="2" />
+                          </div>
 
-                    <div className="input-group">
-                      <label htmlFor="past-surgeries">Past Surgeries</label>
-                      <textarea id="past-surgeries" name="pastSurgeries" value={formData.pastSurgeries} onChange={handleInputChange} rows="2" />
-                    </div>
+                          <div className="input-group">
+                            <label htmlFor="past-surgeries">Past Surgeries</label>
+                            <textarea id="past-surgeries" name="pastSurgeries" value={formData.pastSurgeries} onChange={handleInputChange} rows="2" />
+                          </div>
 
-                    <div className="input-group">
-                      <label htmlFor="primary-dental-concerns">Primary Dental Concerns (e.g., pain, sensitivity, bleeding gums)</label>
-                      <textarea id="primary-dental-concerns" name="primaryDentalConcerns" value={formData.primaryDentalConcerns} onChange={handleInputChange} rows="2" />
-                    </div>
+                          <div className="input-group">
+                            <label htmlFor="primary-dental-concerns">Primary Dental Concerns (e.g., pain, sensitivity, bleeding gums)</label>
+                            <textarea id="primary-dental-concerns" name="primaryDentalConcerns" value={formData.primaryDentalConcerns} onChange={handleInputChange} rows="2" />
+                          </div>
 
-                    <div className="input-group">
-                      <label htmlFor="last-dental-visit">Date of Last Dental Visit</label>
-                      <input type="date" id="last-dental-visit" name="lastDentalVisit" value={formData.lastDentalVisit} onChange={handleInputChange} />
-                    </div>
+                          <div className="input-group">
+                            <label htmlFor="last-dental-visit">Date of Last Dental Visit</label>
+                            <input type="date" id="last-dental-visit" name="lastDentalVisit" value={formData.lastDentalVisit} onChange={handleInputChange} />
+                          </div>
 
-                    </>)}
+                        </>)}
 
-                    <h3>Other Information</h3>
-                    <div className="form-grid">
-                      <div className="input-group">
-                        <label htmlFor="blood-group">Blood Group <span style={{ color: 'red' }}>*</span></label>
-                        <select id="blood-group" name="bloodGroup" value={formData.bloodGroup} onChange={handleInputChange}>
-                          <option value="">Select Blood Group</option>
-                          {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((bg) => (
-                            <option key={bg} value={bg}>{bg}</option>
-                          ))}
-                        </select>
-                        {fieldErrors.bloodGroup && <div className="error-message">{fieldErrors.bloodGroup}</div>}
-                      </div>
-                      <div className="input-group">
-                        <label htmlFor="drug-allergies">Drug Allergies</label>
-                        <input type="text" id="drug-allergies" name="drugAllergies" value={formData.drugAllergies} onChange={handleInputChange} placeholder="Specify drug allergies" />
-                      </div>
-                      <div className="input-group">
-                        <label htmlFor="diet-allergies">Diet Allergies</label>
-                        <input type="text" id="diet-allergies" name="dietAllergies" value={formData.dietAllergies} onChange={handleInputChange} placeholder="Specify diet allergies" />
-                      </div>
-                      <div className="input-group">
-                        <label htmlFor="critical-condition">Critical Condition</label>
-                        <input type="text" id="critical-condition" name="criticalCondition" value={formData.criticalCondition} onChange={handleInputChange} placeholder="e.g. Cardiac arrest risk, Severe allergy, Haemophilia..." />
-                      </div>
-                    </div>
-                    </>
+                        <h3>Other Information</h3>
+                        <div className="form-grid">
+                          <div className="input-group">
+                            <label htmlFor="blood-group">Blood Group <span style={{ color: 'red' }}>*</span></label>
+                            <select id="blood-group" name="bloodGroup" value={formData.bloodGroup} onChange={handleInputChange}>
+                              <option value="">Select Blood Group</option>
+                              {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map((bg) => (
+                                <option key={bg} value={bg}>{bg}</option>
+                              ))}
+                            </select>
+                            {fieldErrors.bloodGroup && <div className="error-message">{fieldErrors.bloodGroup}</div>}
+                          </div>
+                          <div className="input-group">
+                            <label htmlFor="drug-allergies">Drug Allergies <span style={{ color: 'red' }}>*</span></label>
+                            <input type="text" id="drug-allergies" name="drugAllergies" value={formData.drugAllergies} onChange={handleInputChange} placeholder="Specify drug allergies" />
+                            {fieldErrors.drugAllergies && <div className="error-message">{fieldErrors.drugAllergies}</div>}
+                          </div>
+                          <div className="input-group">
+                            <label htmlFor="diet-allergies">Diet Allergies</label>
+                            <input type="text" id="diet-allergies" name="dietAllergies" value={formData.dietAllergies} onChange={handleInputChange} placeholder="Specify diet allergies" />
+                          </div>
+                          <div className="input-group">
+                            <label htmlFor="critical-condition">Critical Condition</label>
+                            <input type="text" id="critical-condition" name="criticalCondition" value={formData.criticalCondition} onChange={handleInputChange} placeholder="e.g. Cardiac arrest risk, Severe allergy, Haemophilia..." />
+                          </div>
+                        </div>
+                      </>
                     )}
 
                     {/* Navigation buttons */}
@@ -2889,20 +2891,20 @@ const UGDashboard = () => {
                         </>
                       )}
                       {!ugDepartmentKey.includes('oral') && !(formData.uniqueId || '').toLowerCase().startsWith('c') && (
-                      <button
-                        type="button"
-                        className="case-files-btn"
-                        onClick={() => {
-                          const caseId = String(generalCasePreview?._id || '').trim();
-                          if (caseId) {
-                            window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
-                          } else {
-                            showMessage('No General Case Sheet has been created for this patient.', 'error');
-                          }
-                        }}
-                      >
-                        View Full General Case Sheet
-                      </button>
+                        <button
+                          type="button"
+                          className="case-files-btn"
+                          onClick={() => {
+                            const caseId = String(generalCasePreview?._id || '').trim();
+                            if (caseId) {
+                              window.open(`/case-sheet-view/${encodeURIComponent(caseId)}`, '_blank');
+                            } else {
+                              showMessage('No General Case Sheet has been created for this patient.', 'error');
+                            }
+                          }}
+                        >
+                          View Full General Case Sheet
+                        </button>
                       )}
                     </div>
                   </div>
@@ -3188,7 +3190,7 @@ const UGDashboard = () => {
                           const hasApprovedReschedule = rescheduleReqStatus === 'approved';
                           const isAssignedAppointment = appointmentStatus === 'assigned' || appointmentStatus === 'in_progress';
                           const isPatientRescheduleRequested = appointmentStatus === 'patient_reschedule_requested';
-                          
+
                           // Accept button only shows for truly pending/rescheduled appointments
                           const isAccepted = ['confirmed', 'assigned', 'in_progress'].includes(appointmentStatus);
                           const canApproveAppointment = ['pending', 'rescheduled', 'patient_reschedule_requested'].includes(appointmentStatus);
@@ -3226,12 +3228,12 @@ const UGDashboard = () => {
                               </td>
                               <td style={{ padding: '6px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                                 {appointmentStatus === 'rejected' ? (
-                                  <span style={{ 
-                                    background: '#f56565', 
-                                    color: '#fff', 
-                                    borderRadius: '12px', 
-                                    padding: '4px 10px', 
-                                    fontSize: '12px', 
+                                  <span style={{
+                                    background: '#f56565',
+                                    color: '#fff',
+                                    borderRadius: '12px',
+                                    padding: '4px 10px',
+                                    fontSize: '12px',
                                     fontWeight: 600,
                                     display: 'inline-block'
                                   }}>
@@ -3286,12 +3288,12 @@ const UGDashboard = () => {
 
                                     {/* Show Pending badge for pending appointments */}
                                     {appointmentStatus === 'pending' && !hasPendingReschedule && (
-                                      <span style={{ 
-                                        background: '#ed8936', 
-                                        color: '#fff', 
-                                        borderRadius: '12px', 
-                                        padding: '4px 10px', 
-                                        fontSize: '12px', 
+                                      <span style={{
+                                        background: '#ed8936',
+                                        color: '#fff',
+                                        borderRadius: '12px',
+                                        padding: '4px 10px',
+                                        fontSize: '12px',
                                         fontWeight: 600,
                                         display: 'inline-block'
                                       }}>
@@ -3301,12 +3303,12 @@ const UGDashboard = () => {
 
                                     {/* Show distinct badge for patient reschedule requests */}
                                     {isPatientRescheduleRequested && (
-                                      <span style={{ 
-                                        background: '#d69e2e', 
-                                        color: '#fff', 
-                                        borderRadius: '12px', 
-                                        padding: '4px 10px', 
-                                        fontSize: '12px', 
+                                      <span style={{
+                                        background: '#d69e2e',
+                                        color: '#fff',
+                                        borderRadius: '12px',
+                                        padding: '4px 10px',
+                                        fontSize: '12px',
                                         fontWeight: 600,
                                         display: 'inline-block'
                                       }}>
@@ -3363,10 +3365,10 @@ const UGDashboard = () => {
             {!rescheduleSelectedDate ? (
               <>
                 {/* Calendar View */}
-                <div style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                   marginBottom: '20px',
                   padding: '0 10px'
                 }}>
@@ -3389,19 +3391,19 @@ const UGDashboard = () => {
                   >
                     ‹
                   </button>
-                  
-                  <h4 style={{ 
-                    margin: 0, 
-                    fontSize: '18px', 
+
+                  <h4 style={{
+                    margin: 0,
+                    fontSize: '18px',
                     fontWeight: 'bold',
                     color: 'white'
                   }}>
-                    {new Date(rescheduleCalendarYear, rescheduleCalendarMonth).toLocaleDateString('en-US', { 
-                      month: 'long', 
-                      year: 'numeric' 
+                    {new Date(rescheduleCalendarYear, rescheduleCalendarMonth).toLocaleDateString('en-US', {
+                      month: 'long',
+                      year: 'numeric'
                     })}
                   </h4>
-                  
+
                   <button
                     type="button"
                     onClick={() => navigateRescheduleCalendar('next')}
@@ -3424,9 +3426,9 @@ const UGDashboard = () => {
                 </div>
 
                 {/* Day Headers */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(7, 1fr)', 
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
                   gap: '2px',
                   marginBottom: '10px'
                 }}>
@@ -3444,9 +3446,9 @@ const UGDashboard = () => {
                 </div>
 
                 {/* Calendar Grid */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(7, 1fr)', 
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
                   gap: '2px'
                 }}>
                   {generateRescheduleCalendarDates(rescheduleCalendarMonth, rescheduleCalendarYear).map((dateObj, index) => {
@@ -3460,9 +3462,9 @@ const UGDashboard = () => {
                         style={{
                           padding: '12px 8px',
                           border: '2px solid rgba(255, 255, 255, 0.3)',
-                          backgroundColor: dateObj.isToday 
-                            ? 'rgba(60, 141, 255, 0.5)' 
-                            : dateObj.isCurrentMonth 
+                          backgroundColor: dateObj.isToday
+                            ? 'rgba(60, 141, 255, 0.5)'
+                            : dateObj.isCurrentMonth
                               ? (isSelectable ? 'rgba(60, 141, 255, 0.2)' : 'rgba(107, 114, 128, 0.2)')
                               : 'rgba(0, 0, 0, 0.1)',
                           color: dateObj.isCurrentMonth ? 'white' : 'rgba(255, 255, 255, 0.5)',
@@ -3497,16 +3499,16 @@ const UGDashboard = () => {
                         const isBooked = bookedCount >= maxSlots;
                         const isCurrentSlot = activeRescheduleAppointment?.appointmentTime === timeSlot && activeRescheduleAppointment?.appointmentDate === rescheduleSelectedDate;
                         const selected = String(rescheduleDrafts[activeRescheduleBookingId]?.appointmentTime || '') === timeSlot;
-                        
+
                         return (
                           <button
                             key={timeSlot}
                             type="button"
                             className={`pg-slot-chip ${selected ? 'selected' : ''}`}
                             disabled={isBooked && !isCurrentSlot || bookedSlotsLoadingDate === rescheduleSelectedDate}
-                            onClick={() => updateRescheduleDraft(activeRescheduleBookingId, { 
+                            onClick={() => updateRescheduleDraft(activeRescheduleBookingId, {
                               appointmentDate: rescheduleSelectedDate,
-                              appointmentTime: timeSlot 
+                              appointmentTime: timeSlot
                             })}
                             style={{
                               opacity: isBooked && !isCurrentSlot ? 0.5 : 1,
@@ -3539,7 +3541,7 @@ const UGDashboard = () => {
                   Back to Calendar
                 </button>
               ) : null}
-              
+
               <button
                 type="button"
                 className="view-button"
