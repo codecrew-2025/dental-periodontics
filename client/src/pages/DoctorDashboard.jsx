@@ -1295,10 +1295,10 @@ const DoctorDashboard = () => {
       const patientData = {
         patientId: generatedUserId,
         personalInfo: {
-          firstName: formData.firstName,
-          middleName: formData.middleName,
-          lastName: formData.lastName,
-          dateOfBirth: formData.dob,
+          firstName: String(formData.firstName || '').trim() || 'Unknown',
+          middleName: String(formData.middleName || '').trim(),
+          lastName: String(formData.lastName || '').trim(),
+          dateOfBirth: String(formData.dob || '').trim() || '',
           age: parseInt(formData.age) || 0,
           gender: formData.gender || 'Other',
           maritalStatus: formData.maritalStatus || 'Single',
