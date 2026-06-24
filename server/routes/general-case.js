@@ -526,8 +526,10 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
       }).sort({ appointmentDate: 1, createdAt: -1 });
 
       if (recentAppointment) {
+        const isPgOrUg = requesterRole === 'pg' || requesterRole === 'ug';
         // Update existing appointment
-        recentAppointment.status = 'assigned';
+        recentAppointment.status = isPgOrUg ? 'pending_doctor_approval' : 'assigned';
+        recentAppointment.needsGeneralApproval = isPgOrUg;
         recentAppointment.isProcessed = true;
         recentAppointment.doctorId = specialistDoctorIdStr; // Store as STRING to match query
         recentAppointment.assignedPgUgId = assignedPg.Identity || '';
@@ -556,6 +558,9 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
           });
           const currentTimeStr = formatter.format(new Date());
           
+          const isPgOrUg = requesterRole === 'pg' || requesterRole === 'ug';
+          const newAppointmentStatus = isPgOrUg ? 'pending_doctor_approval' : 'assigned';
+          
           const newAppointment = new Appointment({
             bookingId,
             patientId,
@@ -566,14 +571,16 @@ router.post(['/', '/save'], auth, requireRole(['doctor', 'chief', 'pg', 'ug']), 
             chiefComplaint: chiefComplaint || 'Referral from General Dentistry',
             appointmentDate: todayStr,
             appointmentTime: currentTimeStr,
-            status: 'assigned',
+            status: newAppointmentStatus,
             isProcessed: true,
+            isReferral: true,
             assignedPgUgId: assignedPg.Identity || '',
             assigned_pg_ug_id: assignedPg.Identity || '',
             pgDoctorId: assignedPg.Identity || '',
             supervisingDeptDoctorId: specialistDoctor?.Identity || '',
             supervising_dept_doctor_id: specialistDoctor?.Identity || '',
             deptDoctorId: specialistDoctor?.Identity || '',
+            needsGeneralApproval: isPgOrUg,
           });
           
           await newAppointment.save();

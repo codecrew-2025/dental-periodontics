@@ -879,6 +879,10 @@ router.get("/appointments/patient/:patientId", async (req, res) => {
   try {
     const appointments = await Appointment.find({
       patientId: req.params.patientId,
+      $or: [
+        { isReferral: { $ne: true }, generalDoctorId: null },
+        { isReferral: { $ne: true }, status: { $nin: ["pending_doctor_approval", "assigned", "in_progress", "pg_counter_reschedule_pending_doc", "pg_counter_reschedule_approved_doc"] } }
+      ]
     }).sort({ createdAt: -1 });
 
     const enriched = await attachPatientName(appointments);
@@ -897,7 +901,7 @@ router.get("/my-appointments", auth, requireRole(["doctor", "chief-doctor"]), as
 
     // Compare as ISO date string (YYYY-MM-DD)
     const todayStr = new Date().toISOString().split("T")[0];
-    const excludedStatuses = ["cancelled", "completed", "closed"];
+    const excludedStatuses = ["cancelled", "completed", "closed", "pending_doctor_approval"];
 
     let appointments;
     
@@ -1011,7 +1015,7 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
 
     // Upcoming = today onwards and not terminal states.
     // Use a deny-list so newly introduced intermediate statuses don't disappear from PG/UG views.
-    const excludedStatuses = ['cancelled', 'completed', 'closed'];
+    const excludedStatuses = ['cancelled', 'completed', 'closed', 'pending_doctor_approval'];
     
     if (isSupervisor) {
       // 🔥 FIX: Doctors see appointments for patients assigned to their PG/UG students
@@ -1155,7 +1159,7 @@ router.get("/pg-appointments", auth, requireRole(["doctor", "chief-doctor", "pg"
       
       let appointments;
       
-      const excludedStatuses = ['cancelled', 'completed', 'closed'];
+      const excludedStatuses = ['cancelled', 'completed', 'closed', 'pending_doctor_approval'];
       if (isGeneralDoctor) {
         // General/Oral department PGs see all upcoming active appointments (like general doctors).
         appointments = await Appointment.find({
@@ -1221,7 +1225,7 @@ router.get('/department/:deptKey', auth, requireRole(['doctor','chief-doctor','c
     const keys = Array.from(new Set(matching.flatMap(d => [String(d._id), String(d.Identity || '')].filter(Boolean))));
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const excludedStatuses = ['cancelled', 'completed', 'closed'];
+    const excludedStatuses = ['cancelled', 'completed', 'closed', 'pending_doctor_approval'];
 
     // 1. Fetch all upcoming appointments first
     const futureAppointments = await Appointment.find({

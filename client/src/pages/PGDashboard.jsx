@@ -3124,9 +3124,9 @@ const PGDashboard = ({ brandTitleOverride }) => {
                           const hasApprovedReschedule = rescheduleReqStatus === 'approved';
                           const actionableStatuses = ['pending', 'assigned', 'confirmed', 'in_progress', 'rescheduled'];
                           const isActionable = actionableStatuses.includes(appointmentStatus);
-                          const isAccepted = ['assigned', 'confirmed', 'in_progress'].includes(appointmentStatus);
+                          const isAccepted = ['confirmed', 'in_progress'].includes(appointmentStatus);
                           const isPatientRescheduleRequested = appointmentStatus === 'patient_reschedule_requested';
-                          const canApproveAppointment = ['pending', 'rescheduled', 'patient_reschedule_requested'].includes(appointmentStatus);
+                          const canApproveAppointment = ['pending', 'assigned', 'rescheduled', 'patient_reschedule_requested'].includes(appointmentStatus);
                           const canRescheduleAppointment = !['rejected', 'cancelled', 'completed', 'closed'].includes(appointmentStatus);
 
                           return (

@@ -58,6 +58,7 @@ const appointmentSchema = new mongoose.Schema(
       type: String,
       enum: [
         "pending",
+        "pending_doctor_approval",
         "confirmed",
         "assigned",
         "in_progress",

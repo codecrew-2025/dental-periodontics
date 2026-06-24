@@ -1,6 +1,7 @@
 // server/routes/Auth.js
 import mongoose from 'mongoose';
 import { User } from '../models/User.js';
+import Appointment from '../models/AppoitmentBooked.js';
 import fs from 'fs';
 import generateNextPatientId from '../utils/patientIdGenerator.js';
 import generateRandomPassword from '../utils/passwordGenerator.js';
@@ -1481,6 +1482,25 @@ router.patch('/doctor/assigned-pgs/cases/:caseId/approve', auth, requireRole(['d
     caseItem.approvedAt = new Date();
 
     await caseItem.save();
+
+    // If the case belongs to a patient with a pending referral appointment, update the appointment
+    try {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const pendingAppointments = await Appointment.find({
+        patientId: caseItem.patientId,
+        status: 'pending_doctor_approval',
+        appointmentDate: { $gte: todayStr }
+      });
+
+      for (const appt of pendingAppointments) {
+        appt.status = 'assigned';
+        appt.needsGeneralApproval = false;
+        await appt.save();
+        console.log(`[Auth.js] ✅ Updated appointment ${appt.bookingId} status to 'assigned' following doctor approval.`);
+      }
+    } catch (apptErr) {
+      console.error('[Auth.js] Failed to update pending appointments after doctor approval:', apptErr.message);
+    }
 
     res.json({
       success: true,

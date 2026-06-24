@@ -197,9 +197,10 @@ const MyAppointment = () => {
   const getStatusTag = (status, appointmentDate, appointmentTime) => {
     try {
       const now = new Date();
-      const appointmentDateTime = new Date(`${appointmentDate}T${convertTo24Hour(appointmentTime)}`);
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const apptDate = new Date(`${appointmentDate}T00:00:00`);
 
-      if (now > appointmentDateTime && status !== "cancelled") {
+      if (apptDate < todayStart && status !== "cancelled") {
         return <span className="status-tag status-expired">EXPIRED</span>;
       }
 
@@ -242,8 +243,9 @@ const MyAppointment = () => {
 
   const isFutureAppointment = (date, time) => {
     const now = new Date();
-    const appt = new Date(`${date}T${convertTo24Hour(time)}`);
-    return appt > now;
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const apptDate = new Date(`${date}T00:00:00`);
+    return apptDate >= todayStart;
   };
 
   const renderActionButtons = (a) => {
