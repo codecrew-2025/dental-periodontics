@@ -2,63 +2,58 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+
 import ConsentForm from './models/ConsentForm.js';
 import OralCase from './models/Oral-model.js';
 import GeneralCase from './models/GeneralCase.js';
+import PedodonticsCase from './models/PedodonticsCase.js';
+import PeriodonticsCaseModel from './models/PeriodonticsCaseModel.js';
+import CampPeriodonticsCaseSheet from './models/CampPeriodonticsCaseSheet.js';
+import CaseDraft from './models/CaseDraft.js';
+import ConsentDraft from './models/ConsentDraft.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 dotenv.config({ path: join(__dirname, '.env') });
 
-const MONGODB_URI = process.env.MONGODB_URI;
+const MONGO_URI = process.env.MONGO_URI || process.env.MONGODB_URI;
 
-if (!MONGODB_URI) {
-  console.error("ERROR: MONGODB_URI is not set in .env");
+if (!MONGO_URI) {
+  console.error("ERROR: MONGO_URI is not set in .env");
   process.exit(1);
 }
 
 const runCleanup = async () => {
   try {
     console.log("Connecting to MongoDB...");
-    await mongoose.connect(MONGODB_URI, {
+    await mongoose.connect(MONGO_URI, {
       serverSelectionTimeoutMS: 15000,
     });
     console.log("✅ Connected to MongoDB.");
 
-    console.log("\nStarting Cleanup Process...");
-    console.log("Prioritizing removal of large base64 videos and images to free up 512MB quota...");
+    console.log("\nStarting Deep Cleanup Process...");
+    console.log("Deleting all case sheets and consent forms. Users and Patient Details will be kept intact.");
 
-    // 1. Unset videoConsentData and signatureImage from ConsentForm
-    const consentResult = await ConsentForm.updateMany(
-      {},
-      { $unset: { videoConsentData: 1, signatureImage: 1 } }
-    );
-    console.log(`🧹 Cleared video/images from ${consentResult.modifiedCount} ConsentForm documents.`);
+    const modelsToDelete = [
+      { name: 'ConsentForm', model: ConsentForm },
+      { name: 'OralCase', model: OralCase },
+      { name: 'GeneralCase', model: GeneralCase },
+      { name: 'PedodonticsCase', model: PedodonticsCase },
+      { name: 'PeriodonticsCase', model: PeriodonticsCaseModel },
+      { name: 'CampPeriodonticsCaseSheet', model: CampPeriodonticsCaseSheet },
+      { name: 'CaseDraft', model: CaseDraft },
+      { name: 'ConsentDraft', model: ConsentDraft }
+    ];
 
-    // 2. Unset large fields from OralCase
-    const oralResult = await OralCase.updateMany(
-      {},
-      { $unset: { digitalSignature: 1 } }
-    );
-    console.log(`🧹 Cleared digital signatures from ${oralResult.modifiedCount} OralCase documents.`);
+    for (const { name, model } of modelsToDelete) {
+      if (model) {
+        const result = await model.deleteMany({});
+        console.log(`🗑️ Deleted ${result.deletedCount} documents from ${name}.`);
+      }
+    }
 
-    // 3. Unset large fields from GeneralCase
-    const generalResult = await GeneralCase.updateMany(
-      {},
-      { $unset: { xrayImage: 1, digitalSignature: 1, doctorSignature: 1, pgSignature: 1 } }
-    );
-    console.log(`🧹 Cleared x-rays and signatures from ${generalResult.modifiedCount} GeneralCase documents.`);
-
-    // OPTIONAL: Delete really old consent forms completely (e.g. older than 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const deleteConsentResult = await ConsentForm.deleteMany({
-      createdAt: { $lt: thirtyDaysAgo }
-    });
-    console.log(`🗑️ Completely deleted ${deleteConsentResult.deletedCount} ConsentForm documents older than 30 days.`);
-
-    console.log("\n✅ Cleanup completed successfully! Your MongoDB Atlas cluster should now have space.");
+    console.log("\n✅ MongoDB Deep Cleanup completed successfully! All case sheets have been deleted. You now have plenty of space!");
   } catch (error) {
     console.error("❌ Cleanup failed:", error);
   } finally {
