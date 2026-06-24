@@ -3184,7 +3184,7 @@ const UGDashboard = () => {
                           const isSubmitting = bookingId && rescheduleSubmittingBookingId === bookingId;
                           const appointmentStatus = String(appointment?.status || '').trim().toLowerCase();
                           const rescheduleReqStatus = String(appointment?.rescheduleRequest?.requestStatus || 'none').trim().toLowerCase();
-                          const hasPendingReschedule = rescheduleReqStatus === 'pending';
+                          const hasPendingReschedule = rescheduleReqStatus === 'pending' && Boolean(appointment?.rescheduleRequest?.proposedDate || appointment?.rescheduleRequest?.initiatorRole);
                           const hasApprovedReschedule = rescheduleReqStatus === 'approved';
                           const isAssignedAppointment = appointmentStatus === 'assigned' || appointmentStatus === 'in_progress';
                           const isPatientRescheduleRequested = appointmentStatus === 'patient_reschedule_requested';
