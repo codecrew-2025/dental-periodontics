@@ -2281,23 +2281,25 @@ router.put("/:bookingId/approve", auth, requireRole(["pg", "ug", "doctor", "chie
     }
 
     // Ensure the doctor doesn't already have a conflicting appointment at the same slot
-    const conflict = await Appointment.findOne({
-      bookingId: { $ne: appointment.bookingId },
-      doctorId: { $in: actingDoctorKeys },
-      appointmentDate: appointment.appointmentDate,
-      appointmentTime: appointment.appointmentTime,
-      status: { $ne: "cancelled" },
-    });
-
-    if (conflict) {
-      return res.status(409).json({
-        success: false,
-        message: "You already have an appointment in this time slot.",
+    if (!isPgRequester) {
+      const conflict = await Appointment.findOne({
+        bookingId: { $ne: appointment.bookingId },
+        doctorId: { $in: actingDoctorKeys },
+        appointmentDate: appointment.appointmentDate,
+        appointmentTime: appointment.appointmentTime,
+        status: { $ne: "cancelled" },
       });
+
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: "You already have an appointment in this time slot.",
+        });
+      }
     }
 
     const previousStatus = String(appointment.status || '').trim().toLowerCase();
-    appointment.status = isPgRequester && previousStatus === "assigned" ? "in_progress" : "confirmed";
+    appointment.status = isPgRequester ? "in_progress" : "confirmed";
     
     if (appointment.needsGeneralApproval && isGeneralDoctor) {
       appointment.needsGeneralApproval = false;

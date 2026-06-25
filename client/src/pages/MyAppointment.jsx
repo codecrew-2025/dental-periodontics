@@ -222,6 +222,7 @@ const MyAppointment = () => {
             </span>
           );
         case "assigned":
+        case "in_progress":
           return <span className="status-tag status-assigned">ACCEPTED</span>;
         default:
           return <span className="status-tag status-waiting">WAITING FOR CONFIRMATION</span>;

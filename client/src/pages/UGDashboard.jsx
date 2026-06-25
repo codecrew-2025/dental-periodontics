@@ -3191,9 +3191,9 @@ const UGDashboard = () => {
                           const isAssignedAppointment = appointmentStatus === 'assigned' || appointmentStatus === 'in_progress';
                           const isPatientRescheduleRequested = appointmentStatus === 'patient_reschedule_requested';
 
-                          // Accept button only shows for truly pending/rescheduled appointments
-                          const isAccepted = ['confirmed', 'assigned', 'in_progress'].includes(appointmentStatus);
-                          const canApproveAppointment = ['pending', 'rescheduled', 'patient_reschedule_requested'].includes(appointmentStatus);
+                          // Accept button only shows for truly pending/rescheduled/assigned appointments
+                          const isAccepted = ['confirmed', 'in_progress'].includes(appointmentStatus);
+                          const canApproveAppointment = ['pending', 'assigned', 'rescheduled', 'patient_reschedule_requested'].includes(appointmentStatus);
                           const canRescheduleAppointment = !['rejected', 'cancelled', 'completed', 'closed'].includes(appointmentStatus);
 
                           return (
@@ -3241,29 +3241,24 @@ const UGDashboard = () => {
                                   </span>
                                 ) : (
                                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-                                    {/* Show green Accepted badge if already confirmed */}
-                                    {isAccepted && (
+                                    {isAccepted ? (
                                       <span style={{
-                                        background: '#276749',
+                                        background: '#2f855a',
                                         color: '#fff',
                                         borderRadius: '12px',
-                                        padding: '4px 10px',
-                                        fontSize: '12px',
+                                        padding: '6px 12px',
+                                        fontSize: '0.8em',
                                         fontWeight: 600,
-                                        display: 'inline-block',
+                                        display: 'inline-block'
                                       }}>
                                         ✓ Accepted
                                       </span>
-                                    )}
-
-                                    {/* Show Accept button only for pending/rescheduled/patient_reschedule_requested */}
-                                    {canApproveAppointment && (
+                                    ) : canApproveAppointment ? (
                                       <button
                                         type="button"
                                         className="view-button"
                                         onClick={() => {
                                           if (isPatientRescheduleRequested) {
-                                            // Handle patient reschedule request directly here
                                             acceptPatientRescheduleRequest(appointment);
                                           } else {
                                             approveAppointment(appointment);
@@ -3284,31 +3279,16 @@ const UGDashboard = () => {
                                       >
                                         Accept
                                       </button>
-                                    )}
-
-                                    {/* Show Pending badge for pending appointments */}
-                                    {appointmentStatus === 'pending' && !hasPendingReschedule && (
-                                      <span style={{
-                                        background: '#ed8936',
-                                        color: '#fff',
-                                        borderRadius: '12px',
-                                        padding: '4px 10px',
-                                        fontSize: '12px',
-                                        fontWeight: 600,
-                                        display: 'inline-block'
-                                      }}>
-                                        Pending
-                                      </span>
-                                    )}
+                                    ) : null}
 
                                     {/* Show distinct badge for patient reschedule requests */}
                                     {isPatientRescheduleRequested && (
-                                      <span style={{
-                                        background: '#d69e2e',
-                                        color: '#fff',
-                                        borderRadius: '12px',
-                                        padding: '4px 10px',
-                                        fontSize: '12px',
+                                      <span style={{ 
+                                        background: '#d69e2e', 
+                                        color: '#fff', 
+                                        borderRadius: '12px', 
+                                        padding: '4px 10px', 
+                                        fontSize: '12px', 
                                         fontWeight: 600,
                                         display: 'inline-block'
                                       }}>
@@ -3316,7 +3296,6 @@ const UGDashboard = () => {
                                       </span>
                                     )}
 
-                                    {/* Reschedule button */}
                                     <button
                                       type="button"
                                       className="view-button"
@@ -3337,6 +3316,20 @@ const UGDashboard = () => {
                                     >
                                       {hasPendingReschedule ? 'Reschedule Pending' : 'Reschedule'}
                                     </button>
+
+                                    {!['confirmed', 'assigned', 'in_progress', 'rescheduled'].includes(appointmentStatus) && appointmentStatus !== 'pending' && !hasPendingReschedule && (
+                                      <span style={{
+                                        background: '#ed8936',
+                                        color: '#fff',
+                                        borderRadius: '12px',
+                                        padding: '4px 10px',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        display: 'inline-block'
+                                      }}>
+                                        {appointmentStatus === 'rescheduled' ? 'Rescheduled' : 'Pending'}
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                               </td>

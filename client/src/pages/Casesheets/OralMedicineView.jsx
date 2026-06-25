@@ -167,16 +167,7 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
         {/* ── Page 1: Patient Information & History ── */}
         {currentPage === 0 && (
           <div className="page active">
-            {caseData.clinicalPhotographs && caseData.clinicalPhotographs.length > 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                <h3>Clinical Photographs:</h3>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {caseData.clinicalPhotographs.map((photo, i) => (
-                    <img key={i} src={normalizeXraySrc(photo)} alt={`Clinical photo ${i+1}`} style={{ width: '150px', height: '150px', objectFit: 'cover', borderRadius: '6px' }} />
-                  ))}
-                </div>
-              </div>
-            )}
+
             <div className="form-row-wide">
               {field('CASE SHEET:', caseData.caseSheetNumber)}
               {field('DATE:', caseData.date ? new Date(caseData.date).toLocaleDateString() : '')}

@@ -742,36 +742,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
     reader.readAsDataURL(file);
   };
 
-  const handleClinicalPhotoUpload = (e) => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
-    const maxSize = 5 * 1024 * 1024;
-    const validFiles = files.filter(f => f.size <= maxSize);
-    if (validFiles.length < files.length) {
-      showToast('Some files exceed the 5MB limit.', 'error');
-    }
 
-    Promise.all(validFiles.map(file => new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => resolve(ev.target.result);
-      reader.readAsDataURL(file);
-    }))).then(dataUrls => {
-      setForm(prev => ({
-        ...prev,
-        clinicalPhotographs: [...(prev.clinicalPhotographs || []), ...dataUrls]
-      }));
-      showToast('Clinical photographs added successfully!', 'success');
-    });
-    e.target.value = ''; // Reset input
-  };
-
-  const removeClinicalPhoto = (index) => {
-    setForm(prev => {
-      const photos = [...(prev.clinicalPhotographs || [])];
-      photos.splice(index, 1);
-      return { ...prev, clinicalPhotographs: photos };
-    });
-  };
 
   /* ── PAGE 0 — Patient Info & History (PDF Page 1) ── */
   const renderPage0 = () => (
@@ -792,26 +763,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
         )}
       </div>
 
-      <div style={{ background: 'rgba(255,255,255,0.05)', padding: '16px', borderRadius: '8px', marginBottom: '16px', border: '1px solid rgba(165,180,252,0.3)' }}>
-        <h3 style={{ margin: '0 0 12px', fontSize: '1rem', color: '#a5b4fc' }}>Upload Clinical Photographs (Oral Medicine Only)</h3>
-        <input 
-          type="file" 
-          accept="image/*" 
-          multiple
-          onChange={handleClinicalPhotoUpload} 
-          style={{ display: 'block', color: '#fff', marginBottom: '12px' }} 
-        />
-        {form.clinicalPhotographs && form.clinicalPhotographs.length > 0 && (
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {form.clinicalPhotographs.map((photo, i) => (
-              <div key={i} style={{ position: 'relative' }}>
-                <img src={photo} alt={`Clinical photo ${i+1}`} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '4px' }} />
-                <button type="button" onClick={() => removeClinicalPhoto(i)} style={{ position: 'absolute', top: '-6px', right: '-6px', background: 'red', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', lineHeight: '18px', padding: 0 }}>&times;</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+
       <h2 className="omr-sheet-title" style={{ marginTop: 8 }}>ORAL MEDICINE AND RADIOLOGY</h2>
       {sectionTitle('CHIEF COMPLAINT:', true)}
       {ta('chiefComplaint', 4, true)}
