@@ -1185,7 +1185,7 @@ const OralMedicine = ({ initialCaseData, readOnly = false }) => {
         <div className="critical-alert no-print" id="patientCriticalAlert" style={{ top: 0 }}>
           <span className="alert-icon">⚠️</span>
           <div className="critical-flow-window">
-            <span id="criticalMessage">{formatAllergyTicker(`Critical Condition: ${criticalCondition}`)}</span>
+            <span id="criticalMessage">{`Critical Condition: ${criticalCondition}`}</span>
           </div>
           <button onClick={() => setShowCritical(false)} className="close-btn" aria-label="Dismiss" style={{ zIndex: 100000 }}>×</button>
         </div>

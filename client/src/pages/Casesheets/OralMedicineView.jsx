@@ -135,7 +135,7 @@ const OralMedicineView = ({ caseData: propCaseData }) => {
         <div className="critical-alert no-print" id="patientCriticalAlert" style={{ top: 0 }}>
           <span className="alert-icon">⚠️</span>
           <div className="critical-flow-window">
-            <span id="criticalMessage">{formatAllergyTicker(criticalMessage)}</span>
+            <span id="criticalMessage">{criticalMessage}</span>
           </div>
           <button onClick={() => setShowCritical(false)} className="close-btn" aria-label="Dismiss" style={{ zIndex: 100000 }}>×</button>
         </div>
