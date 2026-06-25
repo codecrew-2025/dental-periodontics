@@ -759,15 +759,6 @@ const PrescriptionView = () => {
             </div>
           </div>
 
-          {/* Doctor Info */}
-          <div style={{ marginBottom: '12px', borderBottom: '1px solid #ccc', paddingBottom: '8px' }}>
-            <h3 style={{ margin: '0 0 4px 0', fontSize: '15px' }}>
-              BDS, MDS (Periodontics)
-            </h3>
-            <p style={{ margin: '0', fontSize: '10px' }}>
-              Reg No: {prescription.doctorId || 'DCI/93030'}
-            </p>
-          </div>
 
           {/* Patient Info */}
           <div style={{ 
